@@ -1,0 +1,25 @@
+{
+  "name": "@workspace/discord-bot",
+  "version": "1.0.0",
+  "description": "Discord Bot with 22 slash commands",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@discordjs/voice": "^0.19.2",
+    "@google/generative-ai": "^0.24.1",
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "google-auth-library": "^9.10.0",
+    "googleapis": "^173.0.0",
+    "node-fetch": "^2.7.0",
+    "opencv-wasm": "^4.3.0-10",
+    "play-dl": "^1.9.7",
+    "sharp": "^0.34.5",
+    "tesseract.js": "^7.0.0"
+  }
+}
