@@ -210,7 +210,7 @@ class ModerationListener {
           `⚠️ تم حذف رسالتك لأنها تحتوي على رابط مريب: ${domain}`
         );
       } catch (err) {
-        console.error('❌ ما تقدرتش تبعت DM:', err.message);
+        console.error('❌ ما تقدرتش أبعت DM:', err.message);
       }
     } catch (err) {
       throw new ModerationError(
@@ -294,9 +294,3 @@ class ModerationListener {
 }
 
 export default ModerationListener;
-export class ModerationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ModerationError';
-  }
-}
