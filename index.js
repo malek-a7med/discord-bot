@@ -168,6 +168,10 @@ const LEGACY_COMMANDS = [
       o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000)
     ),
   new SlashCommandBuilder()
+    .setName("مسح-الكل")
+    .setDescription("مسح كل رسايل الروم بالكامل [إدارة] / Wipe entire channel")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder()
     .setName("تحذير")
     .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
@@ -1034,6 +1038,25 @@ client.on("interactionCreate", async (interaction) => {
           if (deleted.size < batch) break;
         }
         return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
+      }
+
+      if (cmd === "مسح-الكل") {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const cloned = await channel.clone({ reason: `مسح-الكل بواسطة ${user.tag}` });
+          await cloned.setPosition(channel.position);
+          await channel.delete(`مسح-الكل بواسطة ${user.tag}`);
+          await cloned.send({ embeds: [
+            new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setDescription(`🧹 تم مسح الروم بالكامل بواسطة ${user} ✅`)
+              .setTimestamp()
+          ]});
+        } catch (err) {
+          logger.error("خطأ في مسح-الكل:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        }
+        return;
       }
 
       if (cmd === "تحذير") {
