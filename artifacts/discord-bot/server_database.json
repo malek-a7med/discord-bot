@@ -1,0 +1,108 @@
+{
+  "users": {
+    "954816748140503090": {
+      "xp": 360,
+      "level": 2,
+      "coins": 140,
+      "lastDaily": 1780602154196
+    },
+    "1448840687763325018": {
+      "xp": 705,
+      "level": 3,
+      "coins": 0,
+      "lastDaily": null
+    },
+    "1173757411857809458": {
+      "xp": 15,
+      "level": 0,
+      "coins": 0,
+      "lastDaily": null
+    },
+    "844490366614110218": {
+      "xp": 150,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null
+    },
+    "1474551986413109298": {
+      "xp": 155,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null
+    },
+    "642257294628880395": {
+      "xp": 5,
+      "level": 0,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": []
+    },
+    "594250288282730551": {
+      "xp": 20,
+      "level": 0,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": []
+    },
+    "1431030814442782770": {
+      "xp": 470,
+      "level": 3,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": [
+        {
+          "duration": 3600000,
+          "reason": "غير محدد",
+          "timestamp": 1781535377158
+        }
+      ]
+    },
+    "1223215033400430643": {
+      "xp": 100,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": []
+    },
+    "1287488619111780607": {
+      "xp": 170,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": []
+    },
+    "1226686919447154782": {
+      "xp": 50,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": []
+    },
+    "1479827771730428084": {
+      "xp": 10,
+      "level": 0,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": []
+    },
+    "1113110787792326756": {
+      "xp": 5,
+      "level": 0,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": []
+    }
+  },
+  "manhwa": {},
+  "warnings": {},
+  "welcome": {},
+  "suggestions": {}
+}
