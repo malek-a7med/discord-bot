@@ -1041,22 +1041,26 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "مسح-الكل") {
-        await interaction.deferReply({ ephemeral: true });
-        try {
-          const cloned = await channel.clone({ reason: `مسح-الكل بواسطة ${user.tag}` });
-          await cloned.setPosition(channel.position);
-          await channel.delete(`مسح-الكل بواسطة ${user.tag}`);
-          await cloned.send({ embeds: [
+        const confirmRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`wipe_confirm|${channel.id}`)
+            .setLabel("✅ نعم، امسح كل حاجة")
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId("wipe_cancel")
+            .setLabel("❌ إلغاء")
+            .setStyle(ButtonStyle.Secondary)
+        );
+        return interaction.reply({
+          embeds: [
             new EmbedBuilder()
               .setColor(0xe74c3c)
-              .setDescription(`🧹 تم مسح الروم بالكامل بواسطة ${user} ✅`)
-              .setTimestamp()
-          ]});
-        } catch (err) {
-          logger.error("خطأ في مسح-الكل:", err);
-          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
-        }
-        return;
+              .setTitle("⚠️ تأكيد مسح الروم بالكامل")
+              .setDescription(`هتمسح **كل** رسايل الروم ${channel} بما فيها اللي فوق 14 يوم!\n\nمتقدرش ترجعها، متأكد؟`)
+          ],
+          components: [confirmRow],
+          ephemeral: true
+        });
       }
 
       if (cmd === "تحذير") {
@@ -1238,6 +1242,39 @@ client.on("interactionCreate", async (interaction) => {
           )
         );
         return await interaction.showModal(modal);
+      }
+
+      if (interaction.customId === "wipe_cancel") {
+        return interaction.update({
+          embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription("✅ تم إلغاء عملية المسح")],
+          components: []
+        });
+      }
+
+      if (interaction.customId.startsWith("wipe_confirm|")) {
+        const targetChannelId = interaction.customId.split("|")[1];
+        const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
+        if (!targetChannel) {
+          return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription("❌ مش لاقي الروم!")], components: [] });
+        }
+        await interaction.update({
+          embeds: [new EmbedBuilder().setColor(0xf39c12).setDescription("⏳ جاري المسح...")],
+          components: []
+        });
+        try {
+          const cloned = await targetChannel.clone({ reason: `مسح-الكل بواسطة ${interaction.user.tag}` });
+          await cloned.setPosition(targetChannel.position);
+          await targetChannel.delete(`مسح-الكل بواسطة ${interaction.user.tag}`);
+          await cloned.send({ embeds: [
+            new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setDescription(`🧹 تم مسح الروم بالكامل بواسطة ${interaction.user} ✅`)
+              .setTimestamp()
+          ]});
+        } catch (err) {
+          logger.error("خطأ في wipe_confirm:", err);
+        }
+        return;
       }
 
       if (interaction.customId === "admin_clear_games") {
