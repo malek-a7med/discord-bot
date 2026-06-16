@@ -5,8 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+    "start": "node index.js"
+  }"
   },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
