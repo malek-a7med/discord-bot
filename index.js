@@ -165,7 +165,7 @@ const LEGACY_COMMANDS = [
     .setDescription("مسح رسائل من الشات [مشرف] / Clear messages")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addIntegerOption((o) =>
-      o.setName("عدد").setDescription("عدد الرسائل (1-100)").setRequired(true).setMinValue(1).setMaxValue(100)
+      o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000)
     ),
   new SlashCommandBuilder()
     .setName("تحذير")
@@ -1023,8 +1023,17 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "مسح") {
         const num = interaction.options.getInteger("عدد");
-        await channel.bulkDelete(num, true);
-        return interaction.reply({ content: `🧹 تم تنظيف الروم ومسح **${num}** رسالة!`, ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
+        let remaining = num;
+        let totalDeleted = 0;
+        while (remaining > 0) {
+          const batch = Math.min(remaining, 100);
+          const deleted = await channel.bulkDelete(batch, true);
+          totalDeleted += deleted.size;
+          remaining -= batch;
+          if (deleted.size < batch) break;
+        }
+        return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
       }
 
       if (cmd === "تحذير") {
