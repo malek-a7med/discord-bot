@@ -1380,3 +1380,5 @@ process.on("uncaughtException", (err) => {
 process.on("uncaughtExceptionMonitor", (err) => {
   console.error("⚠️ [Anti-Crash] uncaughtExceptionMonitor:", err.message);
 });
+
+client.login(process.env.DISCORD_TOKEN);
