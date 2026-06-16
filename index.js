@@ -9,7 +9,7 @@
 //     6. Express server يستخدم process.env.PORT
 // ═══════════════════════════════════════════════════════════════
 import dotenv from "dotenv";
-dotenv.config({ path: "../../.env" });
+dotenv.config();
 
 // ───────────────────────────────────────────────────────────────
 //  Advanced Features Imports
