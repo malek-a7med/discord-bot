@@ -958,6 +958,39 @@ const MAX_USER_HIST    = 10;
 const userLastRequest  = new Map(); // cooldown: آخر طلب لكل يوزر
 const USER_COOLDOWN_MS = 15_000;   // 15 ثانية بين كل طلب وتاني
 
+// ── نظام حماية من الـ Spam ────────────────────────────────────
+const SPAM_WINDOW_MS  = 60_000;  // نافذة 60 ثانية
+const SPAM_MAX_MSGS   = 4;       // أقصى 4 رسايل في الدقيقة
+const SPAM_BLOCK_MS   = 5 * 60_000; // بلوك 5 دقايق بعد التجاوز
+const spamData = new Map(); // userId → { timestamps: [], blockedUntil: 0, warned: false }
+
+function getSpamEntry(userId) {
+  if (!spamData.has(userId)) spamData.set(userId, { timestamps: [], blockedUntil: 0, warned: false });
+  return spamData.get(userId);
+}
+
+// بيرجع null لو تمام، أو رسالة الخطأ المناسبة
+function checkSpam(userId, now) {
+  const s = getSpamEntry(userId);
+  // لو في بلوك فعّال
+  if (s.blockedUntil > now) {
+    const mins = Math.ceil((s.blockedUntil - now) / 60_000);
+    return `🚫 اتبلوكت لمدة ${mins} دقيقة بسبب الإزعاج — اهدى!`;
+  }
+  // نظّف الـ timestamps القديمة (خارج النافذة)
+  s.timestamps = s.timestamps.filter(t => now - t < SPAM_WINDOW_MS);
+  // لو وصل الحد
+  if (s.timestamps.length >= SPAM_MAX_MSGS) {
+    s.blockedUntil = now + SPAM_BLOCK_MS;
+    s.warned = false;
+    s.timestamps = [];
+    return `🚫 بعتلي ${SPAM_MAX_MSGS} رسايل في دقيقة — اتبلوكت 5 دقايق. استحى 😤`;
+  }
+  // أضف الطلب الحالي
+  s.timestamps.push(now);
+  return null;
+}
+
 function getUserHistory(userId) {
   if (!userChatHistory.has(userId)) userChatHistory.set(userId, []);
   return userChatHistory.get(userId);
@@ -1088,15 +1121,24 @@ client.on("messageCreate", async (msg) => {
   const question = msg.content.replace(/<@!?\d+>/g, "").trim();
   if (!question || !_geminiReady) return;
 
-  // ── cooldown: 60 ثانية بين كل طلب وتاني لنفس اليوزر ──────────
-  const now      = Date.now();
-  const lastReq  = userLastRequest.get(msg.author.id) || 0;
-  const elapsed  = now - lastReq;
-  if (elapsed < USER_COOLDOWN_MS) {
-    const remaining = Math.ceil((USER_COOLDOWN_MS - elapsed) / 1000);
-    return msg.reply(`⏳ استنى ${remaining} ثانية قبل ما تكلمني تاني!`).catch(() => {});
+  const now = Date.now();
+
+  // ── حماية Spam (الأونر معفي) ─────────────────────────────────
+  if (!isOwner) {
+    const spamErr = checkSpam(msg.author.id, now);
+    if (spamErr) return msg.reply(spamErr).catch(() => {});
   }
-  userLastRequest.set(msg.author.id, now);
+
+  // ── cooldown: 15 ثانية بين كل طلب وتاني (الأونر معفي) ────────
+  if (!isOwner) {
+    const lastReq = userLastRequest.get(msg.author.id) || 0;
+    const elapsed = now - lastReq;
+    if (elapsed < USER_COOLDOWN_MS) {
+      const remaining = Math.ceil((USER_COOLDOWN_MS - elapsed) / 1000);
+      return msg.reply(`⏳ استنى ${remaining} ثانية قبل ما تكلمني تاني!`).catch(() => {});
+    }
+    userLastRequest.set(msg.author.id, now);
+  }
 
   if (isOwner) {
     return handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
