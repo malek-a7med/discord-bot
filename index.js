@@ -1263,7 +1263,8 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (isOwner) {
-    return handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
+    handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel);
+    return;
   }
 
   try {
