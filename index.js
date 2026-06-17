@@ -249,6 +249,13 @@ const LEGACY_COMMANDS = [
     .setName("نسخة-احتياطية")
     .setDescription("تحميل نسخة احتياطية من بيانات السيرفر [إدارة] / Download server database backup")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder()
+    .setName("استرجاع")
+    .setDescription("استرجاع بيانات السيرفر من نسخة احتياطية [إدارة] / Restore database from backup")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addAttachmentOption((o) =>
+      o.setName("ملف").setDescription("ملف الـ JSON اللي حملته من أمر نسخة-احتياطية").setRequired(true)
+    ),
 ];
 
 // Advanced Feature Commands
@@ -1205,6 +1212,49 @@ client.on("interactionCreate", async (interaction) => {
           });
         } catch (err) {
           logger.error("خطأ في النسخة الاحتياطية:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        }
+      }
+
+      if (cmd === "استرجاع") {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const attachment = interaction.options.getAttachment("ملف");
+          if (!attachment.name.endsWith(".json")) {
+            return interaction.editReply({ content: "❌ الملف لازم يكون `.json` — ارفع الملف اللي حملته من أمر `/نسخة-احتياطية`" });
+          }
+          const response = await fetch(attachment.url);
+          const text = await response.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            return interaction.editReply({ content: "❌ الملف تالف أو مش JSON صح!" });
+          }
+          if (!parsed.users) {
+            return interaction.editReply({ content: "❌ الملف ده مش نسخة احتياطية صحيحة — مفيش بيانات أعضاء فيه!" });
+          }
+          const oldCount = Object.keys(db.getAllData().users || {}).length;
+          db.data = parsed;
+          db.save();
+          const newCount = Object.keys(parsed.users || {}).length;
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم الاسترجاع بنجاح")
+                .setDescription(`تم استبدال بيانات السيرفر بالنسخة الاحتياطية المرفوعة.`)
+                .addFields(
+                  { name: "👥 أعضاء قبل", value: `${oldCount}`, inline: true },
+                  { name: "👥 أعضاء بعد", value: `${newCount}`, inline: true },
+                  { name: "👤 نفّذ العملية", value: `${user}`, inline: false }
+                )
+                .setFooter({ text: "⚠️ البيانات القديمة اتاستبدلت نهائياً" })
+                .setTimestamp()
+            ]
+          });
+        } catch (err) {
+          logger.error("خطأ في الاسترجاع:", err);
           return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
         }
       }
