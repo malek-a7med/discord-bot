@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 //  Owner AI — قوي وثابت: retry + text-based history
 // ═══════════════════════════════════════════════════════════════
-import { EmbedBuilder } from "discord.js";
+import { EmbedBuilder, PermissionFlagsBits } from "discord.js";
 import config from "../config.js";
 import {
   memoryRemember, memoryForget, memoryClear,
@@ -147,6 +147,10 @@ ${memoryToPromptText()}${history ? `\nسياق المحادثة:\n${history}\n` 
 - حذف رتبة: {"action":"delete_role","role_id":"ID"}
 - تغيير لون رتبة: {"action":"role_color","role_id":"ID","color":"hex"}
 - تغيير اسم رتبة: {"action":"rename_role","role_id":"ID","name":"اسم"}
+- إضافة/حذف صلاحيات رول: {"action":"edit_role_permissions","role_id":"ID","add":["Administrator","ManageChannels","KickMembers"],"remove":["SendMessages"]}
+- تعديل إعدادات رول (hoist/mentionable): {"action":"edit_role","role_id":"ID","hoist":true,"mentionable":true}
+
+الصلاحيات المتاحة (استخدم الاسم الإنجليزي بالظبط): Administrator, ManageGuild, ManageChannels, ManageRoles, ManageMessages, ManageWebhooks, KickMembers, BanMembers, ModerateMembers, SendMessages, ViewChannel, ReadMessageHistory, Connect, Speak, MuteMembers, DeafenMembers, MoveMembers, MentionEveryone, AttachFiles, EmbedLinks, AddReactions, UseApplicationCommands, ManageThreads, CreatePublicThreads, CreatePrivateThreads, SendMessagesInThreads, ViewAuditLog, ManageGuildExpressions, ManageNicknames, ChangeNickname
 
 ── كوينز وـ XP ──
 - إعطاء كوينز: {"action":"give_coins","user_id":"ID","amount":100}
@@ -695,6 +699,61 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, ownerName, d);
       return send(ok("✏️ تم تغيير اسم الرتبة", d));
+    }
+
+    // ─── تعديل صلاحيات رول ───────────────────────────────────────
+    if (action === "edit_role_permissions") {
+      const role = guild.roles.cache.get(parsed.role_id);
+      if (!role) return send("❌ مش لاقي الرتبة!");
+
+      const toAdd    = (parsed.add    || []).filter(p => PermissionFlagsBits[p] !== undefined);
+      const toRemove = (parsed.remove || []).filter(p => PermissionFlagsBits[p] !== undefined);
+
+      const invalidAdd    = (parsed.add    || []).filter(p => PermissionFlagsBits[p] === undefined);
+      const invalidRemove = (parsed.remove || []).filter(p => PermissionFlagsBits[p] === undefined);
+
+      let newPerms = role.permissions;
+      if (toAdd.length)    newPerms = newPerms.add(toAdd.map(p => PermissionFlagsBits[p]));
+      if (toRemove.length) newPerms = newPerms.remove(toRemove.map(p => PermissionFlagsBits[p]));
+
+      await role.setPermissions(newPerms, `بأمر ${ownerName}`).catch(e => { throw e; });
+
+      const addText    = toAdd.length    ? `✅ أضفنا: ${toAdd.join(', ')}`    : '';
+      const removeText = toRemove.length ? `🚫 شلنا: ${toRemove.join(', ')}` : '';
+      const invalidText = (invalidAdd.length || invalidRemove.length)
+        ? `\n⚠️ مش عارفاها: ${[...invalidAdd, ...invalidRemove].join(', ')}` : '';
+      const d = `تعديل صلاحيات "${role.name}" — ${[addText, removeText].filter(Boolean).join(' | ')}${invalidText}`;
+
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🔐 تم تعديل الصلاحيات", d));
+    }
+
+    // ─── تعديل إعدادات رول (hoist / mentionable) ─────────────────
+    if (action === "edit_role") {
+      const role = guild.roles.cache.get(parsed.role_id);
+      if (!role) return send("❌ مش لاقي الرتبة!");
+
+      const updates = {};
+      if (parsed.hoist       !== undefined) updates.hoist       = parsed.hoist;
+      if (parsed.mentionable !== undefined) updates.mentionable = parsed.mentionable;
+      if (parsed.name)                      updates.name        = parsed.name;
+      if (parsed.color)                     updates.color       = parseInt(parsed.color.replace("#", ""), 16);
+
+      if (!Object.keys(updates).length) return send("❌ مفيش تعديلات محددة!");
+
+      await role.edit({ ...updates, reason: `بأمر ${ownerName}` }).catch(e => { throw e; });
+
+      const parts = [];
+      if (updates.hoist       !== undefined) parts.push(`ظهور منفصل: ${updates.hoist ? "✅ شغال" : "❌ وقفنا"}`);
+      if (updates.mentionable !== undefined) parts.push(`قابل للمنشن: ${updates.mentionable ? "✅ شغال" : "❌ وقفنا"}`);
+      if (updates.name)                      parts.push(`الاسم: "${updates.name}"`);
+      if (updates.color)                     parts.push(`اللون: ${parsed.color}`);
+
+      const d = `تعديل "${role.name}" — ${parts.join(' | ')}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("⚙️ تم تعديل الرول", d));
     }
 
     // ─── كوينز: خصم / تعيين ──────────────────────────────────────
