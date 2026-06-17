@@ -112,5 +112,8 @@
   "manhwa": {},
   "warnings": {},
   "welcome": {},
-  "suggestions": {}
+  "suggestions": {},
+  "settings": {
+    "backupChannelId": "1486495986263261385"
+  }
 }
