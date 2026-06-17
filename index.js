@@ -276,6 +276,24 @@ const LEGACY_COMMANDS = [
           { name: "🥀 رسالة وداع",  value: "goodbye" }
         )
     ),
+  new SlashCommandBuilder()
+    .setName("رسالة-جماعية")
+    .setDescription("إرسال رسالة جماعية لكل الأعضاء أو في قناة [أونر فقط]")
+    .addStringOption((o) =>
+      o.setName("نوع")
+        .setDescription("وين تبعت الرسالة؟")
+        .setRequired(true)
+        .addChoices(
+          { name: "📩 رسائل خاصة لكل الأعضاء", value: "dm" },
+          { name: "📢 في قناة محددة", value: "channel" }
+        )
+    )
+    .addStringOption((o) =>
+      o.setName("نص").setDescription("نص الرسالة").setRequired(true)
+    )
+    .addChannelOption((o) =>
+      o.setName("قناة").setDescription("القناة (لو اخترت إرسال في قناة)")
+    ),
 ];
 
 // Advanced Feature Commands
@@ -1389,6 +1407,58 @@ client.on("interactionCreate", async (interaction) => {
         }
 
         return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
+      }
+
+      if (cmd === "رسالة-جماعية") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const نوع = interaction.options.getString("نوع");
+        const نص = interaction.options.getString("نص");
+
+        const embed = new EmbedBuilder()
+          .setColor(0xa020f0)
+          .setTitle("📣 رسالة من الإدارة")
+          .setDescription(نص)
+          .setFooter({ text: `⚜️ سيرفر الفراعنة — ${guild.name}` })
+          .setTimestamp();
+
+        if (نوع === "channel") {
+          const targetChannel = interaction.options.getChannel("قناة");
+          if (!targetChannel) {
+            return interaction.editReply({ content: "❌ حدد القناة اللي هتبعت فيها الرسالة!" });
+          }
+          await targetChannel.send({ embeds: [embed] });
+          return interaction.editReply({ content: `✅ اتبعتت الرسالة في ${targetChannel} بنجاح!` });
+        }
+
+        if (نوع === "dm") {
+          await guild.members.fetch();
+          const members = guild.members.cache.filter(m => !m.user.bot);
+          let sent = 0, failed = 0;
+
+          for (const [, member] of members) {
+            await member.send({ embeds: [embed] }).then(() => sent++).catch(() => failed++);
+            await new Promise(r => setTimeout(r, 500));
+          }
+
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم إرسال الرسالة الجماعية")
+                .addFields(
+                  { name: "📩 وصلت لـ", value: `${sent} عضو`, inline: true },
+                  { name: "❌ فشلت مع", value: `${failed} عضو`, inline: true }
+                )
+                .setFooter({ text: "الفشل عادةً بسبب إعدادات الخصوصية عند العضو" })
+                .setTimestamp()
+            ]
+          });
+        }
       }
 
       if (cmd === "قناة-النسخ") {
