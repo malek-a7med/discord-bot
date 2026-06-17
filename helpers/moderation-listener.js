@@ -23,8 +23,8 @@ class ModerationListener {
       // Ignore bot messages
       if (message.author.bot) return;
 
-      // Ignore owner messages
-      if (message.author.id === config.OWNER_ID) return;
+      // Ignore owner messages (all owners)
+      if (config.isOwner(message.author.id)) return;
 
       // Check anti-spam
       await this.checkSpam(message);

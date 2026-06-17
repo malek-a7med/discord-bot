@@ -518,7 +518,7 @@ function buildSuggestionEmbed({ user, text, statusKey = "pending", moderator = n
     .addFields(
       {
         name: "👤 مقدم الاقتراح",
-        value: `${user} — **${user.tag}**`,
+        value: `${user} — **${user.globalName || user.username}**`,
         inline: false,
       },
       {
@@ -985,7 +985,7 @@ async function sendAutoBackup(clientInstance) {
 
 client.once("clientReady", async (c) => {
   logger.setClient(c);
-  logger.success(`تسجيل الدخول بـ: ${c.user.tag}`);
+  logger.success(`تسجيل الدخول بـ: ${c.user.username}`);
   c.user.setActivity(`${LEGACY_COMMANDS.length + 14} أمر | /مساعدة`, { type: 3 });
   await deployCommands(process.env.DISCORD_TOKEN, c.user.id);
   await ensureSuggestionsPanel(c);
@@ -1817,22 +1817,14 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "صورة") {
-        const prompt = interaction.options.getString("وصف");
-        if (!_geminiReady) return interaction.reply("❌ ميزة توليد الصور بالذكاء الاصطناعي غير متاحة حالياً.");
-
-        await interaction.deferReply();
-        try {
-          const result = await geminiImageModel().generateContent(prompt);
-          const image = result.response.candidates[0].content.parts[0].inlineData;
-          const imageBuffer = Buffer.from(image.data, 'base64');
-
-          const attachment = new AttachmentBuilder(imageBuffer, { name: 'ai_image.png' });
-
-          return interaction.editReply({ files: [attachment] });
-        } catch (error) {
-          logger.error("خطأ في توليد الصورة بالذكاء الاصطناعي:", error);
-          return interaction.editReply("معلش يسطا ثواني بس");
-        }
+        return interaction.reply({
+          embeds: [new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setTitle("❌ ميزة غير متاحة")
+            .setDescription("توليد الصور بالذكاء الاصطناعي غير متاح حالياً.\nهذه الميزة تحتاج نموذج Gemini متخصص لتوليد الصور وهو غير مفعّل في هذا البوت.")
+            .setFooter({ text: "استخدم /زنجي لطلب أي حاجة تانية 😊" })],
+          ephemeral: true
+        });
       }
 
       if (cmd === "نسخة-احتياطية") {
@@ -1948,7 +1940,7 @@ client.on("interactionCreate", async (interaction) => {
               `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
               `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
             )
-            .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+            .setThumbnail(user.displayAvatarURL({ size: 256 }))
             .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️ [اختبار]' })
             .setTimestamp();
           await testChannel.send({ embeds: [embed] });
@@ -2288,9 +2280,9 @@ client.on("interactionCreate", async (interaction) => {
           components: []
         });
         try {
-          const cloned = await targetChannel.clone({ reason: `مسح-الكل بواسطة ${interaction.user.tag}` });
+          const cloned = await targetChannel.clone({ reason: `مسح-الكل بواسطة ${interaction.user.username}` });
           await cloned.setPosition(targetChannel.position);
-          await targetChannel.delete(`مسح-الكل بواسطة ${interaction.user.tag}`);
+          await targetChannel.delete(`مسح-الكل بواسطة ${interaction.user.username}`);
           await cloned.send({ embeds: [
             new EmbedBuilder()
               .setColor(0xe74c3c)
@@ -2535,7 +2527,7 @@ client.on('guildMemberRemove', async (member) => {
         `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
       )
-      .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+      .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
       .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️' })
       .setTimestamp();
 
@@ -2558,7 +2550,7 @@ app.get('/', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    bot: client.user ? client.user.tag : 'connecting...',
+    bot: client.user ? client.user.username : 'connecting...',
     uptime: Math.floor(process.uptime()),
   });
 });
@@ -2578,9 +2570,7 @@ _server.on("error", (err) => {
 // ═══════════════════════════════════════════════════════════════
 //  نظام Keep-Alive المتطور — 24/7 بدون تهنيج
 // ═══════════════════════════════════════════════════════════════
-const SELF_URL = process.env.REPLIT_DEV_DOMAIN
-  ? `https://${process.env.REPLIT_DEV_DOMAIN}/health`
-  : `http://localhost:${PORT}/health`;
+const SELF_URL = `http://localhost:${PORT}/health`;
 
 // ── إحصائيات الـ uptime ──────────────────────────────────────
 let _pingOk       = 0;
@@ -2643,6 +2633,7 @@ setInterval(async () => {
   console.warn(`⚠️ [AutoReconnect] مشكلة — ready=${isReady} | ping=${wsPing}ms | صمت=${Math.floor(secsSilent)}s — محاولة #${_reconnects}`);
 
   try {
+    await client.destroy();
     await client.login(process.env.DISCORD_TOKEN);
     console.log(`✅ [AutoReconnect] اتصل تاني بنجاح! (محاولة #${_reconnects})`);
   } catch (e) {
@@ -2659,7 +2650,7 @@ app.get('/status', (_req, res) => {
   const m = Math.floor((uptimeSec % 3600) / 60);
   const s = uptimeSec % 60;
   res.json({
-    bot:        client.user?.tag ?? "connecting...",
+    bot:        client.user?.username ?? "connecting...",
     status:     client.isReady() ? "online" : "offline",
     uptime:     `${h}h ${m}m ${s}s`,
     wsPing:     `${client.ws.ping}ms`,
