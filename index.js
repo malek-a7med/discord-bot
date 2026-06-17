@@ -1577,6 +1577,37 @@ client.on('guildMemberAdd', async (member) => {
   }
 });
 
+// ================= نظام الوداع للفراعنة =================
+client.on('guildMemberRemove', async (member) => {
+  const WELCOME_CHANNEL_ID = "1486100560494203183";
+
+  const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+  if (!channel) return;
+
+  try {
+    const goodbyeEmbed = new EmbedBuilder()
+      .setColor('#A020F0')
+      .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
+      .setDescription(
+        `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 **الفرعون اللي ودعنا:** <@${member.id}>\n` +
+        `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
+        `📊 **بقينا** \`${member.guild.memberCount}\` **فرعون في المملكة.**\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
+      )
+      .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+      .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️' })
+      .setTimestamp();
+
+    await channel.send({ embeds: [goodbyeEmbed] });
+
+  } catch (error) {
+    console.error("خطأ في نظام الوداع:", error);
+  }
+});
+
 // ================= نظام إبقاء البوت حياً 24 ساعة =================
 // ✅ [تعديل 7] Express بطريقة ES Module الصحيحة + PORT من البيئة
 const app = express();
