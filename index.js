@@ -1122,7 +1122,8 @@ client.on("messageCreate", async (msg) => {
       const isDashCmd = /(داشبورد|داش بورد|لوحة.*تحكم|dashboard|panel)/i.test(trimmedDash);
       if (isDashCmd) return msg.channel.send(buildDMControlPanel(guild)).catch(() => {});
       if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
-      return handleOwnerAI(msg, guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
+      handleOwnerAI(msg, guild, geminiModel(), db, buildDMControlPanel);
+      return;
     }
 
     // باقي الناس يقدروا يكلموا البوت في الخاص — رد AI عادي

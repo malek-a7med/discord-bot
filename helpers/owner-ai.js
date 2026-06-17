@@ -243,8 +243,15 @@ export function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard = null
   }
 }
 
+// ── حماية نهائية: نفس الرسالة لا تتبعتلها رسالتين أبداً ──────────
+const sentReplies = new Set();
+
 // ── المعالجة الفعلية لرسالة واحدة ────────────────────────────────
 async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
+  if (sentReplies.has(msg.id)) return;
+  sentReplies.add(msg.id);
+  setTimeout(() => sentReplies.delete(msg.id), 120_000);
+
   const isDM      = !msg.guild;
   const userId    = msg.author.id;
   const rawText   = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
