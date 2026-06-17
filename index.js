@@ -2317,8 +2317,16 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+const _server = app.listen(PORT, () => {
   console.log(`✅ Server is ready and listening on port ${PORT}`);
+});
+_server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`❌ البورت ${PORT} مشغول — في نسخة تانية شغالة، هيتم إغلاق هذه النسخة.`);
+    process.exit(1);
+  } else {
+    throw err;
+  }
 });
 
 // ── Keep-Alive: يضرب نفسه كل 4 دقايق عشان Replit ميناموش ────────
