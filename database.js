@@ -174,6 +174,32 @@ class Database {
     return this.data.raidTracking[key].joinTimes.filter((t) => now - t < windowMs).length;
   }
 
+  // ─── حماية من الرد المكرر بين نسختين للبوت ──────────────────
+  // بيقرأ من الملف مباشرة (مش من الذاكرة) عشان يشتغل بين instances مختلفة
+  claimAiMessage(msgId) {
+    try {
+      const raw      = fs.readFileSync(DB_PATH, 'utf8');
+      const diskData = JSON.parse(raw);
+      if (!diskData.aiClaims) diskData.aiClaims = {};
+
+      if (diskData.aiClaims[msgId]) return false; // اتكلّم عليه نسخة تانية
+
+      diskData.aiClaims[msgId] = Date.now();
+
+      // تنظيف claims أقدم من دقيقتين
+      const cutoff = Date.now() - 120_000;
+      for (const id of Object.keys(diskData.aiClaims)) {
+        if (diskData.aiClaims[id] < cutoff) delete diskData.aiClaims[id];
+      }
+
+      fs.writeFileSync(DB_PATH, JSON.stringify(diskData, null, 2), 'utf8');
+      this.data.aiClaims = diskData.aiClaims;
+      return true;
+    } catch {
+      return true; // لو في خطأ، اسمح بالمعالجة عشان البوت ما يوقفش
+    }
+  }
+
   getAllData() {
     return this.data;
   }

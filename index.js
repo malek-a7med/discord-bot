@@ -1273,11 +1273,8 @@ client.on("messageCreate", async (msg) => {
   }
 
   if (isOwner) {
-    // حماية مزدوجة من التكرار بين نسختين (memory + DB)
-    const ownerData = db.getUser(msg.author.id);
-    if (ownerData._lastAiMsg === msg.id) return;
-    ownerData._lastAiMsg = msg.id;
-    db.updateUser(msg.author.id, ownerData);
+    // حماية من الرد المكرر — بتكتب في الملف مباشرة عشان تشتغل حتى مع نسختين
+    if (!db.claimAiMessage(msg.id)) return;
     handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel);
     return;
   }
