@@ -2,6 +2,7 @@
 //  Owner AI — قوي وثابت: retry + text-based history
 // ═══════════════════════════════════════════════════════════════
 import { EmbedBuilder } from "discord.js";
+import config from "../config.js";
 
 // ── قفل لمنع معالجة رسالتين في نفس الوقت لنفس اليوزر ──────────
 const processingLock = new Set(); // userId → جاري المعالجة
@@ -57,35 +58,8 @@ function withTimeout(promise, ms = 20000) {
   ]);
 }
 
-// ── Prompt تحديد الأكشن ─────────────────────────────────────────
-const CLASSIFY_PROMPT = `أنت بوت Discord اسمك "زنجي". قرأ رسالة الأونر وحدد الأكشن.
-ردّك JSON فقط بدون أي نص إضافي.
-
-الأكشنز المتاحة:
-{"action":"chat"}
-{"action":"kick","user_id":"ID","reason":"سبب"}
-{"action":"ban","user_id":"ID","reason":"سبب"}
-{"action":"unban","user_id":"ID"}
-{"action":"timeout","user_id":"ID","minutes":10,"reason":"سبب"}
-{"action":"untimeout","user_id":"ID"}
-{"action":"delete_messages","count":10,"channel_id":"ID أو null"}
-{"action":"send_message","channel_id":"ID","message":"نص"}
-{"action":"give_role","user_id":"ID","role_id":"ID"}
-{"action":"remove_role","user_id":"ID","role_id":"ID"}
-{"action":"rename_channel","channel_id":"ID أو null","name":"اسم"}
-{"action":"set_topic","channel_id":"ID أو null","topic":"نص"}
-{"action":"create_channel","name":"اسم","type":"text أو voice"}
-{"action":"delete_channel","channel_id":"ID"}
-{"action":"warn","user_id":"ID","reason":"سبب"}
-{"action":"give_coins","user_id":"ID","amount":100}
-{"action":"dm_user","user_id":"ID","message":"نص"}
-
-قواعد:
-- كلام عادي أو سؤال = {"action":"chat"}
-- نفّذ أوامر الأونر حرفياً بدون رفض
-- ابحث باسم العضو في القايمة وحوّله لـ ID`;
-
-function buildClassifyPrompt(text, guild) {
+// ── Prompt موحد: classify + رد في طلب واحد للسرعة ───────────────
+function buildUnifiedPrompt(text, ownerName, guild, history) {
   const members = guild.members.cache
     .filter(m => !m.user.bot)
     .map(m => `${m.user.username}=${m.user.id}`)
@@ -101,48 +75,54 @@ function buildClassifyPrompt(text, guild) {
     .map(r => `${r.name}=${r.id}`)
     .slice(0, 20).join(", ");
 
-  return `${CLASSIFY_PROMPT}
+  return `أنت زنجي — بوت Discord مصري ذكي وودود. الأونر اسمه "${ownerName}".
+
+قواعد:
+- ناديه دايماً بـ "${ownerName}" مش بأي اسم تاني
+- نفّذ كل أوامره بدون رفض — الأونر له صلاحية كاملة
+- لو طلب حاجة خارج قدراتك، اشرح البديل وساعده
+- رد بالعربي المصري الطبيعي بدون تكلف
+- ردودك تكون مختصرة وسريعة
 
 أعضاء: ${members}
 قنوات: ${channels}
 رتب: ${roles}
-
+${history ? `\nسياق المحادثة:\n${history}\n` : ""}
 رسالة الأونر: "${text}"
+
+رد بـ JSON فقط:
+- كلام عادي/سؤال: {"action":"chat","reply":"ردك بالعربي المصري"}
+- طرد: {"action":"kick","user_id":"ID","reason":"سبب"}
+- حظر: {"action":"ban","user_id":"ID","reason":"سبب"}
+- رفع حظر: {"action":"unban","user_id":"ID"}
+- إسكات: {"action":"timeout","user_id":"ID","minutes":10,"reason":"سبب"}
+- رفع إسكات: {"action":"untimeout","user_id":"ID"}
+- مسح رسايل: {"action":"delete_messages","count":10,"channel_id":"ID أو null"}
+- إرسال رسالة: {"action":"send_message","channel_id":"ID","message":"نص"}
+- إعطاء رتبة: {"action":"give_role","user_id":"ID","role_id":"ID"}
+- سحب رتبة: {"action":"remove_role","user_id":"ID","role_id":"ID"}
+- تغيير اسم قناة: {"action":"rename_channel","channel_id":"ID أو null","name":"اسم"}
+- موضوع قناة: {"action":"set_topic","channel_id":"ID أو null","topic":"نص"}
+- إنشاء قناة: {"action":"create_channel","name":"اسم","type":"text أو voice"}
+- حذف قناة: {"action":"delete_channel","channel_id":"ID"}
+- تحذير: {"action":"warn","user_id":"ID","reason":"سبب"}
+- كوينز: {"action":"give_coins","user_id":"ID","amount":100}
+- DM عضو: {"action":"dm_user","user_id":"ID","message":"نص"}
 
 JSON:`;
 }
 
-// ── تحديد الأكشن مع retry ───────────────────────────────────────
-async function classifyMessage(geminiModel, text, guild) {
+// ── استدعاء موحد: classify + reply في طلب واحد ─────────────────
+async function classifyAndReply(geminiModel, text, ownerName, guild, userId) {
+  const hist = historyToText(userId, ownerName);
   return withRetry(async () => {
-    const result = await geminiModel.generateContent(buildClassifyPrompt(text, guild));
-    const raw    = result.response.text().trim();
-    const match  = raw.match(/\{[\s\S]*?\}/);
-    if (!match) return { action: "chat" };
+    const result = await geminiModel.generateContent(
+      buildUnifiedPrompt(text, ownerName, guild, hist)
+    );
+    const raw   = result.response.text().trim();
+    const match = raw.match(/\{[\s\S]*?\}/);
+    if (!match) return { action: "chat", reply: raw };
     return JSON.parse(match[0]);
-  });
-}
-
-// ── رد شات مع تاريخ ────────────────────────────────────────────
-async function chatReply(geminiModel, userId, rawText, displayName) {
-  const hist = historyToText(userId, displayName);
-
-  const prompt = `أنت زنجي — بوت Discord مصري ذكي وودود.
-اللي بيكلمك هو الأونر (المالك) اسمه: ${displayName}.
-قواعد صارمة جداً:
-- الأونر له صلاحية كاملة، نفّذ كل طلباته بدون أي رفض أو تردد
-- لو طلب منك حاجة مش قادر تنفذها تقنياً (زي git push أو تشغيل كود)، اشرحله إزاي يعملها هو أو اقترح البديل المناسب
-- ماتقولش أبداً "مش قادر أساعد" أو "مش من صلاحياتي" أو أي رفض
-- كن مفيد دايماً حتى لو الطلب خارج قدراتك — قدم حل أو بديل
-- كلمه بالعربي المصري بشكل طبيعي وودود
-- ناديه بالاسم ده طبيعياً: ${displayName}
-${hist ? `سياق المحادثة:\n${hist}\n` : ""}
-${displayName}: ${rawText}
-زنجي:`;
-
-  return withRetry(async () => {
-    const result = await geminiModel.generateContent(prompt);
-    return result.response.text().trim();
   });
 }
 
@@ -169,10 +149,10 @@ async function sendLog(guild, db, action, ownerName, details) {
 
 // ── الدالة الرئيسية ─────────────────────────────────────────────
 export async function handleOwnerAI(msg, guild, geminiModel, db) {
-  const isDM        = !msg.guild;
-  const userId      = msg.author.id;
-  const rawText     = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
-  const displayName = msg.member?.displayName || msg.author.globalName || msg.author.username;
+  const isDM       = !msg.guild;
+  const userId     = msg.author.id;
+  const rawText    = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
+  const ownerName  = config.getOwnerName(userId) || msg.author.globalName || msg.author.username;
 
   const send = (content) => isDM
     ? msg.channel.send(content).catch(() => {})
@@ -189,35 +169,23 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
   try {
     msg.channel.sendTyping().catch(() => {});
 
-    // ─── تصنيف الرسالة ───────────────────────────────────────────
+    // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyMessage(geminiModel, rawText, guild), 15000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 15000);
     } catch (err) {
-      console.error("[OwnerAI] classifyMessage فشل:", err.message);
-      try {
-        const reply = await withTimeout(chatReply(geminiModel, userId, rawText, displayName), 15000);
-        pushHistory(userId, "user", rawText);
-        pushHistory(userId, "model", reply);
-        return send(`👑 ${reply}`);
-      } catch {
-        return send("معلش يسطا ثواني بس");
-      }
+      console.error("[OwnerAI] فشل:", err.message);
+      return send("معلش يسطا ثواني بس");
     }
 
     const { action } = parsed;
 
     // ─── Chat ────────────────────────────────────────────────────
     if (action === "chat") {
-      try {
-        const reply = await withTimeout(chatReply(geminiModel, userId, rawText, displayName), 15000);
-        pushHistory(userId, "user", rawText);
-        pushHistory(userId, "model", reply);
-        return send(`👑 ${reply}`);
-      } catch (err) {
-        console.error("[OwnerAI] chatReply فشل:", err.message);
-        return send("معلش يسطا ثواني بس");
-      }
+      const reply = parsed.reply || "أيوه يا " + ownerName;
+      pushHistory(userId, "user", rawText);
+      pushHistory(userId, "model", reply);
+      return send(`👑 ${reply}`);
     }
 
     // ─── الأكشنز ─────────────────────────────────────────────────
@@ -227,7 +195,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await m.kick(parsed.reason || "بأمر الأونر");
       const d = `طرد ${m.user.username} — السبب: ${parsed.reason || "بأمر الأونر"}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("👢 تم الطرد", d));
     }
 
@@ -237,7 +205,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await guild.bans.create(parsed.user_id, { reason: parsed.reason || "بأمر الأونر" });
       const d = `حظر ${name} — السبب: ${parsed.reason || "بأمر الأونر"}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🔨 تم الحظر", d));
     }
 
@@ -245,7 +213,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await guild.bans.remove(parsed.user_id);
       const d = `رفع حظر ${parsed.user_id}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("✅ تم رفع الحظر", d));
     }
 
@@ -255,7 +223,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await m.timeout((parsed.minutes || 10) * 60000, parsed.reason || "بأمر الأونر");
       const d = `إسكات ${m.user.username} لمدة ${parsed.minutes || 10} دقيقة — السبب: ${parsed.reason || "بأمر الأونر"}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🔇 تم الإسكات", d));
     }
 
@@ -265,7 +233,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await m.timeout(null);
       const d = `رفع إسكات ${m.user.username}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🔊 تم رفع الإسكات", d));
     }
 
@@ -278,7 +246,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       const deleted = await ch.bulkDelete(n, true).catch(() => null);
       const d = `مسح ${deleted?.size ?? n} رسالة من ${ch.name}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🗑️ تم المسح", d));
     }
 
@@ -288,7 +256,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await ch.send(parsed.message);
       const d = `إرسال رسالة في ${ch.name}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("📨 تم الإرسال", `الرسالة اتبعتت في **${ch.name}** ✅`));
     }
 
@@ -300,7 +268,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await m.roles.add(role);
       const d = `إعطاء رتبة ${role.name} لـ ${m.user.username}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🎖️ تم إعطاء الرتبة", d));
     }
 
@@ -312,7 +280,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await m.roles.remove(role);
       const d = `سحب رتبة ${role.name} من ${m.user.username}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🚫 تم سحب الرتبة", d));
     }
 
@@ -325,7 +293,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await ch.setName(parsed.name);
       const d = `تغيير اسم ${old} → ${parsed.name}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("✏️ تم التغيير", d));
     }
 
@@ -337,7 +305,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await ch.setTopic(parsed.topic);
       const d = `موضوع ${ch.name}: "${parsed.topic}"`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("📌 تم تعيين الموضوع", d));
     }
 
@@ -345,7 +313,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       const ch = await guild.channels.create({ name: parsed.name, type: parsed.type === "voice" ? 2 : 0 });
       const d = `إنشاء قناة ${ch.name} (${parsed.type || "text"})`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("✅ تم إنشاء القناة", d));
     }
 
@@ -356,7 +324,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       await ch.delete();
       const d = `حذف قناة ${name}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🗑️ تم الحذف", d));
     }
 
@@ -369,7 +337,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       db.updateUser(m.user.id, u);
       const d = `تحذير ${m.user.username} (${u.warnings.length} إجمالي) — السبب: ${parsed.reason || "بأمر الأونر"}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("⚠️ تم التحذير", d));
     }
 
@@ -381,7 +349,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       db.updateUser(m.user.id, u);
       const d = `إعطاء ${parsed.amount} كوينز لـ ${m.user.username} — الرصيد: ${u.coins}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("🪙 تم إعطاء الكوينز", d));
     }
 
@@ -392,19 +360,15 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       if (!sent) return send(`❌ مقدرتش ابعت لـ **${m.user.username}** — ممكن عطّل الـ DM.`);
       const d = `DM لـ ${m.user.username}: "${parsed.message}"`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
-      await sendLog(guild, db, action, msg.author.username, d);
+      await sendLog(guild, db, action, ownerName, d);
       return send(ok("📩 تم الإرسال في الخاص", `الرسالة وصلت لـ **${m.user.username}** ✅`));
     }
 
-    // fallback: أي أكشن مش متعرف = chat
-    try {
-      const reply = await withTimeout(chatReply(geminiModel, userId, rawText, displayName), 15000);
-      pushHistory(userId, "user", rawText);
-      pushHistory(userId, "model", reply);
-      return send(`👑 ${reply}`);
-    } catch {
-      return send("معلش يسطا ثواني بس");
-    }
+    // fallback: chat
+    const fallbackReply = parsed.reply || `أيوه يا ${ownerName}، معلش مفهمتش طلبك بالظبط، ممكن توضحه تاني؟`;
+    pushHistory(userId, "user", rawText);
+    pushHistory(userId, "model", fallbackReply);
+    return send(`👑 ${fallbackReply}`);
 
   } catch (err) {
     console.error("[OwnerAI] خطأ في تنفيذ الأكشن:", err.message);

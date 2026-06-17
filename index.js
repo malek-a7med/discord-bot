@@ -959,10 +959,18 @@ client.on("messageCreate", async (msg) => {
   // الـ DM للأونر — بره السيرفر (أي رسالة من غير ما يعمل reply)
   if (!msg.guild) {
     if (!config.isOwner(msg.author.id)) return;
-    if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
     const guild = client.guilds.cache.first();
     if (!guild) return msg.channel.send("❌ البوت مش في أي سيرفر!").catch(() => {});
     await guild.members.fetch().catch(() => {});
+
+    // ── داشبورد الأونر ─────────────────────────────────────────
+    const trimmed = msg.content.trim();
+    const isDashCmd = /^(داشبورد|داش|!داش|dashboard|panel)$/i.test(trimmed);
+    if (isDashCmd) {
+      return msg.channel.send(buildDMControlPanel(guild)).catch(() => {});
+    }
+
+    if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
     return handleOwnerAI(msg, guild, geminiModel(), db).catch(() => {});
   }
 
