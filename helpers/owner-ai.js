@@ -53,14 +53,23 @@ async function withRetry(fn, retries = 1, delayMs = 800) {
   }
 }
 
-// ── Timeout قصير عشان الرد يكون سريع ────────────────────────────
-function withTimeout(promise, ms = 15000) {
+// ── Timeout ─────────────────────────────────────────────────────
+function withTimeout(promise, ms = 25000) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
       setTimeout(() => reject(new Error("timeout")), ms)
     )
   ]);
+}
+
+// ── Typing Loop: يبعث typing كل 8 ثواني عشان Discord ميوقفوش ───
+function startTypingLoop(channel) {
+  channel.sendTyping().catch(() => {});
+  const interval = setInterval(() => {
+    channel.sendTyping().catch(() => {});
+  }, 8000);
+  return () => clearInterval(interval);
 }
 
 // ── Prompt موحد: classify + رد في طلب واحد للسرعة ───────────────
@@ -261,13 +270,13 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     ? msg.channel.send(content).catch(() => {})
     : msg.reply(content).catch(() => {});
 
+  const stopTyping = startTypingLoop(msg.channel);
   try {
-    msg.channel.sendTyping().catch(() => {});
 
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 15000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 25000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
       return send("❌ الـ AI اتأخر أكتر من المعتاد، حاول تاني بعد ثانية!");
@@ -850,6 +859,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
   } catch (err) {
     console.error("[OwnerAI] خطأ في تنفيذ الأكشن:", err.message);
     send("❌ حصل خطأ غير متوقع، حاول تاني!").catch(() => {});
+  } finally {
+    stopTyping();
   }
 }
 

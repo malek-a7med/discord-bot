@@ -1134,8 +1134,9 @@ client.on("messageCreate", async (msg) => {
     }
     const question = msg.content.trim();
     if (!question) return;
+    const dmTypingInterval = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
+    msg.channel.sendTyping().catch(() => {});
     try {
-      msg.channel.sendTyping().catch(() => {});
       const senderName = msg.author.globalName || msg.author.username;
       const prompt     = buildUserPrompt(senderName, question, msg.author.id);
       const result     = await geminiModel().generateContent(prompt);
@@ -1145,6 +1146,8 @@ client.on("messageCreate", async (msg) => {
       return msg.channel.send(reply).catch(() => {});
     } catch {
       return msg.channel.send("معلش يسطا ثواني بس 🙏").catch(() => {});
+    } finally {
+      clearInterval(dmTypingInterval);
     }
   }
 
@@ -1279,6 +1282,8 @@ client.on("messageCreate", async (msg) => {
     return;
   }
 
+  const svTypingInterval = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
+  msg.channel.sendTyping().catch(() => {});
   try {
     // msg.member ممكن يكون null لو الرسالة جت من DM أو cache miss
     const senderName = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
@@ -1295,6 +1300,8 @@ client.on("messageCreate", async (msg) => {
     } else {
       await msg.reply("معلش يسطا ثواني بس").catch(() => {});
     }
+  } finally {
+    clearInterval(svTypingInterval);
   }
 });
 
