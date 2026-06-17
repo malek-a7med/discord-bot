@@ -2281,6 +2281,24 @@ app.listen(PORT, () => {
   console.log(`✅ Server is ready and listening on port ${PORT}`);
 });
 
+// ── Keep-Alive: يضرب نفسه كل 4 دقايق عشان Replit ميناموش ────────
+const SELF_URL = process.env.REPLIT_DEV_DOMAIN
+  ? `https://${process.env.REPLIT_DEV_DOMAIN}/health`
+  : `http://localhost:${PORT}/health`;
+
+let _pingErrors = 0;
+setInterval(async () => {
+  try {
+    const r = await fetch(SELF_URL, { signal: AbortSignal.timeout(8000) });
+    if (r.ok) { _pingErrors = 0; }
+    else { _pingErrors++; }
+  } catch {
+    _pingErrors++;
+    if (_pingErrors >= 3) console.warn("⚠️ [Keep-Alive] فشل الـ ping 3 مرات متتالية — تحقق من الاتصال");
+  }
+}, 4 * 60 * 1000); // كل 4 دقايق
+console.log(`🔄 [Keep-Alive] سيتم الـ ping على: ${SELF_URL} كل 4 دقايق`);
+
 // ───────────────────────────────────────────────────────────────
 // Anti-Crash — حماية البوت من الإغلاق + منع تكرار رسايل الـ Error
 // ───────────────────────────────────────────────────────────────

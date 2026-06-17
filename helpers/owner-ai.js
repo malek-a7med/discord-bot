@@ -3,6 +3,10 @@
 // ═══════════════════════════════════════════════════════════════
 import { EmbedBuilder } from "discord.js";
 import config from "../config.js";
+import {
+  memoryRemember, memoryForget, memoryClear,
+  memoryGetAll, memoryToPromptText, memorySearch
+} from "./bot-memory.js";
 
 // ── قفل لمنع معالجة رسالتين في نفس الوقت لنفس اليوزر ──────────
 const processingLock = new Set(); // userId → جاري المعالجة
@@ -87,10 +91,17 @@ function buildUnifiedPrompt(text, ownerName, guild, history) {
 أعضاء: ${members}
 قنوات: ${channels}
 رتب: ${roles}
-${history ? `\nسياق المحادثة:\n${history}\n` : ""}
+${memoryToPromptText()}${history ? `\nسياق المحادثة:\n${history}\n` : ""}
 رسالة الأونر: "${text}"
 
 رد بـ JSON فقط — اختار الأكشن الأنسب لطلب الأونر:
+
+── ذاكرة دائمة ──
+- احفظ معلومة: {"action":"remember","key":"اسم المعلومة","value":"القيمة"}
+- امسح معلومة: {"action":"forget_memory","key":"اسم المعلومة"}
+- امسح كل الذاكرة: {"action":"clear_memory"}
+- فتش في الذاكرة: {"action":"search_memory","query":"كلمة البحث"}
+- اعرض كل الذاكرة: {"action":"show_memory"}
 
 ── تفاعل وإدارة أعضاء ──
 - كلام عادي/سؤال: {"action":"chat","reply":"ردك"}
@@ -232,6 +243,60 @@ export async function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard 
     if (action === "dashboard") {
       if (buildDashboard) return send(buildDashboard(guild));
       return send("📊 اكتب **داشبورد** في الـ DM عشان تشوف لوحة التحكم!");
+    }
+
+    // ─── ذاكرة دائمة ─────────────────────────────────────────────
+    if (action === "remember") {
+      if (!parsed.key || !parsed.value) return send("❌ محتاج key و value عشان أحفظ!");
+      const result = memoryRemember(parsed.key, parsed.value);
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", result);
+      return send({
+        embeds: [new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setTitle("🧠 تم الحفظ في الذاكرة")
+          .setDescription(`**${parsed.key}**\n${parsed.value}`)
+          .setFooter({ text: "هفتكر ده حتى لو اتقفلت وشغلت تاني" })
+          .setTimestamp()]
+      });
+    }
+
+    if (action === "forget_memory") {
+      const result = memoryForget(parsed.key || "");
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", result);
+      return send(ok("🗑️ تم المسح من الذاكرة", result));
+    }
+
+    if (action === "clear_memory") {
+      memoryClear();
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", "تم مسح كل الذاكرة");
+      return send(ok("🧹 تم مسح كل الذاكرة", "الذاكرة اتمسحت بالكامل دلوقتي"));
+    }
+
+    if (action === "show_memory") {
+      const all = memoryGetAll();
+      const entries = Object.entries(all);
+      if (!entries.length) return send("📭 الذاكرة فاضية دلوقتي — قولي احفظ حاجة!");
+      const lines = entries.map(([k, v]) => `• **${k}**: ${v.value}`).join("\n");
+      return send({
+        embeds: [new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setTitle(`🧠 الذاكرة (${entries.length} معلومة)`)
+          .setDescription(lines.slice(0, 4000))
+          .setTimestamp()]
+      });
+    }
+
+    if (action === "search_memory") {
+      const results = memorySearch(parsed.query || "");
+      if (!results.length) return send(`🔍 مش لاقي حاجة عن "${parsed.query}"`);
+      const lines = results.map(([k, v]) => `• **${k}**: ${v.value}`).join("\n");
+      return send({
+        embeds: [new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setTitle(`🔍 نتايج البحث عن "${parsed.query}"`)
+          .setDescription(lines.slice(0, 4000))
+          .setTimestamp()]
+      });
     }
 
     // ─── الأكشنز ─────────────────────────────────────────────────
