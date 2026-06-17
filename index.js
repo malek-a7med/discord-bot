@@ -27,6 +27,7 @@ import {
   handleWhitenLink,
   handleOcrUpload
 } from "./commands/quick-clean.js";
+import { handleOwnerAI } from "./helpers/owner-ai.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -917,12 +918,15 @@ client.on("messageCreate", async (msg) => {
   const question = msg.content.replace(/<@!?\d+>/g, "").trim();
   if (!question || !geminiModel) return;
 
+  if (isOwner) {
+    return handleOwnerAI(msg, msg.guild, geminiModel, db).catch(() => {});
+  }
+
   msg.channel.sendTyping().catch(() => {});
   try {
-    const ownerTag = isOwner ? "يا باشا 👑 " : "";
     const prompt = `اسم اللي بيكلمك: ${msg.author.username}\nالرسالة: ${question}`;
     const result = await geminiModel.generateContent(prompt);
-    await msg.reply(`${ownerTag}${result.response.text().trim()}`);
+    await msg.reply(result.response.text().trim());
   } catch (err) {
     await msg.reply("معلش يسطا، هنجت مني ثواني وجرب تاني!");
   }
