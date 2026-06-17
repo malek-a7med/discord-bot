@@ -956,7 +956,7 @@ client.once("ready", async (c) => {
 const userChatHistory  = new Map();
 const MAX_USER_HIST    = 10;
 const userLastRequest  = new Map(); // cooldown: آخر طلب لكل يوزر
-const USER_COOLDOWN_MS = 60_000;   // 60 ثانية بين كل طلب وتاني
+const USER_COOLDOWN_MS = 15_000;   // 15 ثانية بين كل طلب وتاني
 
 function getUserHistory(userId) {
   if (!userChatHistory.has(userId)) userChatHistory.set(userId, []);
