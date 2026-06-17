@@ -1203,7 +1203,8 @@ client.on("messageCreate", async (msg) => {
 
   const isMentioned  = msg.mentions.has(client.user.id);
   const isOwner      = config.isOwner(msg.author.id);
-  const calledByName = /زنجي/i.test(msg.content);
+  // باسمه = للأونر بس — باقي الناس لازم يعملوا منشن
+  const calledByName = /زنجي/i.test(msg.content) && isOwner;
 
   // في السيرفر، الكل (حتى الأونر) لازم ينده باسمه أو يعمل منشن
   if (!isMentioned && !calledByName) return;
@@ -1255,7 +1256,11 @@ client.on("messageCreate", async (msg) => {
     await msg.reply(reply);
   } catch (err) {
     logger.error("خطأ في الرد على الرسالة:", err);
-    await msg.reply("معلش يسطا ثواني بس").catch(() => {});
+    if (err.isQuotaError || err.message === "ALL_KEYS_EXHAUSTED") {
+      await msg.reply("⏳ الـ AI وصل للحد اليومي — جرب تاني بعد شوية!").catch(() => {});
+    } else {
+      await msg.reply("معلش يسطا ثواني بس").catch(() => {});
+    }
   }
 });
 
