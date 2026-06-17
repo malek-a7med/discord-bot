@@ -891,6 +891,12 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
     logger.warn("⚠️ روم إدارة الاقتراحات غير متاح");
   }
 
+  // ── إعادة نشر لوحة الأزرار عشان تكون دايماً في الأسفل ────────
+  await suggestionsChannel.send({
+    embeds: [buildSuggestionsPanelEmbed()],
+    components: [buildSuggestionsPanelRow()],
+  }).catch(() => {});
+
   return interaction.editReply({
     content: "✅ **شكراً لك!** تم استلام اقتراحك بنجاح وسيتم مراجعته من قبل الإدارة قريباً. 🙏",
   });
