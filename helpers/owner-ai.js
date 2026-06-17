@@ -18,9 +18,9 @@ function pushHistory(userId, who, text) {
   if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
 }
 
-function historyToText(userId) {
+function historyToText(userId, displayName) {
   return getHistory(userId)
-    .map(m => `${m.who === "user" ? "الأونر" : "زنجي"}: ${m.text}`)
+    .map(m => `${m.who === "user" ? (displayName || "الأونر") : "زنجي"}: ${m.text}`)
     .join("\n");
 }
 
@@ -106,12 +106,14 @@ async function classifyMessage(geminiModel, text, guild) {
 }
 
 // ── رد شات مع تاريخ ────────────────────────────────────────────
-async function chatReply(geminiModel, userId, rawText) {
-  const hist = historyToText(userId);
+async function chatReply(geminiModel, userId, rawText, displayName) {
+  const hist = historyToText(userId, displayName);
 
-  const prompt = `أنت زنجي — بوت مصري شخصيتك ودودة ومرنة.
+  const prompt = `أنت زنجي — بوت مصري شخصيتك ودودة ومرنة وذكية.
+اللي بيكلمك اسمه: ${displayName}.
+ناديه بالاسم ده طبيعياً في ردودك.
 ${hist ? `سياق المحادثة:\n${hist}\n` : ""}
-الأونر: ${rawText}
+${displayName}: ${rawText}
 زنجي:`;
 
   return withRetry(async () => {
@@ -143,9 +145,10 @@ async function sendLog(guild, db, action, ownerName, details) {
 
 // ── الدالة الرئيسية ─────────────────────────────────────────────
 export async function handleOwnerAI(msg, guild, geminiModel, db) {
-  const isDM    = !msg.guild;
-  const userId  = msg.author.id;
-  const rawText = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
+  const isDM       = !msg.guild;
+  const userId     = msg.author.id;
+  const rawText    = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
+  const displayName = msg.member?.displayName || msg.author.globalName || msg.author.username;
 
   const send = (content) => isDM
     ? msg.channel.send(content).catch(() => {})
@@ -163,7 +166,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
     console.error("[OwnerAI] classifyMessage فشل:", err.message);
     // fallback: رد شات عادي
     try {
-      const reply = await chatReply(geminiModel, userId, rawText);
+      const reply = await chatReply(geminiModel, userId, rawText, displayName);
       pushHistory(userId, "user", rawText);
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
@@ -177,7 +180,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
   // ─── Chat ────────────────────────────────────────────────────
   if (action === "chat") {
     try {
-      const reply = await chatReply(geminiModel, userId, rawText);
+      const reply = await chatReply(geminiModel, userId, rawText, displayName);
       pushHistory(userId, "user", rawText);
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
@@ -366,7 +369,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
 
     // fallback: أي كلام مش متعرف = chat
     try {
-      const reply = await chatReply(geminiModel, userId, rawText);
+      const reply = await chatReply(geminiModel, userId, rawText, displayName);
       pushHistory(userId, "user", rawText);
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
