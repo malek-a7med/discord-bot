@@ -1055,7 +1055,7 @@ client.on("messageCreate", async (msg) => {
     const result = await geminiModel.generateContent(prompt);
     await msg.reply(result.response.text().trim());
   } catch (err) {
-    await msg.reply("معلش يسطا، هنجت مني ثواني وجرب تاني!");
+    await msg.reply("معلش يسطا ثواني بس");
   }
 });
 
@@ -1464,7 +1464,7 @@ client.on("interactionCreate", async (interaction) => {
         } catch (err) {
           logger.error("خطأ في إرسال لوحة الاقتراحات:", err);
           return interaction.reply({
-            content: `❌ حصل خطأ: ${err.message}`,
+            content: "معلش يسطا ثواني بس",
             ephemeral: true,
           });
         }
@@ -1485,7 +1485,7 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.editReply({ files: [attachment] });
         } catch (error) {
           logger.error("خطأ في توليد الصورة بالذكاء الاصطناعي:", error);
-          return interaction.editReply("❌ حصل خطأ أثناء توليد الصورة بالذكاء الاصطناعي، حاول مرة أخرى.");
+          return interaction.editReply("معلش يسطا ثواني بس");
         }
       }
 
@@ -1514,7 +1514,7 @@ client.on("interactionCreate", async (interaction) => {
           });
         } catch (err) {
           logger.error("خطأ في النسخة الاحتياطية:", err);
-          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+          return interaction.editReply({ content: "معلش يسطا ثواني بس" });
         }
       }
 
@@ -1557,7 +1557,7 @@ client.on("interactionCreate", async (interaction) => {
           });
         } catch (err) {
           logger.error("خطأ في الاسترجاع:", err);
-          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+          return interaction.editReply({ content: "معلش يسطا ثواني بس" });
         }
       }
 
@@ -1720,7 +1720,7 @@ client.on("interactionCreate", async (interaction) => {
 
     } catch (err) {
       logger.error("خطأ في تنفيذ الأمر:", err);
-      return interaction.reply({ content: "❌ حصل خطأ سريع وأنا بنفذ الأمر ده!", ephemeral: true }).catch(() => {});
+      return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
     }
   }
 
@@ -1996,7 +1996,7 @@ client.on("interactionCreate", async (interaction) => {
     } catch (err) {
       logger.error("خطأ في معالجة الزر:", err);
       return interaction.reply({
-        content: "❌ حصل خطأ في معالجة هذا الزر!",
+        content: "معلش يسطا ثواني بس",
         ephemeral: true
       }).catch(() => {});
     }
@@ -2106,7 +2106,7 @@ client.on("interactionCreate", async (interaction) => {
     } catch (err) {
       logger.error("خطأ في معالجة الـ Modal:", err);
       return interaction.reply({
-        content: "❌ حصل خطأ في معالجة اقتراحك!",
+        content: "معلش يسطا ثواني بس",
         ephemeral: true
       }).catch(() => {});
     }
@@ -2252,5 +2252,29 @@ client.on("warn", (info) => {
     console.warn("⚠️ [Discord]", info);
   }
 });
+
+// ── Auto-Reconnect — يراقب الاتصال كل دقيقتين ويعيد الاتصال تلقائياً ──
+let reconnecting = false;
+
+async function ensureConnected() {
+  if (reconnecting) return;
+  try {
+    // لو البوت مش ready أو الـ ping اتأخر أكتر من 10 ثواني = مشكلة
+    if (!client.isReady() || client.ws.ping > 10_000) {
+      reconnecting = true;
+      console.warn("⚠️ [AutoReconnect] البوت مش متصل — بيحاول يتصل تاني...");
+      await client.login(process.env.DISCORD_TOKEN).catch((e) => {
+        console.error("⚠️ [AutoReconnect] فشل إعادة الاتصال:", e.message);
+      });
+      reconnecting = false;
+      console.log("✅ [AutoReconnect] اتصل تاني بنجاح!");
+    }
+  } catch (e) {
+    reconnecting = false;
+    console.error("⚠️ [AutoReconnect] خطأ غير متوقع:", e.message);
+  }
+}
+
+setInterval(ensureConnected, 2 * 60 * 1000); // كل دقيقتين
 
 client.login(process.env.DISCORD_TOKEN);

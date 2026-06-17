@@ -195,7 +195,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
         pushHistory(userId, "model", reply);
         return send(`👑 ${reply}`);
       } catch {
-        return send("ثواني يسطا بس معلش 😅");
+        return send("معلش يسطا ثواني بس");
       }
     }
 
@@ -210,7 +210,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
         return send(`👑 ${reply}`);
       } catch (err) {
         console.error("[OwnerAI] chatReply فشل:", err.message);
-        return send("ثواني يسطا بس معلش 😅");
+        return send("معلش يسطا ثواني بس");
       }
     }
 
@@ -397,12 +397,12 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
     } catch {
-      return send("ثواني يسطا بس معلش 😅");
+      return send("معلش يسطا ثواني بس");
     }
 
   } catch (err) {
     console.error("[OwnerAI] خطأ في تنفيذ الأكشن:", err.message);
-    send(`❌ مقدرتش أنفذ الأمر ده: ${err.message}`);
+    send("معلش يسطا ثواني بس");
   } finally {
     // ── فك القفل دايماً حتى لو حصل أي error ──────────────────────
     processingLock.delete(userId);
