@@ -952,6 +952,29 @@ client.once("ready", async (c) => {
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
 });
 
+// ── ذاكرة المحادثات للأعضاء العاديين ────────────────────────────
+const userChatHistory = new Map();
+const MAX_USER_HIST   = 10;
+
+function getUserHistory(userId) {
+  if (!userChatHistory.has(userId)) userChatHistory.set(userId, []);
+  return userChatHistory.get(userId);
+}
+function pushUserHistory(userId, role, text) {
+  const h = getUserHistory(userId);
+  h.push({ role, text: text.slice(0, 300) });
+  if (h.length > MAX_USER_HIST) h.splice(0, h.length - MAX_USER_HIST);
+}
+function buildUserPrompt(senderName, question, userId) {
+  const hist = getUserHistory(userId);
+  const histText = hist.map(m => `${m.role === "user" ? senderName : "زنجي"}: ${m.text}`).join("\n");
+  return `أنت زنجي — بوت ديسكورد مصري ودود، بتتكلم بالعامية المصرية الطبيعية.
+${histText ? `\nسياق المحادثة:\n${histText}\n` : ""}
+${senderName}: ${question}
+
+رد بالعربي المصري بشكل مختصر وودود.`;
+}
+
 // ─── DM من الأونر ───────────────────────────────────────────────
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
@@ -1047,12 +1070,11 @@ client.on("messageCreate", async (msg) => {
     msg.react("✅").catch(() => {});
   }
 
-  const isMentioned   = msg.mentions.has(client.user.id);
-  const isOwner       = config.isOwner(msg.author.id);
-  const calledByName  = /زنجي/i.test(msg.content);
+  const isMentioned = msg.mentions.has(client.user.id);
+  const isOwner     = config.isOwner(msg.author.id);
 
-  // الأونر يكلمه من غير منشن — غير الأونر لازم منشن أو يقول "زنجي"
-  if (!isOwner && !isMentioned && !calledByName) return;
+  // الأونر يكلمه من غير منشن — غير الأونر لازم منشن
+  if (!isOwner && !isMentioned) return;
 
   const BOT_CHANNEL_ID = "1516591390023352370";
 
@@ -1070,10 +1092,12 @@ client.on("messageCreate", async (msg) => {
   msg.channel.sendTyping().catch(() => {});
   try {
     const senderName = msg.member?.displayName || msg.author.username;
-    const cleanQ     = question.replace(/زنجي/gi, "").trim();
-    const prompt = `اسم اللي بيكلمك: ${senderName}\nالرسالة: ${cleanQ || question}`;
-    const result = await geminiModel().generateContent(prompt);
-    await msg.reply(result.response.text().trim());
+    const prompt     = buildUserPrompt(senderName, question, msg.author.id);
+    const result     = await geminiModel().generateContent(prompt);
+    const reply      = result.response.text().trim();
+    pushUserHistory(msg.author.id, "user", question);
+    pushUserHistory(msg.author.id, "bot",  reply);
+    await msg.reply(reply);
   } catch (err) {
     await msg.reply("معلش يسطا ثواني بس");
   }
