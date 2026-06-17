@@ -324,6 +324,14 @@ const LEGACY_COMMANDS = [
             .setRequired(true)
         )
     ),
+  new SlashCommandBuilder()
+    .setName("رفع-بلوك")
+    .setDescription("ارفع البلوك عن يوزر قبل ما الوقت يخلص [أونر فقط]")
+    .addUserOption(opt =>
+      opt.setName("يوزر")
+        .setDescription("اليوزر اللي هترفع عنه البلوك")
+        .setRequired(true)
+    ),
 ];
 
 // Advanced Feature Commands
@@ -956,7 +964,7 @@ client.once("ready", async (c) => {
 const userChatHistory  = new Map();
 const MAX_USER_HIST    = 10;
 const userLastRequest  = new Map(); // cooldown: آخر طلب لكل يوزر
-const USER_COOLDOWN_MS = 15_000;   // 15 ثانية بين كل طلب وتاني
+const USER_COOLDOWN_MS = 5_000;    // 5 ثواني بين كل طلب وتاني
 
 // ── نظام حماية من الـ Spam ────────────────────────────────────
 const SPAM_WINDOW_MS  = 60_000;  // نافذة 60 ثانية
@@ -1175,6 +1183,21 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     try {
+      // ─── رفع البلوك ──────────────────────────────────────────────
+      if (cmd === "رفع-بلوك") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const target = interaction.options.getUser("يوزر");
+        const entry  = spamData.get(target.id);
+        if (!entry || entry.blockedUntil <= Date.now()) {
+          return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, ephemeral: true });
+        }
+        entry.blockedUntil = 0;
+        entry.timestamps   = [];
+        return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, ephemeral: true });
+      }
+
       // ─── حالة البوت ─────────────────────────────────────────────
       if (cmd === "حالة-البوت") {
         if (!config.isOwner(user.id)) {
