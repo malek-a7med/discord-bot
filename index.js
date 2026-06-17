@@ -260,8 +260,8 @@ const LEGACY_COMMANDS = [
     .setName("قناة-النسخ")
     .setDescription("تعيين قناة النسخ الاحتياطية اليومية [إدارة] / Set daily backup channel")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addChannelOption((o) =>
-      o.setName("القناة").setDescription("القناة اللي هتوصلها النسخ اليومية").setRequired(true)
+    .addStringOption((o) =>
+      o.setName("id").setDescription("الـ ID بتاع القناة — انسخه من Discord").setRequired(true)
     ),
   new SlashCommandBuilder()
     .setName("تشغيل-اختبار")
@@ -1388,7 +1388,11 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "قناة-النسخ") {
-        const ch = interaction.options.getChannel("القناة");
+        const channelId = interaction.options.getString("id").trim();
+        const ch = await guild.channels.fetch(channelId).catch(() => null);
+        if (!ch) {
+          return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, ephemeral: true });
+        }
         if (!db.data.settings) db.data.settings = {};
         db.data.settings.backupChannelId = ch.id;
         db.save();
@@ -1397,7 +1401,8 @@ client.on("interactionCreate", async (interaction) => {
             new EmbedBuilder()
               .setColor(0x3498db)
               .setTitle("✅ تم تعيين قناة النسخ الاحتياطية")
-              .setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ ${ch} كل 24 ساعة 🔄`)
+              .setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ <#${ch.id}> كل 24 ساعة 🔄`)
+              .addFields({ name: "📋 الـ ID المحفوظ", value: `\`${ch.id}\``, inline: true })
               .setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" })
               .setTimestamp()
           ],
