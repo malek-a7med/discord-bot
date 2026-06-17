@@ -1,21 +1,12 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 import { ImageProcessingError } from '../errors.js';
+import { getImageModel } from './gemini-keys.js';
 
 const GEMINI_INSTRUCTION =
   'Remove all text, speech bubbles text, sound effects text, and captions from this manga/manhwa image. Do NOT alter, repaint, or affect the artwork, linework, characters, or background in any way. Fill the areas where text was with the surrounding background color or pattern to make it look naturally clean. Return only the cleaned image with no text.';
 
-let geminiModel = null;
-
-function initGeminiModel(apiKey) {
-  const key = apiKey || process.env.GOOGLE_API_KEY;
-  if (!geminiModel && key) {
-    const genAI = new GoogleGenerativeAI(key);
-    geminiModel = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash'
-    });
-  }
-  return geminiModel;
+function initGeminiModel() {
+  return getImageModel();
 }
 
 async function cleanImageViaSharp(imageBuffer) {
@@ -94,8 +85,8 @@ async function cleanImageWithGemini(imageBuffer, mimeType = 'image/jpeg') {
 }
 
 class ImageCleanerHelper {
-  constructor(geminiApiKey) {
-    initGeminiModel(geminiApiKey);
+  constructor() {
+    // الموديل بيتجاب من نظام التدوير التلقائي
   }
 
   cleanImage(imageBuffer, mimeType = 'image/jpeg') {

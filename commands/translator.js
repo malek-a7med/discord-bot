@@ -54,7 +54,7 @@ async function handleTranslateChapter(interaction) {
     // Initialize helpers
     const driveHelper = new GoogleDriveHelper(config.GOOGLE_API_KEY);
     const docsHelper = new GoogleDocsHelper(config.GOOGLE_API_KEY);
-    const translator = new GeminiTranslator(config.GOOGLE_API_KEY);
+    const translator = new GeminiTranslator();
 
     await interaction.editReply({
       content: '⏳ بحمل الصور... دي ممكن تاخد وقت'

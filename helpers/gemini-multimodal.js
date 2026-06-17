@@ -1,13 +1,12 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ImageProcessingError } from '../errors.js';
+import { getImageModel } from './gemini-keys.js';
 
 class GeminiTranslator {
-  constructor(apiKey) {
-    this.client = new GoogleGenerativeAI(apiKey);
-    this.model = this.client.getGenerativeModel({
-      model: 'gemini-1.5-flash'
-    });
+  constructor() {
+    // بيجيب الموديل مع التدوير التلقائي للمفاتيح
   }
+
+  get model() { return getImageModel(); }
 
   async ocrAndTranslate(imageBuffer, targetLanguage = 'arabic') {
     try {

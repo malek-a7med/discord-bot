@@ -61,7 +61,7 @@ import {
   VoiceConnectionDisconnectReason,
 } from "@discordjs/voice";
 import playdl from "play-dl";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats } from "./helpers/gemini-keys.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -864,13 +864,7 @@ function showSuggestionModal(interaction) {
   return interaction.showModal(modal);
 }
 
-let geminiModel = null;
-let geminiImageModel = null;
-if (process.env.GOOGLE_API_KEY) {
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-  geminiModel = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    systemInstruction: `أنت "زنجي" — بوت ديسكورد مصري بامتياز تابع لسيرفر "الفراعنة".
+const _geminiReady = initGeminiKeys(`أنت "زنجي" — بوت ديسكورد مصري بامتياز تابع لسيرفر "الفراعنة".
 شخصيتك بتتغير **بالكامل** بناءً على أسلوب اللي بيكلمك:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -892,11 +886,13 @@ if (process.env.GOOGLE_API_KEY) {
 ⚠️ قواعد ثابتة:
 - دايماً بالعامية المصرية
 - لا تشرح إيه اللي بتعمله، بس افعله
-- لو مش واضح الأسلوب، افترض إنه محترم`,
-  });
-  geminiImageModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  logger.info("🤖 Gemini AI جاهز!");
-}
+- لو مش واضح الأسلوب، افترض إنه محترم`);
+
+if (_geminiReady) logger.info("🤖 Gemini AI جاهز!");
+
+// بيجيب الموديل في اللحظة اللي بيتستخدم فيها عشان يضمن التدوير
+function geminiModel()      { return getChatModel(); }
+function geminiImageModel() { return getImageModel(); }
 
 async function sendAutoBackup(clientInstance) {
   try {
@@ -948,11 +944,11 @@ client.on("messageCreate", async (msg) => {
   // الـ DM للأونر — بره السيرفر (أي رسالة من غير ما يعمل reply)
   if (!msg.guild) {
     if (!config.isOwner(msg.author.id)) return;
-    if (!geminiModel) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
+    if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
     const guild = client.guilds.cache.first();
     if (!guild) return msg.channel.send("❌ البوت مش في أي سيرفر!").catch(() => {});
     await guild.members.fetch().catch(() => {});
-    return handleOwnerAI(msg, guild, geminiModel, db).catch(() => {});
+    return handleOwnerAI(msg, guild, geminiModel(), db).catch(() => {});
   }
 
   // ── Auto-Mod الذكي ─────────────────────────────────────────────
@@ -987,7 +983,7 @@ client.on("messageCreate", async (msg) => {
       }
     };
 
-    const amResult = await autoModScan(msg, db, geminiImageModel, notifyOwner).catch(() => ({}));
+    const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner).catch(() => ({}));
     // لو الرسالة اتحذفت بواسطة automod، وقف الباقي
     if (amResult?.triggered) return;
   }
@@ -1043,16 +1039,16 @@ client.on("messageCreate", async (msg) => {
   }
 
   const question = msg.content.replace(/<@!?\d+>/g, "").trim();
-  if (!question || !geminiModel) return;
+  if (!question || !_geminiReady) return;
 
   if (isOwner) {
-    return handleOwnerAI(msg, msg.guild, geminiModel, db).catch(() => {});
+    return handleOwnerAI(msg, msg.guild, geminiModel(), db).catch(() => {});
   }
 
   msg.channel.sendTyping().catch(() => {});
   try {
     const prompt = `اسم اللي بيكلمك: ${msg.author.username}\nالرسالة: ${question}`;
-    const result = await geminiModel.generateContent(prompt);
+    const result = await geminiModel().generateContent(prompt);
     await msg.reply(result.response.text().trim());
   } catch (err) {
     await msg.reply("معلش يسطا ثواني بس");
@@ -1092,7 +1088,7 @@ client.on("interactionCreate", async (interaction) => {
 
         const memMB    = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
         const ping     = client.ws.ping;
-        const aiStatus = geminiModel ? "🟢 شغال" : "🔴 مش شغال";
+        const aiStatus = _geminiReady ? `🟢 شغال (${getKeyCount()} مفتاح)` : "🔴 مش شغال";
         const locks    = getProcessingCount();
         const guilds   = client.guilds.cache.size;
 
@@ -1472,11 +1468,11 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "صورة") {
         const prompt = interaction.options.getString("وصف");
-        if (!geminiImageModel) return interaction.reply("❌ ميزة توليد الصور بالذكاء الاصطناعي غير متاحة حالياً.");
+        if (!_geminiReady) return interaction.reply("❌ ميزة توليد الصور بالذكاء الاصطناعي غير متاحة حالياً.");
 
         await interaction.deferReply();
         try {
-          const result = await geminiImageModel.generateContent(prompt);
+          const result = await geminiImageModel().generateContent(prompt);
           const image = result.response.candidates[0].content.parts[0].inlineData;
           const imageBuffer = Buffer.from(image.data, 'base64');
 
