@@ -963,7 +963,15 @@ client.on("messageCreate", async (msg) => {
 client.on("interactionCreate", async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const cmd = interaction.commandName;
-    const { guild, user, channel } = interaction;
+    const { user, channel } = interaction;
+
+    // ─── دعم DM الكامل: لو الأمر جاي من DM هنجيب السيرفر تلقائياً ───
+    let guild = interaction.guild;
+    const isFromDM = !guild;
+    if (isFromDM) {
+      guild = client.guilds.cache.first() || null;
+      if (guild) await guild.members.fetch().catch(() => {});
+    }
 
     try {
       // ═══════════════════════════════════════════════════════════════
@@ -992,37 +1000,54 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // Music Commands (New System)
-      if (cmd === "play") {
-        const { handlePlay } = await import("./commands/music.js");
-        return await handlePlay(interaction);
-      }
-      if (cmd === "skip") {
-        const { handleSkip } = await import("./commands/music.js");
-        return await handleSkip(interaction);
-      }
-      if (cmd === "stop") {
-        const { handleStop } = await import("./commands/music.js");
-        return await handleStop(interaction);
-      }
-      if (cmd === "queue") {
-        const { handleQueue } = await import("./commands/music.js");
-        return await handleQueue(interaction);
-      }
-      if (cmd === "pause") {
-        const { handlePause } = await import("./commands/music.js");
-        return await handlePause(interaction);
-      }
-      if (cmd === "resume") {
-        const { handleResume } = await import("./commands/music.js");
-        return await handleResume(interaction);
-      }
-      if (cmd === "nowplaying") {
-        const { handleNowPlaying } = await import("./commands/music.js");
-        return await handleNowPlaying(interaction);
-      }
-      if (cmd === "volume") {
-        const { handleVolume } = await import("./commands/music.js");
-        return await handleVolume(interaction);
+      // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
+      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume"];
+      if (MUSIC_CMDS.includes(cmd)) {
+        let musicInteraction = interaction;
+        if (isFromDM && guild) {
+          const guildMember = await guild.members.fetch(user.id).catch(() => null);
+          musicInteraction = new Proxy(interaction, {
+            get(target, prop) {
+              if (prop === "guild")   return guild;
+              if (prop === "guildId") return guild.id;
+              if (prop === "member")  return guildMember;
+              const val = target[prop];
+              return typeof val === "function" ? val.bind(target) : val;
+            }
+          });
+        }
+        if (cmd === "play") {
+          const { handlePlay } = await import("./commands/music.js");
+          return await handlePlay(musicInteraction);
+        }
+        if (cmd === "skip") {
+          const { handleSkip } = await import("./commands/music.js");
+          return await handleSkip(musicInteraction);
+        }
+        if (cmd === "stop") {
+          const { handleStop } = await import("./commands/music.js");
+          return await handleStop(musicInteraction);
+        }
+        if (cmd === "queue") {
+          const { handleQueue } = await import("./commands/music.js");
+          return await handleQueue(musicInteraction);
+        }
+        if (cmd === "pause") {
+          const { handlePause } = await import("./commands/music.js");
+          return await handlePause(musicInteraction);
+        }
+        if (cmd === "resume") {
+          const { handleResume } = await import("./commands/music.js");
+          return await handleResume(musicInteraction);
+        }
+        if (cmd === "nowplaying") {
+          const { handleNowPlaying } = await import("./commands/music.js");
+          return await handleNowPlaying(musicInteraction);
+        }
+        if (cmd === "volume") {
+          const { handleVolume } = await import("./commands/music.js");
+          return await handleVolume(musicInteraction);
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -1166,6 +1191,9 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "مسح") {
+        if (isFromDM) {
+          return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** 🤖", ephemeral: true });
+        }
         const num = interaction.options.getInteger("عدد");
         await interaction.deferReply({ ephemeral: true });
         let remaining = num;
@@ -1181,6 +1209,9 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "مسح-الكل") {
+        if (isFromDM) {
+          return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
+        }
         const confirmRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId(`wipe_confirm|${channel.id}`)
