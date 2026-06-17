@@ -29,12 +29,13 @@ export function clearOwnerHistory(userId) {
 }
 
 // ── Retry تلقائي ────────────────────────────────────────────────
-async function withRetry(fn, retries = 3, delayMs = 1000) {
+async function withRetry(fn, retries = 5, delayMs = 1500) {
   for (let i = 0; i < retries; i++) {
     try { return await fn(); }
     catch (err) {
       if (i === retries - 1) throw err;
-      await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+      // exponential backoff: 1.5s, 3s, 6s, 12s
+      await new Promise(r => setTimeout(r, delayMs * Math.pow(2, i)));
     }
   }
 }
@@ -171,7 +172,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
     } catch {
-      return send("⚠️ في ضغط على الـ AI دلوقتي، جرب بعد ثواني.");
+      return send("ثواني يسطا بس معلش 😅");
     }
   }
 
@@ -186,7 +187,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       return send(`👑 ${reply}`);
     } catch (err) {
       console.error("[OwnerAI] chatReply فشل:", err.message);
-      return send("⚠️ في ضغط على الـ AI دلوقتي، جرب بعد ثواني.");
+      return send("ثواني يسطا بس معلش 😅");
     }
   }
 
@@ -374,7 +375,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
     } catch {
-      return send("⚠️ في ضغط على الـ AI دلوقتي، جرب بعد ثواني.");
+      return send("ثواني يسطا بس معلش 😅");
     }
 
   } catch (err) {
