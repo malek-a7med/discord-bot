@@ -35,6 +35,7 @@ import { handleOwnerAI } from "./helpers/owner-ai.js";
 import {
   Client,
   GatewayIntentBits,
+  Partials,
   REST,
   Routes,
   SlashCommandBuilder,
@@ -354,7 +355,10 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildModeration,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessageReactions,
   ],
+  partials: [Partials.Channel, Partials.Message],
   sweepers: {
     messages: {
       interval: 1800,
