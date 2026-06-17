@@ -263,6 +263,19 @@ const LEGACY_COMMANDS = [
     .addChannelOption((o) =>
       o.setName("القناة").setDescription("القناة اللي هتوصلها النسخ اليومية").setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName("تشغيل-اختبار")
+    .setDescription("اختبار رسالة الترحيب أو الوداع [إدارة] / Test welcome or goodbye message")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((o) =>
+      o.setName("نوع")
+        .setDescription("اختار نوع الرسالة")
+        .setRequired(true)
+        .addChoices(
+          { name: "🎉 رسالة ترحيب", value: "welcome" },
+          { name: "🥀 رسالة وداع",  value: "goodbye" }
+        )
+    ),
 ];
 
 // Advanced Feature Commands
@@ -1322,6 +1335,56 @@ client.on("interactionCreate", async (interaction) => {
           logger.error("خطأ في الاسترجاع:", err);
           return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
         }
+      }
+
+      if (cmd === "تشغيل-اختبار") {
+        const type = interaction.options.getString("نوع");
+        const WELCOME_CHANNEL_ID = "1486100560494203183";
+        const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
+        if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+
+        if (type === "welcome") {
+          const imagePath = path.join(__dirname, 'welcome.png');
+          const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
+          const embed = new EmbedBuilder()
+            .setColor('#A020F0')
+            .setTitle('⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️')
+            .setDescription(
+              `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
+              `👤 **الـعـضـو الـجـديـد:** ${user}\n` +
+              `🆔 **الـمـعـرّف الـخـاص:** \`${user.id}\`\n` +
+              `📊 **أنـت الـفـرعـون رقـم:** \`${guild.memberCount}\` في مملكتنا!\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+              `🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`
+            )
+            .setImage('attachment://welcome.png')
+            .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️ [اختبار]' })
+            .setTimestamp();
+          await testChannel.send({ embeds: [embed], files: [attachment] });
+        } else {
+          const embed = new EmbedBuilder()
+            .setColor('#A020F0')
+            .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
+            .setDescription(
+              `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `👤 **الفرعون اللي ودعنا:** ${user}\n` +
+              `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
+              `📊 **بقينا** \`${guild.memberCount}\` **فرعون في المملكة.**\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+              `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
+            )
+            .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+            .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️ [اختبار]' })
+            .setTimestamp();
+          await testChannel.send({ embeds: [embed] });
+        }
+
+        return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
       }
 
       if (cmd === "قناة-النسخ") {
