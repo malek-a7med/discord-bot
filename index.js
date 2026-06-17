@@ -869,7 +869,7 @@ let geminiImageModel = null;
 if (process.env.GOOGLE_API_KEY) {
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
   geminiModel = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-1.5-flash",
     systemInstruction: `أنت "زنجي" — بوت ديسكورد مصري بامتياز تابع لسيرفر "الفراعنة".
 شخصيتك بتتغير **بالكامل** بناءً على أسلوب اللي بيكلمك:
 
@@ -894,7 +894,7 @@ if (process.env.GOOGLE_API_KEY) {
 - لا تشرح إيه اللي بتعمله، بس افعله
 - لو مش واضح الأسلوب، افترض إنه محترم`,
   });
-  geminiImageModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  geminiImageModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
   logger.info("🤖 Gemini AI جاهز!");
 }
 
