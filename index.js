@@ -876,16 +876,15 @@ client.once("ready", async (c) => {
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-  // الـ DM للأونر — بره السيرفر
-  if (!msg.guild && config.isOwner(msg.author.id)) {
-    if (!geminiModel) return msg.reply("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
+  // الـ DM للأونر — بره السيرفر (أي رسالة من غير ما يعمل reply)
+  if (!msg.guild) {
+    if (!config.isOwner(msg.author.id)) return;
+    if (!geminiModel) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
     const guild = client.guilds.cache.first();
-    if (!guild) return msg.reply("❌ البوت مش في أي سيرفر!").catch(() => {});
+    if (!guild) return msg.channel.send("❌ البوت مش في أي سيرفر!").catch(() => {});
     await guild.members.fetch().catch(() => {});
     return handleOwnerAI(msg, guild, geminiModel, db).catch(() => {});
   }
-
-  if (!msg.guild) return;
 
   // Autonomous Moderation Scanning
   if (moderation.isEnabled()) {
@@ -923,11 +922,15 @@ client.on("messageCreate", async (msg) => {
     msg.react("✅").catch(() => {});
   }
 
-  const isMentioned = msg.mentions.has(client.user.id);
-  if (!isMentioned) return;
+  const isMentioned  = msg.mentions.has(client.user.id);
+  const BOT_NAME_RGX = /زنجي/i;
+  const isOwner      = config.isOwner(msg.author.id);
+  const namedByOwner = isOwner && BOT_NAME_RGX.test(msg.content);
+
+  // الأونر يقدر يكلمه بالمنشن أو بالاسم
+  if (!isMentioned && !namedByOwner) return;
 
   const BOT_CHANNEL_ID = "1516591390023352370";
-  const isOwner = config.isOwner(msg.author.id);
 
   if (!isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
     return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
