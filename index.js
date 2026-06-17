@@ -1040,12 +1040,10 @@ client.on("messageCreate", async (msg) => {
   }
 
   const isMentioned  = msg.mentions.has(client.user.id);
-  const BOT_NAME_RGX = /زنجي/i;
   const isOwner      = config.isOwner(msg.author.id);
-  const namedByOwner = isOwner && BOT_NAME_RGX.test(msg.content);
 
-  // الأونر يقدر يكلمه بالمنشن أو بالاسم
-  if (!isMentioned && !namedByOwner) return;
+  // الأونر يكلمه من غير منشن أو ريبلاي — غير الأونر لازم منشن
+  if (!isOwner && !isMentioned) return;
 
   const BOT_CHANNEL_ID = "1516591390023352370";
 

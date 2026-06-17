@@ -16,35 +16,40 @@ function collectKeys() {
 }
 
 // ── حالة كل مفتاح ────────────────────────────────────────────
-const keyStates = new Map(); // key → { exhaustedAt: Date|null }
+const exhaustedKeys = new Set(); // المفاتيح اللي خلصت دلوقتي
+let _currentIndex = 0;           // فهرس الدوران الحالي
 
 function isExhausted(key) {
-  const state = keyStates.get(key);
-  if (!state || !state.exhaustedAt) return false;
-  // بعد ساعة بنجرب تاني (الكوتا بترجع في أي وقت بعد reset)
-  return (Date.now() - state.exhaustedAt) < 60 * 60 * 1000;
+  return exhaustedKeys.has(key);
 }
 
 function markExhausted(key) {
-  keyStates.set(key, { exhaustedAt: Date.now() });
+  exhaustedKeys.add(key);
   console.warn(`⚠️ [GeminiKeys] المفتاح ${key.slice(-6)} وصل للحد — بيتحول للتالي`);
 }
 
 function markAvailable(key) {
-  keyStates.set(key, { exhaustedAt: null });
+  exhaustedKeys.delete(key);
 }
 
-// ── اختار أول مفتاح شغال ─────────────────────────────────────
+// ── اختار المفتاح التالي في الدايرة ──────────────────────────
 function pickKey(keys) {
-  const available = keys.filter(k => !isExhausted(k));
-  if (available.length > 0) return available[0];
-  // لو كلهم خلصوا — خد الأقدم في الـ exhaustion عشان يكون الأقرب للريست
-  const sorted = [...keys].sort((a, b) => {
-    const at = keyStates.get(a)?.exhaustedAt || 0;
-    const bt = keyStates.get(b)?.exhaustedAt || 0;
-    return at - bt;
-  });
-  return sorted[0];
+  const total = keys.length;
+
+  // دور على أقرب مفتاح شغال من الفهرس الحالي
+  for (let i = 0; i < total; i++) {
+    const idx = (_currentIndex + i) % total;
+    if (!isExhausted(keys[idx])) {
+      _currentIndex = idx;
+      return keys[idx];
+    }
+  }
+
+  // كل المفاتيح خلصت — صحّيهم كلهم وابدأ من الأول (دايرة كاملة)
+  console.warn(`🔄 [GeminiKeys] كل المفاتيح اتاستخدمت — بيرجع للمفتاح الأول`);
+  exhaustedKeys.clear();
+  _currentIndex = 0;
+  return keys[0];
 }
 
 // ── Proxy Model — بيشتغل زي model عادي بس بيدور المفاتيح ──────
