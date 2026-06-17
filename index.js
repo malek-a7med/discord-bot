@@ -1088,6 +1088,21 @@ client.on("messageCreate", async (msg) => {
   processedMessages.add(msg.id);
   setTimeout(() => processedMessages.delete(msg.id), 60_000);
 
+  // ── روم الاقتراحات: احذف أي رسالة عادية وذكّر بالأزرار ────────
+  if (msg.guild && msg.channel.id === SUGGESTIONS_CHANNEL_ID) {
+    await msg.delete().catch(() => {});
+    await msg.author.send(
+      "👋 يا صاحبي!\n" +
+      `روم <#${SUGGESTIONS_CHANNEL_ID}> بيشتغل عن طريق الأزرار بس — ما ينفعش تكتب فيه مباشرة.\n\n` +
+      "استخدم الأزرار الموجودة في الروم:\n" +
+      "💡 **اقتراح** — عشان تقترح فكرة جديدة\n" +
+      "🔴 **مشكلة** — عشان تبلّغ عن مشكلة\n" +
+      "💬 **تعليق** — عشان تبعت تعليق أو ملاحظة\n\n" +
+      "شكراً لتفهمك! 🙏"
+    ).catch(() => {});
+    return;
+  }
+
   // الـ DM — بره السيرفر
   if (!msg.guild) {
     const isOwner = config.isOwner(msg.author.id);
