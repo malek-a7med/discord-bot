@@ -8,8 +8,10 @@ import {
   memoryGetAll, memoryToPromptText, memorySearch
 } from "./bot-memory.js";
 
-// ── قفل لمنع معالجة رسالتين في نفس الوقت لنفس اليوزر ──────────
-const processingLock = new Set(); // userId → جاري المعالجة
+// ── قائمة انتظار ذكية لكل أونر — مش lock بيضيّع الرسايل ──────────
+const userQueues    = new Map(); // userId → [ {msg, guild, geminiModel, db, buildDashboard} ]
+const isProcessing  = new Set(); // userId → بيشتغل دلوقتي
+const MAX_QUEUE     = 4;         // أقصى عدد رسايل منتظرة (الأقدم بيتشال)
 
 // ── ذاكرة المحادثات (text-based — أثبت من startChat) ───────────
 const ownerHistory = new Map(); // userId → [{who, text}]
@@ -37,23 +39,22 @@ export function clearOwnerHistory(userId) {
 }
 
 export function getProcessingCount() {
-  return processingLock.size;
+  return isProcessing.size;
 }
 
-// ── Retry تلقائي (3 محاولات بس — أسرع وأقل إزعاج) ──────────────
-async function withRetry(fn, retries = 3, delayMs = 800) {
+// ── Retry أسرع (2 محاولة فقط) ───────────────────────────────────
+async function withRetry(fn, retries = 2, delayMs = 500) {
   for (let i = 0; i < retries; i++) {
     try { return await fn(); }
     catch (err) {
       if (i === retries - 1) throw err;
-      // backoff: 0.8s, 1.6s
-      await new Promise(r => setTimeout(r, delayMs * Math.pow(2, i)));
+      await new Promise(r => setTimeout(r, delayMs * (i + 1)));
     }
   }
 }
 
 // ── Timeout wrapper عشان Gemini مياخدش وقت أكتر من اللازم ────────
-function withTimeout(promise, ms = 20000) {
+function withTimeout(promise, ms = 10000) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
@@ -198,24 +199,48 @@ async function sendLog(guild, db, action, ownerName, details) {
   }).catch(() => {});
 }
 
-// ── الدالة الرئيسية ─────────────────────────────────────────────
-export async function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard = null) {
-  const isDM       = !msg.guild;
-  const userId     = msg.author.id;
-  const rawText    = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
-  const ownerName  = config.getOwnerName(userId) || msg.author.globalName || msg.author.username;
+// ── مشغّل القائمة: ينفذ طلب واحد وبعدين يجيب التاني ────────────
+async function _runQueue(userId) {
+  while (true) {
+    const queue = userQueues.get(userId) || [];
+    if (!queue.length) { isProcessing.delete(userId); userQueues.delete(userId); return; }
+    const job = queue.shift();
+    userQueues.set(userId, queue);
+    await _processOne(job).catch(() => {});
+  }
+}
+
+// ── الدالة الرئيسية — تُضيف للقائمة وتشغّل لو مش شغّال ──────────
+export function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard = null) {
+  const userId  = msg.author.id;
+  const rawText = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
+  if (!rawText) return;
+
+  // أضف للقائمة
+  if (!userQueues.has(userId)) userQueues.set(userId, []);
+  const queue = userQueues.get(userId);
+
+  // لو القائمة ممتلية → اشيل الأقدم وحط الجديد
+  if (queue.length >= MAX_QUEUE) queue.shift();
+  queue.push({ msg, guild, geminiModel, db, buildDashboard });
+
+  // لو مش بيشتغل → ابدأ
+  if (!isProcessing.has(userId)) {
+    isProcessing.add(userId);
+    _runQueue(userId);
+  }
+}
+
+// ── المعالجة الفعلية لرسالة واحدة ────────────────────────────────
+async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
+  const isDM      = !msg.guild;
+  const userId    = msg.author.id;
+  const rawText   = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
+  const ownerName = config.getOwnerName(userId) || msg.author.globalName || msg.author.username;
 
   const send = (content) => isDM
     ? msg.channel.send(content).catch(() => {})
     : msg.reply(content).catch(() => {});
-
-  if (!rawText) return;
-
-  // ── منع تشغيل أكتر من طلب واحد في نفس الوقت لنفس اليوزر ────────
-  if (processingLock.has(userId)) {
-    return send("⏳ لسه بعالج طلبك السابق، استنى ثانية!");
-  }
-  processingLock.add(userId);
 
   try {
     msg.channel.sendTyping().catch(() => {});
@@ -223,10 +248,10 @@ export async function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard 
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 15000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 10000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
-      return send("معلش يسطا ثواني بس");
+      return send("❌ تأخرت أو في مشكلة في الـ AI، حاول تاني!");
     }
 
     const { action } = parsed;
@@ -750,10 +775,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard 
 
   } catch (err) {
     console.error("[OwnerAI] خطأ في تنفيذ الأكشن:", err.message);
-    send("معلش يسطا ثواني بس");
-  } finally {
-    // ── فك القفل دايماً حتى لو حصل أي error ──────────────────────
-    processingLock.delete(userId);
+    send("❌ حصل خطأ غير متوقع، حاول تاني!").catch(() => {});
   }
 }
 
