@@ -245,6 +245,10 @@ const LEGACY_COMMANDS = [
     .setName("صورة")
     .setDescription("توليد صورة بالـ AI / Generate an AI image")
     .addStringOption((o) => o.setName("وصف").setDescription("وصف الصورة المطلوبة").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("نسخة-احتياطية")
+    .setDescription("تحميل نسخة احتياطية من بيانات السيرفر [إدارة] / Download server database backup")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ];
 
 // Advanced Feature Commands
@@ -1173,6 +1177,35 @@ client.on("interactionCreate", async (interaction) => {
         } catch (error) {
           logger.error("خطأ في توليد الصورة بالذكاء الاصطناعي:", error);
           return interaction.editReply("❌ حصل خطأ أثناء توليد الصورة بالذكاء الاصطناعي، حاول مرة أخرى.");
+        }
+      }
+
+      if (cmd === "نسخة-احتياطية") {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const allData = db.getAllData();
+          const now = new Date();
+          const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+          const jsonBuffer = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
+          const attachment = new AttachmentBuilder(jsonBuffer, { name: `backup_${dateStr}.json` });
+          const userCount = Object.keys(allData.users || {}).length;
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("💾 نسخة احتياطية جاهزة")
+                .addFields(
+                  { name: "📅 التاريخ", value: dateStr, inline: true },
+                  { name: "👥 عدد الأعضاء المحفوظين", value: `${userCount}`, inline: true }
+                )
+                .setFooter({ text: "احتفظ بالملف في مكان آمن ✅" })
+                .setTimestamp()
+            ],
+            files: [attachment]
+          });
+        } catch (err) {
+          logger.error("خطأ في النسخة الاحتياطية:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
         }
       }
 
