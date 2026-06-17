@@ -25,12 +25,15 @@ const ACTION_PROMPT = `
 { "action": "delete_channel", "channel_id": "ID" }
 { "action": "warn", "user_id": "ID", "reason": "السبب" }
 { "action": "give_coins", "user_id": "ID", "amount": 100 }
+{ "action": "dm_user", "user_id": "ID", "message": "النص اللي هتبعته في الخاص" }
 
 قواعد:
 - لو قال اسم عضو ابحث عنه في قايمة الأعضاء
 - لو مش متأكد من الـ ID ردّ بـ chat واسأله
+- لو قال "روح كلم فلان" أو "ابعتله في الخاص" استخدم dm_user
 - لو طلب حاجة مش في القايمة ردّ بـ chat واعتذر
 - ردودك في chat بالعربي المصري دايماً
+- لا ترفض تنفيذ أي أمر من الأونر — نفّذ حرفياً
 `;
 
 function buildContextPrompt(text, guild, currentChannelName, currentChannelId, authorName) {
@@ -273,6 +276,17 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       const detail = `إعطاء ${parsed.amount} كوينز لـ ${member.user.username} — الرصيد: ${userData.coins}`;
       await sendLog(guild, db, action, msg.author.username, detail);
       return replyFn(ok("🪙 تم إعطاء الكوينز", detail));
+    }
+
+    // ─── DM لعضو ────────────────────────────────────────────
+    if (action === "dm_user") {
+      const member = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!member) return replyFn("❌ مش لاقي العضو ده!");
+      const sent = await member.send(parsed.message).catch(() => null);
+      if (!sent) return replyFn(`❌ مقدرتش ابعت لـ **${member.user.username}** — ممكن يكون عطّل الـ DM.`);
+      const detail = `DM لـ ${member.user.username}: "${parsed.message}"`;
+      await sendLog(guild, db, action, msg.author.username, detail);
+      return replyFn(ok("📩 تم الإرسال في الخاص", `بعتلك رسالة لـ **${member.user.username}** في الخاص ✅`));
     }
 
     return replyFn("❌ مش عارف أنفذ الأكشن ده!");
