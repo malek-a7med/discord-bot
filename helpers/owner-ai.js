@@ -65,20 +65,20 @@ function withTimeout(promise, ms = 15000) {
 
 // ── Prompt موحد: classify + رد في طلب واحد للسرعة ───────────────
 function buildUnifiedPrompt(text, ownerName, guild, history) {
-  const members = guild.members.cache
-    .filter(m => !m.user.bot)
-    .map(m => `${m.user.username}=${m.user.id}`)
-    .slice(0, 30).join(", ");
+  const members = guild?.members?.cache
+    ?.filter(m => !m.user.bot)
+    ?.map(m => `${m.user.username}=${m.user.id}`)
+    ?.slice(0, 30)?.join(", ") ?? "غير متاح";
 
-  const channels = guild.channels.cache
-    .filter(c => c.type === 0 || c.type === 2)
-    .map(c => `${c.name}=${c.id}`)
-    .slice(0, 15).join(", ");
+  const channels = guild?.channels?.cache
+    ?.filter(c => c.type === 0 || c.type === 2)
+    ?.map(c => `${c.name}=${c.id}`)
+    ?.slice(0, 15)?.join(", ") ?? "غير متاح";
 
-  const roles = guild.roles.cache
-    .filter(r => r.name !== "@everyone")
-    .map(r => `${r.name}=${r.id}`)
-    .slice(0, 10).join(", ");
+  const roles = guild?.roles?.cache
+    ?.filter(r => r.name !== "@everyone")
+    ?.map(r => `${r.name}=${r.id}`)
+    ?.slice(0, 10)?.join(", ") ?? "غير متاح";
 
   return `أنت زنجي — بوت Discord مصري ذكي وودود. الأونر اسمه "${ownerName}".
 
