@@ -95,6 +95,14 @@ class RotatingGeminiModel {
   }
 }
 
+// ── إعادة تشغيل المفاتيح المحروقة تلقائياً كل ساعة ──────────────
+setInterval(() => {
+  if (exhaustedKeys.size > 0) {
+    console.log(`🔄 [GeminiKeys] إعادة تشغيل ${exhaustedKeys.size} مفتاح محروق`);
+    exhaustedKeys.clear();
+  }
+}, 60 * 60 * 1000); // كل ساعة
+
 // ── الـ instance الرئيسي للـ rotator ─────────────────────────
 let _keys = [];
 let _chatModel = null;
@@ -107,7 +115,7 @@ export function initGeminiKeys(systemInstruction) {
   _chatModel  = new RotatingGeminiModel(_keys, "gemini-2.5-flash", systemInstruction);
   _imageModel = new RotatingGeminiModel(_keys, "gemini-2.5-flash");
 
-  console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (${_keys.length * 500} طلب/يوم)`);
+  console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (~${_keys.length * 1500} طلب/يوم)`);
   return true;
 }
 
@@ -122,7 +130,13 @@ export function getKeyStats() {
   }));
 }
 
-// ── إضافة مفاتيح جديدة وهو شغال ─────────────────────────────
+// ── إعادة تشغيل المفاتيح يدوياً (من أمر الأونر) ─────────────────
+export function resetExhaustedKeys() {
+  const count = exhaustedKeys.size;
+  exhaustedKeys.clear();
+  _currentIndex = 0;
+  return count;
+}
 export function addKeys(newKeys) {
   const added = [];
   for (const k of newKeys) {
@@ -134,7 +148,7 @@ export function addKeys(newKeys) {
   }
   if (added.length > 0) {
     // حدّث الموديلات عشان يشوفوا المفاتيح الجديدة (هما بيستخدموا نفس الـ _keys reference)
-    console.log(`✅ [GeminiKeys] اتضافوا ${added.length} مفتاح جديد — إجمالي: ${_keys.length} (${_keys.length * 20} طلب/يوم)`);
+    console.log(`✅ [GeminiKeys] اتضافوا ${added.length} مفتاح جديد — إجمالي: ${_keys.length} (~${_keys.length * 1500} طلب/يوم)`);
   }
   return { added: added.length, total: _keys.length };
 }
