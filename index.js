@@ -2584,25 +2584,30 @@ setInterval(async () => {
 }, 2 * 60 * 1000); // كل دقيقتين
 
 // ── مراقبة الاتصال بـ Discord كل دقيقة ──────────────────────
+// بنستنى 90 ثانية بعد الـ startup قبل ما نبدأ نفحص (ping بيبقى -1 في البداية)
+const _startupTime = Date.now();
+
 setInterval(async () => {
   if (_reconnecting) return;
 
-  const isReady     = client.isReady();
-  const wsPing      = client.ws.ping;
-  const secsSilent  = (Date.now() - _lastHeartbeat) / 1000;
-  const deadPing    = wsPing > 15_000 || wsPing < 0;
+  // إيقاف الفحص في أول 90 ثانية من الـ startup
+  if (Date.now() - _startupTime < 90_000) return;
 
-  // حالات تستدعي إعادة الاتصال
-  const needsReconnect =
-    !isReady ||
-    deadPing ||
-    (secsSilent > 600 && !isReady); // 10 دقايق صمت وفجأة مش ready
+  const isReady    = client.isReady();
+  const wsPing     = client.ws.ping;
+  const secsSilent = (Date.now() - _lastHeartbeat) / 1000;
+
+  // لا نعتبر ping سالب مشكلة (بيحصل طبيعياً في البداية)
+  // نفحص بس لو البوت مش ready فعلاً أو الـ ping عالي جداً
+  const deadPing = wsPing > 15_000; // أكتر من 15 ثانية بس
+
+  const needsReconnect = !isReady || deadPing;
 
   if (!needsReconnect) return;
 
   _reconnecting = true;
   _reconnects++;
-  console.warn(`⚠️ [AutoReconnect] مشكلة في الاتصال — ready=${isReady} | ping=${wsPing}ms | صمت=${Math.floor(secsSilent)}s — محاولة #${_reconnects}`);
+  console.warn(`⚠️ [AutoReconnect] مشكلة — ready=${isReady} | ping=${wsPing}ms | صمت=${Math.floor(secsSilent)}s — محاولة #${_reconnects}`);
 
   try {
     await client.login(process.env.DISCORD_TOKEN);
@@ -2630,6 +2635,13 @@ app.get('/status', (_req, res) => {
     lastPingMs: `${_lastPingMs}ms`,
     reconnects: _reconnects,
   });
+});
+
+// ── endpoint لإيقاف النسخة القديمة قبل ما نسخة جديدة تشتغل ──
+app.post('/shutdown', (_req, res) => {
+  res.json({ ok: true, pid: process.pid });
+  console.warn("⚠️ [Shutdown] طلب إيقاف تشغيل من نسخة جديدة — بيقفل...");
+  setTimeout(() => process.exit(0), 500);
 });
 
 console.log(`🔄 [Keep-Alive] شغّال — ping كل 2 دقيقة | مراقبة كل دقيقة | /status للإحصائيات`);
