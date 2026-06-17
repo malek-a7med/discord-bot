@@ -61,7 +61,7 @@ import {
   VoiceConnectionDisconnectReason,
 } from "@discordjs/voice";
 import playdl from "play-dl";
-import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats } from "./helpers/gemini-keys.js";
+import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys } from "./helpers/gemini-keys.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -309,6 +309,21 @@ const LEGACY_COMMANDS = [
   new SlashCommandBuilder()
     .setName("حالة-البوت")
     .setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
+  new SlashCommandBuilder()
+    .setName("مفاتيح-جيميني")
+    .setDescription("إدارة مفاتيح Gemini API [أونر فقط]")
+    .addSubcommand(sub =>
+      sub.setName("عرض").setDescription("اعرض كل المفاتيح وحالتها")
+    )
+    .addSubcommand(sub =>
+      sub.setName("إضافة")
+        .setDescription("ضيف مفاتيح جديدة للنظام")
+        .addStringOption(opt =>
+          opt.setName("مفاتيح")
+            .setDescription("المفاتيح مفصولة بفاصلة أو سطر جديد")
+            .setRequired(true)
+        )
+    ),
 ];
 
 // Advanced Feature Commands
@@ -1110,6 +1125,59 @@ client.on("interactionCreate", async (interaction) => {
           .setTimestamp();
 
         return interaction.editReply({ embeds: [embed] });
+      }
+
+      // ── مفاتيح-جيميني ──────────────────────────────────────────────
+      if (cmd === "مفاتيح-جيميني") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const sub = interaction.options.getSubcommand();
+        await interaction.deferReply({ ephemeral: true });
+
+        if (sub === "عرض") {
+          const stats = getKeyStats();
+          const total = stats.length;
+          const active = stats.filter(k => !k.exhausted).length;
+          const lines = stats.map(k =>
+            `${k.exhausted ? "🔴" : "🟢"} مفتاح ${k.index} — \`...${k.suffix}\``
+          ).join("\n");
+
+          const embed = new EmbedBuilder()
+            .setColor(active > 0 ? 0x2ecc71 : 0xe74c3c)
+            .setTitle("🔑 مفاتيح Gemini API")
+            .setDescription(lines || "لا يوجد مفاتيح")
+            .addFields(
+              { name: "📊 إجمالي المفاتيح", value: `\`${total}\``, inline: true },
+              { name: "✅ شغالين",           value: `\`${active}\``, inline: true },
+              { name: "🚫 خلصوا",            value: `\`${total - active}\``, inline: true },
+              { name: "📈 طلبات/يوم",        value: `\`${total * 20} طلب\``, inline: true },
+            )
+            .setFooter({ text: "المفاتيح المحمرّة بترجع تلقائياً بعد ساعة" })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (sub === "إضافة") {
+          const raw = interaction.options.getString("مفاتيح");
+          const newKeys = raw.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
+          if (newKeys.length === 0) {
+            return interaction.editReply("❌ مفيش مفاتيح صح في الرسالة!");
+          }
+          const result = addKeys(newKeys);
+          const embed = new EmbedBuilder()
+            .setColor(result.added > 0 ? 0x2ecc71 : 0xf39c12)
+            .setTitle("🔑 إضافة مفاتيح Gemini")
+            .addFields(
+              { name: "✅ اتضافوا",        value: `\`${result.added}\``,          inline: true },
+              { name: "⏭️ مكررين (تجاهل)", value: `\`${newKeys.length - result.added}\``, inline: true },
+              { name: "📊 الإجمالي دلوقتي", value: `\`${result.total} مفتاح\``,   inline: true },
+              { name: "📈 طلبات/يوم",       value: `\`${result.total * 20} طلب\``, inline: true },
+            )
+            .setFooter({ text: "المفاتيح الجديدة شغالة على طول من غير restart" })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════

@@ -110,3 +110,20 @@ export function getKeyStats() {
     exhausted: isExhausted(k),
   }));
 }
+
+// ── إضافة مفاتيح جديدة وهو شغال ─────────────────────────────
+export function addKeys(newKeys) {
+  const added = [];
+  for (const k of newKeys) {
+    const trimmed = k.trim();
+    if (trimmed && !_keys.includes(trimmed)) {
+      _keys.push(trimmed);
+      added.push(trimmed);
+    }
+  }
+  if (added.length > 0) {
+    // حدّث الموديلات عشان يشوفوا المفاتيح الجديدة (هما بيستخدموا نفس الـ _keys reference)
+    console.log(`✅ [GeminiKeys] اتضافوا ${added.length} مفتاح جديد — إجمالي: ${_keys.length} (${_keys.length * 20} طلب/يوم)`);
+  }
+  return { added: added.length, total: _keys.length };
+}
