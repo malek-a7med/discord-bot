@@ -256,6 +256,13 @@ const LEGACY_COMMANDS = [
     .addAttachmentOption((o) =>
       o.setName("ملف").setDescription("ملف الـ JSON اللي حملته من أمر نسخة-احتياطية").setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName("قناة-النسخ")
+    .setDescription("تعيين قناة النسخ الاحتياطية اليومية [إدارة] / Set daily backup channel")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addChannelOption((o) =>
+      o.setName("القناة").setDescription("القناة اللي هتوصلها النسخ اليومية").setRequired(true)
+    ),
 ];
 
 // Advanced Feature Commands
@@ -762,12 +769,47 @@ if (process.env.GOOGLE_API_KEY) {
   logger.info("🤖 Gemini AI جاهز!");
 }
 
+async function sendAutoBackup(clientInstance) {
+  try {
+    const settings = db.data.settings || {};
+    const backupChannelId = settings.backupChannelId;
+    if (!backupChannelId) return;
+    const channel = await clientInstance.channels.fetch(backupChannelId).catch(() => null);
+    if (!channel?.isTextBased()) return;
+    const allData = db.getAllData();
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const jsonBuffer = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
+    const attachment = new AttachmentBuilder(jsonBuffer, { name: `auto_backup_${dateStr}.json` });
+    const userCount = Object.keys(allData.users || {}).length;
+    await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle("🔄 نسخة احتياطية تلقائية يومية")
+          .addFields(
+            { name: "📅 التاريخ", value: dateStr, inline: true },
+            { name: "👥 عدد الأعضاء", value: `${userCount}`, inline: true }
+          )
+          .setFooter({ text: "يتم الإرسال تلقائياً كل 24 ساعة ✅" })
+          .setTimestamp()
+      ],
+      files: [attachment]
+    });
+    logger.info(`✅ تم إرسال النسخة الاحتياطية التلقائية بنجاح`);
+  } catch (err) {
+    logger.error("خطأ في النسخة الاحتياطية التلقائية:", err);
+  }
+}
+
 client.once("ready", async (c) => {
   logger.setClient(c);
   logger.success(`تسجيل الدخول بـ: ${c.user.tag}`);
   c.user.setActivity(`${LEGACY_COMMANDS.length + 14} أمر | /مساعدة`, { type: 3 });
   await deployCommands(process.env.DISCORD_TOKEN, c.user.id);
   await ensureSuggestionsPanel(c);
+  setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
+  logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
 });
 
 client.on("messageCreate", async (msg) => {
@@ -1257,6 +1299,24 @@ client.on("interactionCreate", async (interaction) => {
           logger.error("خطأ في الاسترجاع:", err);
           return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
         }
+      }
+
+      if (cmd === "قناة-النسخ") {
+        const ch = interaction.options.getChannel("القناة");
+        if (!db.data.settings) db.data.settings = {};
+        db.data.settings.backupChannelId = ch.id;
+        db.save();
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0x3498db)
+              .setTitle("✅ تم تعيين قناة النسخ الاحتياطية")
+              .setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ ${ch} كل 24 ساعة 🔄`)
+              .setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" })
+              .setTimestamp()
+          ],
+          ephemeral: true
+        });
       }
 
     } catch (err) {
