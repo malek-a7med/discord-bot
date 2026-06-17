@@ -964,14 +964,14 @@ client.on("messageCreate", async (msg) => {
     await guild.members.fetch().catch(() => {});
 
     // ── داشبورد الأونر ─────────────────────────────────────────
-    const trimmed = msg.content.trim();
-    const isDashCmd = /^(داشبورد|داش|!داش|dashboard|panel)$/i.test(trimmed);
+    const trimmedDash = msg.content.trim();
+    const isDashCmd = /(داشبورد|داش بورد|لوحة.*تحكم|dashboard|panel)/i.test(trimmedDash);
     if (isDashCmd) {
       return msg.channel.send(buildDMControlPanel(guild)).catch(() => {});
     }
 
     if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
-    return handleOwnerAI(msg, guild, geminiModel(), db).catch(() => {});
+    return handleOwnerAI(msg, guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
   }
 
   // ── Auto-Mod الذكي ─────────────────────────────────────────────
@@ -1063,7 +1063,7 @@ client.on("messageCreate", async (msg) => {
   if (!question || !_geminiReady) return;
 
   if (isOwner) {
-    return handleOwnerAI(msg, msg.guild, geminiModel(), db).catch(() => {});
+    return handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
   }
 
   msg.channel.sendTyping().catch(() => {});

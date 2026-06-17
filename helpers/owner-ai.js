@@ -92,6 +92,7 @@ ${history ? `\nسياق المحادثة:\n${history}\n` : ""}
 
 رد بـ JSON فقط:
 - كلام عادي/سؤال: {"action":"chat","reply":"ردك بالعربي المصري"}
+- داشبورد/لوحة تحكم/panel: {"action":"dashboard"}
 - طرد: {"action":"kick","user_id":"ID","reason":"سبب"}
 - حظر: {"action":"ban","user_id":"ID","reason":"سبب"}
 - رفع حظر: {"action":"unban","user_id":"ID"}
@@ -148,7 +149,7 @@ async function sendLog(guild, db, action, ownerName, details) {
 }
 
 // ── الدالة الرئيسية ─────────────────────────────────────────────
-export async function handleOwnerAI(msg, guild, geminiModel, db) {
+export async function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard = null) {
   const isDM       = !msg.guild;
   const userId     = msg.author.id;
   const rawText    = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
@@ -186,6 +187,12 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       pushHistory(userId, "user", rawText);
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
+    }
+
+    // ─── Dashboard ───────────────────────────────────────────────
+    if (action === "dashboard") {
+      if (buildDashboard) return send(buildDashboard(guild));
+      return send("📊 اكتب **داشبورد** في الـ DM عشان تشوف لوحة التحكم!");
     }
 
     // ─── الأكشنز ─────────────────────────────────────────────────
