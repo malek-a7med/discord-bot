@@ -2522,23 +2522,97 @@ _server.on("error", (err) => {
   }
 });
 
-// ── Keep-Alive: يضرب نفسه كل 4 دقايق عشان Replit ميناموش ────────
+// ═══════════════════════════════════════════════════════════════
+//  نظام Keep-Alive المتطور — 24/7 بدون تهنيج
+// ═══════════════════════════════════════════════════════════════
 const SELF_URL = process.env.REPLIT_DEV_DOMAIN
   ? `https://${process.env.REPLIT_DEV_DOMAIN}/health`
   : `http://localhost:${PORT}/health`;
 
-let _pingErrors = 0;
+// ── إحصائيات الـ uptime ──────────────────────────────────────
+let _pingOk       = 0;
+let _pingFail     = 0;
+let _lastPingMs   = 0;
+let _reconnects   = 0;
+let _reconnecting = false;
+let _lastHeartbeat = Date.now();
+
+// ── Heartbeat: يتحدث كل ما البوت يستلم رسالة أو interaction ──
+client.on("messageCreate", () => { _lastHeartbeat = Date.now(); });
+client.on("interactionCreate", () => { _lastHeartbeat = Date.now(); });
+
+// ── Self-Ping كل دقيقتين ──────────────────────────────────────
 setInterval(async () => {
+  const t0 = Date.now();
   try {
-    const r = await fetch(SELF_URL, { signal: AbortSignal.timeout(8000) });
-    if (r.ok) { _pingErrors = 0; }
-    else { _pingErrors++; }
-  } catch {
-    _pingErrors++;
-    if (_pingErrors >= 3) console.warn("⚠️ [Keep-Alive] فشل الـ ping 3 مرات متتالية — تحقق من الاتصال");
+    const r = await fetch(SELF_URL, { signal: AbortSignal.timeout(10_000) });
+    _lastPingMs = Date.now() - t0;
+    if (r.ok) {
+      _pingOk++;
+      _pingFail = 0;
+    } else {
+      _pingFail++;
+      console.warn(`⚠️ [Keep-Alive] الخادم رد بـ ${r.status}`);
+    }
+  } catch (e) {
+    _pingFail++;
+    _lastPingMs = Date.now() - t0;
+    if (_pingFail >= 3) {
+      console.warn(`⚠️ [Keep-Alive] فشل ${_pingFail} مرات — ${e.message}`);
+    }
   }
-}, 4 * 60 * 1000); // كل 4 دقايق
-console.log(`🔄 [Keep-Alive] سيتم الـ ping على: ${SELF_URL} كل 4 دقايق`);
+}, 2 * 60 * 1000); // كل دقيقتين
+
+// ── مراقبة الاتصال بـ Discord كل دقيقة ──────────────────────
+setInterval(async () => {
+  if (_reconnecting) return;
+
+  const isReady     = client.isReady();
+  const wsPing      = client.ws.ping;
+  const secsSilent  = (Date.now() - _lastHeartbeat) / 1000;
+  const deadPing    = wsPing > 15_000 || wsPing < 0;
+
+  // حالات تستدعي إعادة الاتصال
+  const needsReconnect =
+    !isReady ||
+    deadPing ||
+    (secsSilent > 600 && !isReady); // 10 دقايق صمت وفجأة مش ready
+
+  if (!needsReconnect) return;
+
+  _reconnecting = true;
+  _reconnects++;
+  console.warn(`⚠️ [AutoReconnect] مشكلة في الاتصال — ready=${isReady} | ping=${wsPing}ms | صمت=${Math.floor(secsSilent)}s — محاولة #${_reconnects}`);
+
+  try {
+    await client.login(process.env.DISCORD_TOKEN);
+    console.log(`✅ [AutoReconnect] اتصل تاني بنجاح! (محاولة #${_reconnects})`);
+  } catch (e) {
+    console.error(`❌ [AutoReconnect] فشل: ${e.message}`);
+  } finally {
+    _reconnecting = false;
+  }
+}, 60 * 1000); // كل دقيقة
+
+// ── endpoint لعرض إحصائيات الـ uptime ────────────────────────
+app.get('/status', (_req, res) => {
+  const uptimeSec = Math.floor(process.uptime());
+  const h = Math.floor(uptimeSec / 3600);
+  const m = Math.floor((uptimeSec % 3600) / 60);
+  const s = uptimeSec % 60;
+  res.json({
+    bot:        client.user?.tag ?? "connecting...",
+    status:     client.isReady() ? "online" : "offline",
+    uptime:     `${h}h ${m}m ${s}s`,
+    wsPing:     `${client.ws.ping}ms`,
+    pingOk:     _pingOk,
+    pingFail:   _pingFail,
+    lastPingMs: `${_lastPingMs}ms`,
+    reconnects: _reconnects,
+  });
+});
+
+console.log(`🔄 [Keep-Alive] شغّال — ping كل 2 دقيقة | مراقبة كل دقيقة | /status للإحصائيات`);
 
 // ───────────────────────────────────────────────────────────────
 // Anti-Crash — حماية البوت من الإغلاق + منع تكرار رسايل الـ Error
@@ -2581,29 +2655,5 @@ client.on("warn", (info) => {
     console.warn("⚠️ [Discord]", info);
   }
 });
-
-// ── Auto-Reconnect — يراقب الاتصال كل دقيقتين ويعيد الاتصال تلقائياً ──
-let reconnecting = false;
-
-async function ensureConnected() {
-  if (reconnecting) return;
-  try {
-    // لو البوت مش ready أو الـ ping اتأخر أكتر من 10 ثواني = مشكلة
-    if (!client.isReady() || client.ws.ping > 10_000) {
-      reconnecting = true;
-      console.warn("⚠️ [AutoReconnect] البوت مش متصل — بيحاول يتصل تاني...");
-      await client.login(process.env.DISCORD_TOKEN).catch((e) => {
-        console.error("⚠️ [AutoReconnect] فشل إعادة الاتصال:", e.message);
-      });
-      reconnecting = false;
-      console.log("✅ [AutoReconnect] اتصل تاني بنجاح!");
-    }
-  } catch (e) {
-    reconnecting = false;
-    console.error("⚠️ [AutoReconnect] خطأ غير متوقع:", e.message);
-  }
-}
-
-setInterval(ensureConnected, 2 * 60 * 1000); // كل دقيقتين
 
 client.login(process.env.DISCORD_TOKEN);
