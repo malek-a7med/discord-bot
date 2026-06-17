@@ -80,11 +80,11 @@ class RotatingGeminiModel {
         if (err.message?.includes("429") || err.message?.includes("quota")) {
           markExhausted(key);
           lastErr = err;
-          // استنى الوقت اللي جيميني قاله قبل ما نجرب المفتاح الجاي
-          const delayMatch = err.message?.match(/retry in ([\d.]+)s/);
-          const waitMs = delayMatch ? Math.ceil(parseFloat(delayMatch[1]) * 1000) : 1000;
-          if (waitMs > 0 && waitMs < 30000) {
-            await new Promise(r => setTimeout(r, waitMs));
+          // لو في مفتاح تاني متاح، روح عليه فوراً بدون استنا
+          const hasAnotherKey = this.keys.some(k => k !== key && !isExhausted(k));
+          if (!hasAnotherKey) {
+            // مفيش مفاتيح تانية — استنى وقت قصير وبعدين افشل
+            await new Promise(r => setTimeout(r, 2000));
           }
         } else {
           throw err;
