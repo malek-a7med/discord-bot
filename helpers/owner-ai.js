@@ -43,7 +43,7 @@ export function getProcessingCount() {
 }
 
 // ── Retry أسرع (2 محاولة فقط) ───────────────────────────────────
-async function withRetry(fn, retries = 2, delayMs = 500) {
+async function withRetry(fn, retries = 3, delayMs = 800) {
   for (let i = 0; i < retries; i++) {
     try { return await fn(); }
     catch (err) {
@@ -248,10 +248,10 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 10000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 28000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
-      return send("❌ تأخرت أو في مشكلة في الـ AI، حاول تاني!");
+      return send("❌ الـ AI اتأخر أكتر من المعتاد، حاول تاني بعد ثانية!");
     }
 
     const { action } = parsed;
