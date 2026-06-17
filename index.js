@@ -1189,13 +1189,17 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
-  // XP فقط في السيرفر
+  // XP فقط في السيرفر — حماية مزدوجة من التكرار (memory + DB)
   if (msg.guild) {
     const userData = db.getUser(msg.author.id);
-    const oldLevel = userData.level;
 
+    // لو نسخة تانية من البوت معالجة نفس الرسالة — تجاهل
+    if (userData._lastXpMsg === msg.id) return;
+
+    const oldLevel = userData.level;
     userData.xp += 5;
     userData.level = calcLevel(userData.xp);
+    userData._lastXpMsg = msg.id;
     db.updateUser(msg.author.id, userData);
 
     if (userData.level > oldLevel) {
