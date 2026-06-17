@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  مصارعة كلام — نظام ألعاب كامل (بوت vs لاعب، أو لاعب vs لاعب)
+//  الديناميكا 🥊 — مصارعة الكلام — نظام chat collector سريع
+//  بدون modals — اللعبة في الـ chat مباشرة وفيها إثارة حقيقية
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder,
@@ -7,99 +8,153 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
 } from "discord.js";
 
 // ── إعدادات اللعبة ───────────────────────────────────────────
 const ROUNDS       = 3;
 const WIN_COINS    = 300;
-const TURN_TIMEOUT = 3 * 60_000; // 3 دقايق لكل دور
+const ATTACK_TIME  = 45_000; // 45 ثانية لكل طعنة
+const ACCEPT_TIME  = 60_000; // دقيقة للقبول
 
-// ── بيانات المعارك الجارية ────────────────────────────────────
+// ── مواضيع الجولات (عشوائية) ─────────────────────────────────
+const TOPICS = [
+  "🍳 طبخك اللي بيسمم الجيران",
+  "💤 نومك اللي بيخزي الأموات",
+  "📱 تعليقاتك الفارغة على السوشيال ميديا",
+  "⚽ لعبك الكورة اللي بيبكي المدرب",
+  "🧠 ذكاؤك اللي بيلجأ للكالكيوليتر في 2+2",
+  "👗 ستايلك اللي بيخلي البيت يبكي",
+  "🎮 لعبك الجيمز وإنت بتخسر دايماً",
+  "🚗 قيادتك اللي بتخوف الأسفلت",
+  "🏋️ اشتراكك في الجيم اللي بيزوره كل ٦ شهور",
+  "💰 مصاريفك اللي بتخلي الفلوس تعيط",
+  "📚 مذاكرتك اللي بتبدأ بعد الامتحان بيوم",
+  "🎤 غناؤك اللي بيأذي الميكروفون",
+  "🤳 صورك السيلفي اللي بتخوف الكاميرا",
+  "🍕 أكلك اللي بيحكي عن شخصيتك",
+  "😴 استناك في الصبح اللي بيعطّل الكون",
+];
+
+// ── بيانات المعارك ────────────────────────────────────────────
 const activeBattles = new Map(); // battleId → battle
 const userInBattle  = new Map(); // userId   → battleId
 
 // ── تعريف الأمر ──────────────────────────────────────────────
 export const battleCommand = new SlashCommandBuilder()
   .setName("مصارعة")
-  .setDescription("🥊 تحدّي في مصارعة كلام — إثبت إنك الأقوى!")
+  .setDescription("🥊 الديناميكا — تحدّي في مصارعة كلام مباشرة!")
   .addUserOption(opt =>
     opt.setName("خصم")
-      .setDescription("اختار خصمك (اتركه فاضي عشان تتحارب مع البوت 🤖)")
+      .setDescription("اختار خصمك (اتركه فاضي عشان تتحارب مع زنجي 🤖)")
   );
 
-// ── مساعدات داخلية ───────────────────────────────────────────
-function makeBattleId() {
-  return `btl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+// ── مساعدات ──────────────────────────────────────────────────
+function makeId() {
+  return `b${Date.now().toString(36)}`;
+}
+
+function randomTopic() {
+  return TOPICS[Math.floor(Math.random() * TOPICS.length)];
 }
 
 function scoreBar(score) {
-  const filled = Math.round(score / 10 * 5);
-  return "🟥".repeat(filled) + "⬛".repeat(5 - filled) + ` ${score}/10`;
+  const n = Math.round((score / 10) * 8);
+  return "🟥".repeat(n) + "⬛".repeat(8 - n) + `  **${score}/10**`;
 }
 
-function buildScoreLine(battle, cName, oName) {
-  const oLabel = battle.opponent === "bot" ? "🤖 زنجي" : `<@${battle.opponent}>`;
-  return `<@${battle.challenger}> \`${battle.scores.challenger}pts\` ⚡ ${oLabel} \`${battle.scores.opponent}pts\``;
+function buildArenaEmbed(b, phase, extra = {}) {
+  const oLabel  = b.opponentIsBot ? "🤖 زنجي" : `<@${b.opponent}>`;
+  const cScore  = b.scores.challenger;
+  const oScore  = b.scores.opponent;
+  const colors  = [0xe74c3c, 0xf39c12, 0x9b59b6];
+  const color   = colors[(b.round - 1) % colors.length];
+
+  const embed = new EmbedBuilder()
+    .setColor(color)
+    .setAuthor({ name: "🥊 الديناميكا — مصارعة الكلام" })
+    .addFields(
+      { name: "🗡️ المتحدي",    value: `<@${b.challenger}>`,                          inline: true },
+      { name: "⚡ VS",           value: "────────",                                    inline: true },
+      { name: "🛡️ الخصم",      value: oLabel,                                         inline: true },
+      { name: "📊 النتيجة",     value: `<@${b.challenger}>: **${cScore}** ⚡ ${oLabel}: **${oScore}**`, inline: false },
+      { name: "🎯 الجولة",      value: `${b.round} / ${ROUNDS}`,                      inline: true },
+      { name: "📌 الموضوع",     value: b.currentTopic || "—",                         inline: false },
+    )
+    .setFooter({ text: "الديناميكا Bot 🥊" })
+    .setTimestamp();
+
+  if (phase === "waiting_challenger") {
+    embed.setTitle(`🔥 الجولة ${b.round} — دور <@${b.challenger}> يضرب!`);
+    embed.setDescription(`⏱️ **اكتب طعنتك في الشات دلوقتي — عندك 45 ثانية!**\n\n> الموضوع: ${b.currentTopic}`);
+  } else if (phase === "waiting_opponent") {
+    embed.setTitle(`⚡ الجولة ${b.round} — دور ${oLabel} يرد!`);
+    embed.setDescription(
+      `**<@${b.challenger}> طعن:**\n> ${extra.cAttack || "—"}\n\n` +
+      `⏱️ **${oLabel}، ابعت ردك في الشات — 45 ثانية!**`
+    );
+  } else if (phase === "judging") {
+    embed.setTitle(`⏳ الجولة ${b.round} — الحكم بيفكر...`);
+    embed.setDescription("🤖 زنجي بيحكّم الطعنتين دلوقتي...");
+  } else if (phase === "round_result") {
+    embed.setTitle(`📣 نتيجة الجولة ${b.round}`);
+    embed.addFields(
+      { name: `🗡️ <@${b.challenger}> قال:`,   value: `> ${extra.cAttack || "—"}`,  inline: false },
+      { name: `🛡️ ${oLabel} رد:`,             value: `> ${extra.oAttack || "—"}`,  inline: false },
+      { name: `<@${b.challenger}>`,            value: scoreBar(extra.score1 || 0),  inline: true  },
+      { name: `${oLabel}`,                     value: scoreBar(extra.score2 || 0),  inline: true  },
+      { name: "💬 رأي زنجي الحكم",           value: extra.comment || "—",         inline: false },
+    );
+  } else if (phase === "timeout") {
+    embed.setTitle("⏰ انتهى الوقت!");
+    embed.setDescription(extra.msg || "حد ما ردش في الوقت!");
+    embed.setColor(0x95a5a6);
+  }
+
+  return embed;
 }
 
-function attackButtons(battleId) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`btl_attack_${battleId}`)
-      .setLabel("🗡️ اضرب!")
-      .setStyle(ButtonStyle.Danger),
-    new ButtonBuilder()
-      .setCustomId(`btl_forfeit_${battleId}`)
-      .setLabel("🏳️ استسلم")
-      .setStyle(ButtonStyle.Secondary),
-  );
-}
-
-// ── استدعاء Gemini: توليد طعنة البوت ────────────────────────
-async function generateBotAttack(geminiModel, playerName, playerAttack, round) {
+// ── توليد طعنة البوت ─────────────────────────────────────────
+async function generateBotAttack(geminiModel, pName, pAttack, topic) {
   const prompt =
-    `أنت "زنجي" — بوت مصري يشارك في مصارعة كلام مضحكة.\n` +
-    `خصمك اسمه "${playerName}" وطعنك في الجولة ${round} بـ:\n"${playerAttack}"\n\n` +
-    `رد بطعنة واحدة مضحكة وذكية بالعامية المصرية، جملة أو اتنين كحد أقصى.\n` +
-    `لا تكون مسيء أو وقح — خليها ذكاء لفظي لا إهانة حقيقية.`;
+    `أنت "زنجي" — بوت مصري في مصارعة كلام.\n` +
+    `الموضوع هو: ${topic}\n` +
+    `خصمك "${pName}" قال: "${pAttack}"\n\n` +
+    `رد بطعنة مضحكة وذكية بالعامية المصرية، سطر أو اتنين بس. ` +
+    `ذكاء لفظي لا إهانة حقيقية.`;
   try {
     const res = await geminiModel.generateContent(prompt);
-    return res.response.text().trim().slice(0, 250);
+    return res.response.text().trim().slice(0, 300);
   } catch {
-    const fallbacks = [
-      "أنا زنجي مش محتاج أتكلم — وجودي بس طعنة! 😏",
-      "كلامك وصل... وراح في الهوا على طول 💨",
-      "حاول تاني لما تكبر شوية 😂",
-      "ده أقوى كلام عندك؟ يا خسارة فيك! 😅",
+    const fb = [
+      "كلامك جاني وراح بالأوتوبيس اللي بعده 🚌",
+      "ولا الموضوع ده بيستاهل ردي 😴",
+      "بكرة لما تكبر تفهم ليه خسرت 😏",
+      "أنا زنجي — وجودي بس طعنة! ✨",
     ];
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+    return fb[Math.floor(Math.random() * fb.length)];
   }
 }
 
-// ── استدعاء Gemini: تحكيم الجولة ────────────────────────────
-async function judgeRound(geminiModel, attack1, attack2, name1, name2) {
+// ── تحكيم الجولة ─────────────────────────────────────────────
+async function judgeRound(geminiModel, a1, a2, n1, n2, topic) {
   const prompt =
-    `أنت حكم في مصارعة كلام مصرية. قيّم الطعنتين بشكل عادل.\n\n` +
-    `${name1}: "${attack1}"\n` +
-    `${name2}: "${attack2}"\n\n` +
-    `رد بـ JSON فقط بالشكل ده (بدون أي نص قبله أو بعده):\n` +
-    `{"score1":X,"score2":Y,"comment":"تعليق مضحك ومختصر بالعامية المصرية"}`;
+    `أنت حكم في مصارعة كلام مصرية.\n` +
+    `الموضوع: ${topic}\n` +
+    `${n1}: "${a1}"\n${n2}: "${a2}"\n\n` +
+    `قيّمهم وارد بـ JSON فقط:\n` +
+    `{"score1":X,"score2":Y,"comment":"تعليق مضحك قصير بالعامية"}`;
   try {
     const res   = await geminiModel.generateContent(prompt);
-    const raw   = res.response.text().trim();
-    const match = raw.match(/\{[\s\S]*?\}/);
+    const match = res.response.text().match(/\{[\s\S]*?\}/);
     if (!match) throw new Error("no json");
-    const parsed = JSON.parse(match[0]);
+    const p = JSON.parse(match[0]);
     return {
-      score1:  Math.min(10, Math.max(0, Number(parsed.score1) || 5)),
-      score2:  Math.min(10, Math.max(0, Number(parsed.score2) || 5)),
-      comment: parsed.comment || "جولة متكافئة!",
+      score1:  Math.min(10, Math.max(0, Number(p.score1) || 5)),
+      score2:  Math.min(10, Math.max(0, Number(p.score2) || 5)),
+      comment: p.comment || "جولة متكافئة! 🤷",
     };
   } catch {
-    return { score1: 5, score2: 5, comment: "الحكم تعب — نقطة لكل واحد! 😅" };
+    return { score1: 5, score2: 5, comment: "صعبة والله — نقطة لكل واحد! 😅" };
   }
 }
 
@@ -116,71 +171,43 @@ export async function handleBattleCommand(interaction, db, geminiModel) {
 
   // ─── ضد البوت ─────────────────────────────────────────────
   if (!opponent) {
-    const id = makeBattleId();
-    activeBattles.set(id, {
-      id, challenger: challenger.id, opponent: "bot",
-      channel: interaction.channelId, round: 1,
-      scores: { challenger: 0, opponent: 0 },
-      currentTurn: "challenger", attacks: [], status: "active",
-      currentRound: {}, geminiModel, db,
-    });
-    userInBattle.set(challenger.id, id);
-    setBattleTimeout(id, interaction.channel);
-
-    const embed = new EmbedBuilder()
-      .setColor(0xe74c3c)
-      .setTitle("🥊 مصارعة كلام — إنت ضد البوت!")
-      .setDescription(
-        `يا **${challenger.displayName}** — جرئت تتحدى زنجي؟ 😤\n\n` +
-        `**الجولة 1 من ${ROUNDS}** — دورك تضرب الأول!`
-      )
-      .addFields({ name: "📊 النتيجة", value: buildScoreLine(activeBattles.get(id), "", ""), inline: false })
-      .setFooter({ text: "⏱️ عندك 3 دقايق للطعنة!" })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [embed], components: [attackButtons(id)] });
-    return;
+    return startBattle(interaction, db, geminiModel, challenger, null);
   }
 
   // ─── ضد لاعب ──────────────────────────────────────────────
   if (opponent.id === challenger.id)
     return interaction.reply({ content: "❌ ما تقدرش تتحارب مع نفسك! 😂", ephemeral: true });
   if (opponent.bot)
-    return interaction.reply({ content: "❌ مش هتتحارب مع بوت تاني! جرب `/مصارعة` من غير خصم عشان تتحارب مع زنجي.", ephemeral: true });
+    return interaction.reply({ content: "❌ اكتب `/مصارعة` من غير خصم عشان تتحارب مع زنجي 🤖", ephemeral: true });
   if (userInBattle.has(opponent.id))
-    return interaction.reply({ content: `❌ **${opponent.displayName}** كمان في معركة دلوقتي!`, ephemeral: true });
+    return interaction.reply({ content: `❌ **${opponent.displayName}** في معركة دلوقتي!`, ephemeral: true });
 
-  const id = makeBattleId();
+  // أرسل تحدي
+  const id = makeId();
   activeBattles.set(id, {
     id, challenger: challenger.id, opponent: opponent.id,
-    channel: interaction.channelId, round: 1,
-    scores: { challenger: 0, opponent: 0 },
-    currentTurn: "challenger", attacks: [], status: "waiting",
-    currentRound: {}, geminiModel, db,
+    opponentIsBot: false, channel: interaction.channelId,
+    round: 1, scores: { challenger: 0, opponent: 0 },
+    attacks: [], status: "waiting", currentTopic: null,
+    geminiModel, db,
   });
   userInBattle.set(challenger.id, id);
-
-  // timeout للقبول — دقيقتين
-  activeBattles.get(id)._acceptTimeout = setTimeout(() => {
-    const b = activeBattles.get(id);
-    if (b && b.status === "waiting") {
-      activeBattles.delete(id);
-      userInBattle.delete(challenger.id);
-    }
-  }, 2 * 60_000);
 
   const embed = new EmbedBuilder()
     .setColor(0xf39c12)
     .setTitle("🥊 تحدي مصارعة كلام!")
-    .setDescription(`${challenger} بيتحداك يا ${opponent}!\n\n**هتقبل ولا هتجري؟** 😤`)
-    .addFields(
-      { name: "🥊 المتحدي",  value: `${challenger}`,    inline: true },
-      { name: "⚡ VS",        value: "────────",         inline: true },
-      { name: "🛡️ المتحدَى", value: `${opponent}`,      inline: true },
-      { name: "🎯 الجولات",  value: `${ROUNDS} جولات`,  inline: true },
-      { name: "🏆 المكافأة", value: `${WIN_COINS} 🪙`,   inline: true },
+    .setDescription(
+      `${challenger} بيتحداك يا ${opponent}!\n\n` +
+      `**الأوضاع:** ${ROUNDS} جولات، كل جولة ليها موضوع مختلف\n` +
+      `**الفايز:** يكسب **${WIN_COINS} 🪙 كوينز**\n\n` +
+      `> هتقبل ولا هتجري يا عيني؟ 😤`
     )
-    .setFooter({ text: "⏱️ عندك دقيقتين تقبل أو ترفض!" })
+    .addFields(
+      { name: "🥊 المتحدي",  value: `${challenger}`,  inline: true },
+      { name: "⚡ VS",        value: "────",            inline: true },
+      { name: "🛡️ المتحدَى", value: `${opponent}`,     inline: true },
+    )
+    .setFooter({ text: "⏱️ عندك دقيقة تقبل أو ترفض!" })
     .setTimestamp();
 
   const row = new ActionRowBuilder().addComponents(
@@ -189,10 +216,262 @@ export async function handleBattleCommand(interaction, db, geminiModel) {
   );
 
   await interaction.reply({ embeds: [embed], components: [row] });
+
+  // expire after ACCEPT_TIME
+  activeBattles.get(id)._acceptTimer = setTimeout(() => {
+    const b = activeBattles.get(id);
+    if (b?.status === "waiting") {
+      activeBattles.delete(id);
+      userInBattle.delete(challenger.id);
+    }
+  }, ACCEPT_TIME);
 }
 
 // ══════════════════════════════════════════════════════════════
-//  معالج الأزرار
+//  بدء المعركة الفعلية (بعد القبول أو ضد البوت مباشرة)
+// ══════════════════════════════════════════════════════════════
+async function startBattle(interaction, db, geminiModel, challenger, opponentUser) {
+  const id = makeId();
+  const isBot = !opponentUser;
+
+  const battle = {
+    id, challenger: challenger.id,
+    opponent:      isBot ? "bot" : opponentUser.id,
+    opponentIsBot: isBot,
+    channel: interaction.channelId,
+    round: 1, scores: { challenger: 0, opponent: 0 },
+    attacks: [], status: "active",
+    currentTopic: randomTopic(),
+    geminiModel, db,
+  };
+  activeBattles.set(id, battle);
+  userInBattle.set(challenger.id, id);
+  if (!isBot) userInBattle.set(opponentUser.id, id);
+
+  const oLabel = isBot ? "🤖 زنجي" : `<@${opponentUser.id}>`;
+
+  const embed = new EmbedBuilder()
+    .setColor(0xe74c3c)
+    .setTitle("🔥 المعركة بدأت!")
+    .setDescription(
+      `**<@${challenger.id}>** ⚔️ **${oLabel}**\n\n` +
+      `📌 **موضوع الجولة 1:**\n> ${battle.currentTopic}\n\n` +
+      `⏱️ **<@${challenger.id}> — اكتب طعنتك في الشات دلوقتي! (45 ثانية)**`
+    )
+    .addFields(
+      { name: "🎯 الجولات",  value: `${ROUNDS} جولات`,        inline: true },
+      { name: "🏆 المكافأة", value: `${WIN_COINS} 🪙 للفايز`,  inline: true },
+    )
+    .setFooter({ text: "💡 ابعت رسالة في الشات مباشرة — مش محتاج تضغط أي زرار!" })
+    .setTimestamp();
+
+  let message;
+  if (interaction.replied || interaction.deferred) {
+    await interaction.editReply({ embeds: [embed], components: [] });
+    message = await interaction.fetchReply();
+  } else {
+    await interaction.reply({ embeds: [embed], components: [] });
+    message = await interaction.fetchReply();
+  }
+
+  battle._message = message;
+
+  // ابدأ جولة أولى
+  await runRound(battle, interaction.channel || await interaction.client.channels.fetch(interaction.channelId));
+}
+
+// ══════════════════════════════════════════════════════════════
+//  تشغيل الجولة — collect من الـ chat
+// ══════════════════════════════════════════════════════════════
+async function runRound(battle, channel) {
+  if (!channel || battle.status !== "active") return;
+
+  const b = battle;
+
+  // ─── اجمع طعنة المتحدي ────────────────────────────────────
+  const cAttack = await collectMessage(channel, b.challenger, b.currentTopic, "challenger", b);
+  if (cAttack === null) {
+    return endBattle(b, channel, "timeout", `⏰ <@${b.challenger}> ما طعنش في الوقت — المعركة اتلغت!`);
+  }
+
+  // ─── رد الخصم (بوت أو لاعب) ─────────────────────────────
+  let oAttack;
+  const oLabel = b.opponentIsBot ? "🤖 زنجي" : `<@${b.opponent}>`;
+
+  if (b.opponentIsBot) {
+    // البوت يرد على طول
+    const waitEmbed = buildArenaEmbed(b, "judging");
+    waitEmbed.setDescription(`**<@${b.challenger}> طعن:**\n> ${cAttack}\n\n⏳ زنجي بيفكر في رد...`);
+    await channel.send({ embeds: [waitEmbed] }).catch(() => {});
+    oAttack = await generateBotAttack(b.geminiModel, `<@${b.challenger}>`, cAttack, b.currentTopic);
+  } else {
+    // نطلب من الخصم
+    const oppWaitEmbed = buildArenaEmbed(b, "waiting_opponent", { cAttack });
+    await channel.send({ embeds: [oppWaitEmbed] }).catch(() => {});
+
+    oAttack = await collectMessage(channel, b.opponent, b.currentTopic, "opponent", b);
+    if (oAttack === null) {
+      return endBattle(b, channel, "timeout", `⏰ ${oLabel} ما ردش في الوقت — المعركة اتلغت!`);
+    }
+  }
+
+  // ─── التحكيم ──────────────────────────────────────────────
+  const cName = (await channel.client.users.fetch(b.challenger).catch(() => null))?.displayName
+    || `<@${b.challenger}>`;
+  const oName = b.opponentIsBot ? "زنجي"
+    : ((await channel.client.users.fetch(b.opponent).catch(() => null))?.displayName || `<@${b.opponent}>`);
+
+  const judgment = await judgeRound(b.geminiModel, cAttack, oAttack, cName, oName, b.currentTopic);
+  b.scores.challenger += judgment.score1;
+  b.scores.opponent   += judgment.score2;
+  b.attacks.push({ round: b.round, cAttack, oAttack, ...judgment });
+
+  // ─── عرض نتيجة الجولة ────────────────────────────────────
+  const resultEmbed = buildArenaEmbed(b, "round_result", {
+    cAttack, oAttack,
+    score1: judgment.score1, score2: judgment.score2,
+    comment: judgment.comment,
+  });
+  const resultMsg = await channel.send({ embeds: [resultEmbed] }).catch(() => null);
+
+  // reactions للتصويت
+  if (resultMsg) {
+    await resultMsg.react("🗡️").catch(() => {});
+    await resultMsg.react("🛡️").catch(() => {});
+  }
+
+  await sleep(2500);
+
+  b.round++;
+
+  // ─── نهاية المعركة؟ ──────────────────────────────────────
+  if (b.round > ROUNDS) {
+    return endBattle(b, channel, "winner");
+  }
+
+  // ─── الجولة التالية ──────────────────────────────────────
+  b.currentTopic = randomTopic();
+  const nextEmbed = new EmbedBuilder()
+    .setColor(0xe74c3c)
+    .setTitle(`🥊 الجولة ${b.round} من ${ROUNDS}`)
+    .setDescription(
+      `📌 **الموضوع الجديد:**\n> ${b.currentTopic}\n\n` +
+      `⏱️ **<@${b.challenger}> — اضرب! (45 ثانية)**`
+    )
+    .addFields({
+      name: "📊 المجموع",
+      value: `<@${b.challenger}>: **${b.scores.challenger}** ⚡ ${oLabel}: **${b.scores.opponent}**`,
+      inline: false,
+    })
+    .setFooter({ text: "💡 ابعت رسالة في الشات مباشرة!" })
+    .setTimestamp();
+
+  await channel.send({ embeds: [nextEmbed] }).catch(() => {});
+  await runRound(b, channel);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  collect رسالة من لاعب محدد في الـ channel
+// ══════════════════════════════════════════════════════════════
+function collectMessage(channel, userId, topic, role, battle) {
+  return new Promise((resolve) => {
+    if (battle.status !== "active") return resolve(null);
+
+    const filter = m => m.author.id === userId && !m.author.bot && m.content.trim().length >= 3;
+    const collector = channel.createMessageCollector({ filter, max: 1, time: ATTACK_TIME });
+
+    // countdown في الكونسول بس (مش رسالة زيادة في الشات)
+    const tickInterval = setInterval(() => {
+      if (battle.status !== "active") {
+        clearInterval(tickInterval);
+        collector.stop("inactive");
+      }
+    }, 5000);
+
+    collector.on("collect", (msg) => {
+      clearInterval(tickInterval);
+      // أضف reaction على الرسالة عشان نعرف إنها اتسجلت
+      msg.react("⚡").catch(() => {});
+      resolve(msg.content.trim().slice(0, 300));
+    });
+
+    collector.on("end", (collected, reason) => {
+      clearInterval(tickInterval);
+      if (reason !== "limit" && collected.size === 0) {
+        resolve(null);
+      }
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+//  إنهاء المعركة
+// ══════════════════════════════════════════════════════════════
+async function endBattle(battle, channel, reason, timeoutMsg = "") {
+  if (battle.status !== "active") return;
+  battle.status = "ended";
+
+  activeBattles.delete(battle.id);
+  userInBattle.delete(battle.challenger);
+  if (!battle.opponentIsBot) userInBattle.delete(battle.opponent);
+
+  if (reason === "timeout") {
+    const embed = new EmbedBuilder()
+      .setColor(0x95a5a6)
+      .setTitle("⏰ انتهى الوقت!")
+      .setDescription(timeoutMsg)
+      .setTimestamp();
+    return channel.send({ embeds: [embed] }).catch(() => {});
+  }
+
+  const oLabel = battle.opponentIsBot ? "🤖 زنجي" : `<@${battle.opponent}>`;
+  const cScore = battle.scores.challenger;
+  const oScore = battle.scores.opponent;
+
+  let winnerId   = null;
+  let winnerText = "";
+
+  if (cScore > oScore) {
+    winnerId   = battle.challenger;
+    winnerText = `🏆 <@${battle.challenger}> يفوز بـ **${cScore}** مقابل **${oScore}**! 🎉`;
+  } else if (oScore > cScore) {
+    winnerId   = battle.opponentIsBot ? "bot" : battle.opponent;
+    winnerText = battle.opponentIsBot
+      ? `🤖 **زنجي** يفوز بـ **${oScore}** مقابل **${cScore}**! صعبان أوي 😈`
+      : `🏆 ${oLabel} يفوز بـ **${oScore}** مقابل **${cScore}**! 🎉`;
+  } else {
+    winnerText = `🤝 **تعادل!** كلهم **${cScore}** نقطة — معركة شرسة! 🔥`;
+  }
+
+  // تاريخ الجولات
+  const historyLines = battle.attacks.map(a =>
+    `**ج${a.round}:** 🗡️${a.score1} vs 🛡️${a.score2} — *${a.comment}*`
+  ).join("\n");
+
+  const finalEmbed = new EmbedBuilder()
+    .setColor(winnerId ? 0xf1c40f : 0x3498db)
+    .setTitle("🏟️ المعركة انتهت!")
+    .setDescription(winnerText)
+    .addFields(
+      { name: `<@${battle.challenger}>`, value: `🪙 ${cScore} نقطة`,   inline: true },
+      { name: "⚡ VS",                   value: "────",                  inline: true },
+      { name: oLabel,                    value: `🪙 ${oScore} نقطة`,    inline: true },
+      { name: "📋 ملخص الجولات",        value: historyLines || "—",     inline: false },
+    )
+    .setTimestamp();
+
+  if (winnerId && winnerId !== "bot") {
+    const u = battle.db.getUser(winnerId);
+    u.coins = (u.coins || 0) + WIN_COINS;
+    battle.db.updateUser(winnerId, u);
+    finalEmbed.setFooter({ text: `🏆 ${WIN_COINS} كوينز اتضافت للفايز!` });
+  }
+
+  await channel.send({ embeds: [finalEmbed] }).catch(() => {});
+}
+
+// ══════════════════════════════════════════════════════════════
+//  معالج الأزرار (قبول / رفض / استسلام)
 // ══════════════════════════════════════════════════════════════
 export async function handleBattleButton(interaction, db, geminiModel) {
   const cid = interaction.customId;
@@ -201,27 +480,20 @@ export async function handleBattleButton(interaction, db, geminiModel) {
   if (cid.startsWith("btl_accept_")) {
     const id = cid.slice("btl_accept_".length);
     const b  = activeBattles.get(id);
-    if (!b) return interaction.reply({ content: "❌ انتهت المعركة أو انتهى وقت القبول!", ephemeral: true });
+    if (!b || b.status !== "waiting")
+      return interaction.reply({ content: "❌ انتهى وقت القبول أو المعركة دي خلصت!", ephemeral: true });
     if (interaction.user.id !== b.opponent)
-      return interaction.reply({ content: "❌ إنت مش المتحدَى!", ephemeral: true });
+      return interaction.reply({ content: "❌ إنت مش المتحدَى في المعركة دي!", ephemeral: true });
 
-    clearTimeout(b._acceptTimeout);
+    clearTimeout(b._acceptTimer);
     b.status = "active";
-    userInBattle.set(b.opponent, id);
-    setBattleTimeout(id, interaction.channel);
 
-    const embed = new EmbedBuilder()
-      .setColor(0xe74c3c)
-      .setTitle("🥊 المعركة بدأت!")
-      .setDescription(
-        `<@${b.challenger}> ⚔️ <@${b.opponent}>\n\n` +
-        `**الجولة 1 من ${ROUNDS}** — دور <@${b.challenger}> يضرب الأول!`
-      )
-      .addFields({ name: "📊 النتيجة", value: buildScoreLine(b, "", ""), inline: false })
-      .setFooter({ text: "⏱️ عندك 3 دقايق للطعنة!" })
-      .setTimestamp();
+    const challenger = await interaction.client.users.fetch(b.challenger).catch(() => null);
+    const channel    = interaction.channel;
 
-    return interaction.update({ embeds: [embed], components: [attackButtons(id)] });
+    await interaction.update({ components: [] });
+    await startBattle(interaction, db, geminiModel, challenger, interaction.user);
+    return;
   }
 
   // ─── رفض ──────────────────────────────────────────────────
@@ -232,7 +504,7 @@ export async function handleBattleButton(interaction, db, geminiModel) {
     if (interaction.user.id !== b.opponent)
       return interaction.reply({ content: "❌ إنت مش المتحدَى!", ephemeral: true });
 
-    clearTimeout(b._acceptTimeout);
+    clearTimeout(b._acceptTimer);
     activeBattles.delete(id);
     userInBattle.delete(b.challenger);
 
@@ -245,255 +517,14 @@ export async function handleBattleButton(interaction, db, geminiModel) {
     return interaction.update({ embeds: [embed], components: [] });
   }
 
-  // ─── زر الضرب — بيفتح Modal ──────────────────────────────
-  if (cid.startsWith("btl_attack_")) {
-    const id = cid.slice("btl_attack_".length);
-    const b  = activeBattles.get(id);
-    if (!b || b.status !== "active")
-      return interaction.reply({ content: "❌ المعركة دي انتهت!", ephemeral: true });
-
-    const isChallenger = interaction.user.id === b.challenger;
-    const isOpponent   = b.opponent !== "bot" && interaction.user.id === b.opponent;
-    if (!isChallenger && !isOpponent)
-      return interaction.reply({ content: "❌ إنت مش في المعركة دي!", ephemeral: true });
-
-    const expectedId = b.currentTurn === "challenger" ? b.challenger : b.opponent;
-    if (interaction.user.id !== expectedId)
-      return interaction.reply({ content: "⏳ مش دورك دلوقتي! استنى خصمك يبعت طعنته.", ephemeral: true });
-
-    const modal = new ModalBuilder()
-      .setCustomId(`btl_modal_${id}`)
-      .setTitle(`🗡️ جولة ${b.round} — طعنتك!`);
-
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder()
-        .setCustomId("attack_txt")
-        .setLabel("اكتب طعنتك (جملة أو اتنين كحد أقصى)")
-        .setStyle(TextInputStyle.Paragraph)
-        .setMinLength(5).setMaxLength(200).setRequired(true)
-        .setPlaceholder("مثال: مش عارف تلعب ولا تتكلم، الاتنين بيجيلك غلط!")
-    ));
-
-    return interaction.showModal(modal);
-  }
-
-  // ─── استسلام ──────────────────────────────────────────────
-  if (cid.startsWith("btl_forfeit_")) {
-    const id = cid.slice("btl_forfeit_".length);
-    const b  = activeBattles.get(id);
-    if (!b) return interaction.reply({ content: "❌ مفيش معركة!", ephemeral: true });
-
-    const isParticipant = interaction.user.id === b.challenger ||
-      (b.opponent !== "bot" && interaction.user.id === b.opponent);
-    if (!isParticipant)
-      return interaction.reply({ content: "❌ إنت مش في المعركة دي!", ephemeral: true });
-
-    clearTimeout(b._turnTimeout);
-    const loser  = interaction.user.id;
-    const winner = loser === b.challenger ? b.opponent : b.challenger;
-
-    activeBattles.delete(id);
-    userInBattle.delete(b.challenger);
-    if (b.opponent !== "bot") userInBattle.delete(b.opponent);
-
-    const embed = new EmbedBuilder()
-      .setColor(0x95a5a6)
-      .setTitle("🏳️ استسلام!")
-      .setDescription(
-        `<@${loser}> رفع الراية البيضا! 😂\n\n` +
-        (winner === "bot" ? "🤖 **زنجي** يفوز بدون مجهود! 😈" : `🏆 <@${winner}> يفوز بالاستسلام!`)
-      )
-      .setTimestamp();
-
-    if (winner !== "bot") {
-      const u = db.getUser(winner);
-      u.coins = (u.coins || 0) + WIN_COINS;
-      db.updateUser(winner, u);
-      embed.setFooter({ text: `🏆 ${WIN_COINS} كوينز اتضافت للفايز!` });
-    }
-
-    return interaction.update({ embeds: [embed], components: [] });
-  }
-
-  return false; // مش تبتاع البوت
+  return false;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  معالج الـ Modal (إرسال الطعنة)
-// ══════════════════════════════════════════════════════════════
+// ── لا modals في اللعبة الجديدة ──────────────────────────────
 export async function handleBattleModal(interaction, db, geminiModel) {
-  if (!interaction.customId.startsWith("btl_modal_")) return false;
-
-  const id = interaction.customId.slice("btl_modal_".length);
-  const b  = activeBattles.get(id);
-  if (!b || b.status !== "active") {
-    return interaction.reply({ content: "❌ المعركة دي انتهت!", ephemeral: true });
-  }
-
-  const attackText   = interaction.fields.getTextInputValue("attack_txt").trim();
-  const isChallenger = interaction.user.id === b.challenger;
-  const userName     = interaction.member?.displayName || interaction.user.displayName || interaction.user.username;
-
-  await interaction.deferReply({ ephemeral: true });
-  clearTimeout(b._turnTimeout);
-
-  // خزّن الطعنة
-  if (isChallenger) {
-    b.currentRound.challengerAttack = attackText;
-    b.currentRound.challengerName   = userName;
-  } else {
-    b.currentRound.opponentAttack = attackText;
-    b.currentRound.opponentName   = userName;
-  }
-
-  const channel = await interaction.client.channels.fetch(b.channel).catch(() => null);
-
-  // ─── ضد لاعب: لو المتحدي ضرب → ننتظر الخصم ───────────────
-  if (b.opponent !== "bot" && isChallenger && !b.currentRound.opponentAttack) {
-    b.currentTurn = "opponent";
-    setBattleTimeout(id, channel);
-
-    await interaction.editReply({ content: "✅ طعنتك اتسجلت! استنى رد خصمك..." });
-
-    if (channel) {
-      const waitEmbed = new EmbedBuilder()
-        .setColor(0xe74c3c)
-        .setTitle(`⚡ الجولة ${b.round} — دور <@${b.opponent}>`)
-        .setDescription(`<@${b.challenger}> ضرب! دلوقتي دور <@${b.opponent}> يرد! 🛡️`)
-        .setFooter({ text: "⏱️ عندك 3 دقايق!" })
-        .setTimestamp();
-      await channel.send({ embeds: [waitEmbed], components: [attackButtons(id)] });
-    }
-    return true;
-  }
-
-  // ─── الاتنين ضربوا (أو ضد البوت) → نحكّم ────────────────
-  await interaction.editReply({ content: "⚡ بيتم التحكيم..." });
-
-  const cAttack = b.currentRound.challengerAttack;
-  const cName   = b.currentRound.challengerName || "المتحدي";
-  let   oAttack = b.currentRound.opponentAttack;
-  const oName   = b.opponent === "bot" ? "زنجي" : (b.currentRound.opponentName || "الخصم");
-
-  if (b.opponent === "bot") {
-    oAttack = await generateBotAttack(b.geminiModel, cName, cAttack, b.round);
-  }
-
-  const judgment = await judgeRound(b.geminiModel, cAttack, oAttack, cName, oName);
-  b.scores.challenger += judgment.score1;
-  b.scores.opponent   += judgment.score2;
-  b.attacks.push({ round: b.round, cAttack, oAttack, ...judgment });
-
-  // ─── Embed نتيجة الجولة ────────────────────────────────────
-  const oLabel = b.opponent === "bot" ? "🤖 زنجي" : `<@${b.opponent}>`;
-  const roundEmbed = new EmbedBuilder()
-    .setColor(0xf39c12)
-    .setTitle(`⚡ نتيجة الجولة ${b.round}`)
-    .addFields(
-      { name: `🗡️ ${cName} قال:`,  value: `> ${cAttack}`,              inline: false },
-      { name: `🛡️ ${oName} رد:`,   value: `> ${oAttack}`,              inline: false },
-      { name: `${cName}`,           value: scoreBar(judgment.score1),   inline: true  },
-      { name: `${oName}`,           value: scoreBar(judgment.score2),   inline: true  },
-      { name: "💬 رأي الحكم",      value: judgment.comment,            inline: false },
-      { name: "📊 المجموع",         value: buildScoreLine(b, cName, oName), inline: false },
-    )
-    .setTimestamp();
-
-  const currentRound = b.round;
-  b.round++;
-  b.currentRound = {};
-  b.currentTurn  = "challenger";
-
-  if (!channel) return true;
-  await channel.send({ embeds: [roundEmbed] });
-
-  // ─── انتهت المعركة ────────────────────────────────────────
-  if (b.round > ROUNDS) {
-    clearTimeout(b._turnTimeout);
-    activeBattles.delete(id);
-    userInBattle.delete(b.challenger);
-    if (b.opponent !== "bot") userInBattle.delete(b.opponent);
-
-    let winnerId   = null;
-    let winnerName = "تعادل";
-    if (b.scores.challenger > b.scores.opponent) {
-      winnerId = b.challenger; winnerName = cName;
-    } else if (b.scores.opponent > b.scores.challenger) {
-      winnerId = b.opponent; winnerName = oName;
-    }
-
-    const totalC = b.scores.challenger;
-    const totalO = b.scores.opponent;
-
-    const finalEmbed = new EmbedBuilder()
-      .setColor(winnerId ? 0xf1c40f : 0x3498db)
-      .setTitle(winnerId ? "🏆 المعركة انتهت — في فايز!" : "🤝 تعادل!")
-      .setDescription(
-        winnerId
-          ? (winnerId === "bot"
-            ? `🤖 **زنجي** يفوز بـ **${totalO}** نقطة مقابل **${totalC}**! جرب تاني يا جدع 😈`
-            : `🎉 <@${winnerId}> يفوز بـ **${Math.max(totalC, totalO)}** نقطة مقابل **${Math.min(totalC, totalO)}**!`)
-          : `**${totalC}** نقطة لكل واحد — معركة شرسة يا جماعة! 🔥`
-      )
-      .addFields(
-        { name: `<@${b.challenger}>`, value: `🪙 ${totalC} نقطة`,                                      inline: true },
-        { name: "⚡ VS",               value: "────",                                                    inline: true },
-        { name: oLabel,               value: `🪙 ${totalO} نقطة`,                                      inline: true },
-      )
-      .setTimestamp();
-
-    if (winnerId && winnerId !== "bot") {
-      const u = db.getUser(winnerId);
-      u.coins = (u.coins || 0) + WIN_COINS;
-      db.updateUser(winnerId, u);
-      finalEmbed.setFooter({ text: `🏆 ${WIN_COINS} كوينز اتضافت للفايز!` });
-    }
-
-    await channel.send({ embeds: [finalEmbed] });
-    return true;
-  }
-
-  // ─── الجولة التالية ───────────────────────────────────────
-  setBattleTimeout(id, channel);
-
-  const nextEmbed = new EmbedBuilder()
-    .setColor(0xe74c3c)
-    .setTitle(`🥊 الجولة ${b.round} من ${ROUNDS}`)
-    .setDescription(`دور <@${b.challenger}> يضرب!`)
-    .addFields({ name: "📊 المجموع", value: buildScoreLine(b, cName, oName), inline: false })
-    .setFooter({ text: "⏱️ عندك 3 دقايق للطعنة!" })
-    .setTimestamp();
-
-  await channel.send({ embeds: [nextEmbed], components: [attackButtons(id)] });
-  return true;
+  return false;
 }
 
-// ══════════════════════════════════════════════════════════════
-//  Timeout — لو حد ما ردش في الوقت
-// ══════════════════════════════════════════════════════════════
-function setBattleTimeout(id, channel) {
-  const b = activeBattles.get(id);
-  if (!b) return;
-  clearTimeout(b._turnTimeout);
-  b._turnTimeout = setTimeout(async () => {
-    const battle = activeBattles.get(id);
-    if (!battle) return;
-    activeBattles.delete(id);
-    userInBattle.delete(battle.challenger);
-    if (battle.opponent !== "bot") userInBattle.delete(battle.opponent);
-
-    const whosTurn = battle.currentTurn === "challenger"
-      ? `<@${battle.challenger}>`
-      : (battle.opponent === "bot" ? "🤖 زنجي" : `<@${battle.opponent}>`);
-
-    const embed = new EmbedBuilder()
-      .setColor(0x95a5a6)
-      .setTitle("⏰ انتهى الوقت!")
-      .setDescription(`${whosTurn} ما ردش في الوقت — المعركة اتلغت! 😴`)
-      .setTimestamp();
-
-    if (channel && typeof channel.send === "function") {
-      await channel.send({ embeds: [embed] }).catch(() => {});
-    }
-  }, TURN_TIMEOUT);
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
 }
