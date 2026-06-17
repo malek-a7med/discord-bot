@@ -1074,8 +1074,8 @@ client.on("messageCreate", async (msg) => {
   const isOwner      = config.isOwner(msg.author.id);
   const calledByName = /زنجي/i.test(msg.content);
 
-  // الأونر يكلمه من غير منشن — غير الأونر يكفي منشن أو ينده باسمه
-  if (!isOwner && !isMentioned && !calledByName) return;
+  // في السيرفر، الكل (حتى الأونر) لازم ينده باسمه أو يعمل منشن
+  if (!isMentioned && !calledByName) return;
 
   const BOT_CHANNEL_ID = "1516591390023352370";
 
