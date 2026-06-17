@@ -1070,11 +1070,12 @@ client.on("messageCreate", async (msg) => {
     msg.react("✅").catch(() => {});
   }
 
-  const isMentioned = msg.mentions.has(client.user.id);
-  const isOwner     = config.isOwner(msg.author.id);
+  const isMentioned  = msg.mentions.has(client.user.id);
+  const isOwner      = config.isOwner(msg.author.id);
+  const calledByName = /زنجي/i.test(msg.content);
 
-  // الأونر يكلمه من غير منشن — غير الأونر لازم منشن
-  if (!isOwner && !isMentioned) return;
+  // الأونر يكلمه من غير منشن — غير الأونر يكفي منشن أو ينده باسمه
+  if (!isOwner && !isMentioned && !calledByName) return;
 
   const BOT_CHANNEL_ID = "1516591390023352370";
 
