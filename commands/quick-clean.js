@@ -31,7 +31,7 @@ async function getOcrWorker() {
 //  تسجيل الأوامر
 // ─────────────────────────────────────────────────────────────────
 async function registerWhitenCommands(client) {
-  const { SlashCommandBuilder } = await import('@discordjs/builders');
+  const { SlashCommandBuilder } = await import('discord.js');
 
   const whitenUploadCommand = new SlashCommandBuilder()
     .setName('تنظيف_صورة')

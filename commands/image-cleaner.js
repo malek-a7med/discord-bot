@@ -7,7 +7,7 @@ import fs from 'fs';
 import { google } from 'googleapis';
 
 async function registerCleanChapterCommand(client) {
-  const { SlashCommandBuilder } = await import('@discordjs/builders');
+  const { SlashCommandBuilder } = await import('discord.js');
 
   const command = new SlashCommandBuilder()
     .setName('clean_chapter')

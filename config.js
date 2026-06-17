@@ -85,6 +85,14 @@ class Config {
     return this.OWNER_NAMES[userId] || null;
   }
 
+  get OWNER_ID() {
+    return this.OWNER_IDS[0] || null;
+  }
+
+  get ADMIN_CHANNEL_ID() {
+    return process.env.ADMIN_CHANNEL_ID || null;
+  }
+
   get ANTI_SPAM_THRESHOLD() {
     return parseInt(process.env.ANTI_SPAM_THRESHOLD || '5', 10);
   }

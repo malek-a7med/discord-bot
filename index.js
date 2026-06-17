@@ -975,7 +975,7 @@ async function sendAutoBackup(clientInstance) {
   }
 }
 
-client.once("ready", async (c) => {
+client.once("clientReady", async (c) => {
   logger.setClient(c);
   logger.success(`تسجيل الدخول بـ: ${c.user.tag}`);
   c.user.setActivity(`${LEGACY_COMMANDS.length + 14} أمر | /مساعدة`, { type: 3 });

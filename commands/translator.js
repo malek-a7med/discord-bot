@@ -5,7 +5,7 @@ import GeminiTranslator from '../helpers/gemini-multimodal.js';
 import { EmbedBuilder } from 'discord.js';
 
 async function registerTranslateChapterCommand(client) {
-  const { SlashCommandBuilder } = await import('@discordjs/builders');
+  const { SlashCommandBuilder } = await import('discord.js');
 
   const command = new SlashCommandBuilder()
     .setName('translate_chapter')

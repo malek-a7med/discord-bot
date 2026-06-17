@@ -4,7 +4,7 @@ import { EmbedBuilder } from 'discord.js';
 const musicHandler = new MusicHandler();
 
 async function registerMusicCommands(client) {
-  const { SlashCommandBuilder } = await import('@discordjs/builders');
+  const { SlashCommandBuilder } = await import('discord.js');
 
   return [
     {
