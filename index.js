@@ -1544,9 +1544,9 @@ process.on("SIGINT", async () => {
 // ================= نظام الترحيب الأسطوري للفراعنة =================
 // ✅ [تعديل 6] حذف require() داخل الدالة — المكتبات محملة في الأعلى
 client.on('guildMemberAdd', async (member) => {
-  const welcomeChannelId = "1486100560494203183";
-  const channel = member.guild.channels.cache.get(welcomeChannelId);
+  const WELCOME_CHANNEL_ID = "1486100560494203183";
 
+  const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
   if (!channel) return;
 
   try {
