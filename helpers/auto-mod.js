@@ -1,46 +1,56 @@
 // ═══════════════════════════════════════════════════════════════
 //  نظام Auto-Mod الذكي — زنجي Bot
-//  كشف الألفاظ الوحشة والصور الغلط + تصعيد التحذيرات تلقائياً
+//  بيشتغل بس على الألفاظ السافلة جداً والصور الإباحية الصريحة
 // ═══════════════════════════════════════════════════════════════
 
 import config from "../config.js";
 
-// ── قائمة الكلمات الممنوعة ─────────────────────────────────────
-const BAD_WORDS = [
-  // شتايم عربي شائعة
-  "كس", "كوس", "طيز", "زب", "زبي", "نيك", "نيكك", "انيك",
-  "متناك", "ابن الشرموطة", "ابن المتناكة", "شرموطة", "عرص",
-  "خول", "اتناك", "شغالة", "زانية", "قحبة", "بتاعة",
-  "يلعن دينك", "يلعن امك", "يلعن ابوك", "العن دينك",
-  "مص", "بهيمة", "حيوان", "وسخ",
-  // إنجليزي
-  "fuck", "shit", "bitch", "asshole", "nigga", "nigger",
-  "cunt", "whore", "slut", "faggot", "bastard",
+// ── الألفاظ السافلة جداً فقط (ماكس level) ──────────────────────
+// مش هنحط كلام خفيف زي: احا / هوه / زفت / وسخ / حيوان / يخرب
+// بس الألفاظ الجنسية الصريحة والشتايم القاسية جداً
+const EXTREME_BAD_WORDS = [
+  // جنسي صريح — عربي
+  "كس امك", "كس اختك", "كس ام",
+  "ابن الشرموطة", "ابن المتناكة", "ابن الوسخة",
+  "شرموطة", "متناكة", "قحبة", "زانية",
+  "انيكك", "هنيكك", "بنيك", "اتناك", "نيك امك", "نيك اختك",
+  "زب في", "زبي في", "زبك في",
+  "طيزك", "طيز امك",
+  "عرص ابوك", "خول ابوك",
+  // إنجليزي صريح فقط
+  "fuck your", "motherfucker", "son of a bitch",
+  "nigger", "cunt",
 ];
 
-// ── regex مجمّع للأداء ──────────────────────────────────────────
-const BAD_WORDS_REGEX = new RegExp(
-  BAD_WORDS.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
+// ── بنبني pattern واحد من كل الكلمات ──────────────────────────
+// بنستخدم كل كلمة كجملة كاملة مش حرف في النص
+const EXTREME_REGEX = new RegExp(
+  EXTREME_BAD_WORDS.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
   "gi"
 );
 
 // مدة الـ timeout بعد التحذير 3: ساعتين
 const TIMEOUT_DURATION_MS = 2 * 60 * 60 * 1000;
 
-// ── Gemini image scan helper ────────────────────────────────────
-async function isImageInappropriate(imageUrl, geminiVisionModel) {
+// ── Gemini image scan — صريح جداً فقط ─────────────────────────
+async function isImageExtreme(imageUrl, geminiVisionModel) {
   if (!geminiVisionModel) return false;
   try {
     const res = await fetch(imageUrl);
-    const buf = await res.arrayBuffer();
+    if (!res.ok) return false;
+    const buf    = await res.arrayBuffer();
     const base64 = Buffer.from(buf).toString("base64");
     const mime   = res.headers.get("content-type") || "image/jpeg";
 
     const result = await geminiVisionModel.generateContent([
-      {
-        inlineData: { data: base64, mimeType: mime },
-      },
-      "هل هذه الصورة تحتوي على محتوى إباحي أو عاري أو عنيف جداً أو مسيء؟ أجب فقط بـ YES أو NO.",
+      { inlineData: { data: base64, mimeType: mime } },
+      [
+        "أجب فقط بـ YES أو NO بدون أي شرح.",
+        "هل هذه الصورة تحتوي على واحد أو أكثر من الآتي:",
+        "- محتوى إباحي صريح (عري كامل / أعضاء تناسلية ظاهرة / أفعال جنسية)",
+        "- عنف دموي شديد جداً (أشلاء / ذبح / دماء مفرطة)",
+        "الصور العادية والمضحكة والكرتون والألعاب والأنيمي العادي = NO.",
+      ].join("\n"),
     ]);
     const txt = result.response.text().trim().toUpperCase();
     return txt.startsWith("YES");
@@ -54,8 +64,8 @@ async function isImageInappropriate(imageUrl, geminiVisionModel) {
  * scanMessage — يفحص الرسالة ويتصرف حسب عدد التحذيرات
  * @param {Message}  msg
  * @param {Database} db
- * @param {Model}    geminiVisionModel   — Gemini vision model (nullable)
- * @param {Function} notifyOwner         — async fn(userId, member, reason, warnCount)
+ * @param {Model}    geminiVisionModel
+ * @param {Function} notifyOwner   — async fn(userId, member, reason, warnCount)
  * @returns {{ triggered: boolean, action: string }}
  */
 export async function scanMessage(msg, db, geminiVisionModel, notifyOwner) {
@@ -65,19 +75,20 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner) {
 
   let reason = null;
 
-  // 1. فحص النص
-  if (BAD_WORDS_REGEX.test(msg.content)) {
-    reason = `كلام وحش في الرسالة`;
-    BAD_WORDS_REGEX.lastIndex = 0;
+  // 1. فحص النص — سافل جداً فقط
+  EXTREME_REGEX.lastIndex = 0;
+  if (EXTREME_REGEX.test(msg.content)) {
+    reason = "لفظ سافل جداً";
+    EXTREME_REGEX.lastIndex = 0;
   }
 
-  // 2. فحص الصور (لو مفيش سبب لسه)
+  // 2. فحص الصور — إباحي صريح فقط
   if (!reason && msg.attachments.size > 0 && geminiVisionModel) {
     for (const att of msg.attachments.values()) {
       if (att.contentType?.startsWith("image/")) {
-        const bad = await isImageInappropriate(att.url, geminiVisionModel).catch(() => false);
+        const bad = await isImageExtreme(att.url, geminiVisionModel).catch(() => false);
         if (bad) {
-          reason = "صورة غير لائقة";
+          reason = "صورة إباحية أو عنيفة جداً";
           break;
         }
       }
@@ -89,61 +100,55 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner) {
   // ── مسح الرسالة ─────────────────────────────────────────────
   await msg.delete().catch(() => {});
 
-  // ── إضافة التحذير في الداتابيس ──────────────────────────────
+  // ── إضافة التحذير ────────────────────────────────────────────
   db.addWarning(msg.author.id, reason, "AUTO_MOD");
-  const warnings = db.getWarnings(msg.author.id);
+  const warnings  = db.getWarnings(msg.author.id);
   const warnCount = warnings.length;
 
   const member = msg.member;
   const user   = msg.author;
 
-  // ── اختيار الإجراء حسب عدد التحذيرات ───────────────────────
+  // ── تصعيد العقوبة ────────────────────────────────────────────
   let action = "warn";
 
   if (warnCount >= 3) {
-    // تحذير 3: timeout ساعتين
     if (member && member.manageable) {
       try {
-        await member.timeout(TIMEOUT_DURATION_MS, `Auto-Mod: تحذير رقم ${warnCount} — ${reason}`);
+        await member.timeout(TIMEOUT_DURATION_MS, `Auto-Mod: تحذير ${warnCount} — ${reason}`);
         action = "timeout";
       } catch {
         action = "warn";
       }
     }
-    // لو عنده 4+ تحذيرات بعد الـ timeout → بلغ الأونر
     if (warnCount > 3) {
       action = "owner_report";
       await notifyOwner(user.id, member, reason, warnCount).catch(() => {});
     }
   }
 
-  // ── رسالة تحذير في القناة (تُحذف بعد 8 ثواني) ───────────────
+  // ── تحذير في القناة (يتحذف بعد 8 ثواني) ─────────────────────
   const actionText =
-    action === "timeout"
-      ? "⏰ وأتأسكت لمدة **ساعتين**!"
-      : action === "owner_report"
-      ? "⏰ أتأسكت وبلغت الإدارة لاتخاذ إجراء!"
-      : "لو كررت هتتعاقب أكتر!";
+    action === "timeout"      ? "⏰ وأتأسكت لمدة **ساعتين**!" :
+    action === "owner_report" ? "⏰ أتأسكت وبلغت الإدارة!" :
+                                "لو كررت هتتعاقب أكتر!";
 
   const warnMsg = await msg.channel
-    .send(
-      `⚠️ ${user} | **تحذير رقم ${warnCount}/3** — السبب: ${reason}\n${actionText}`
-    )
+    .send(`⚠️ ${user} | **تحذير ${warnCount}/3** — السبب: ${reason}\n${actionText}`)
     .catch(() => null);
 
   if (warnMsg) setTimeout(() => warnMsg.delete().catch(() => {}), 8000);
 
   // ── DM للعضو ────────────────────────────────────────────────
   const dmLines = [
-    `⚠️ **تحذير تلقائي من بوت زنجي**`,
+    `⚠️ **تحذير تلقائي — زنجي Bot**`,
     `السيرفر: **${msg.guild.name}**`,
     `السبب: **${reason}**`,
     `تحذيراتك: **${warnCount}/3**`,
     action === "timeout"
-      ? "\n🔇 تم إسكاتك لمدة **ساعتين**. لو عدت تاني هيتم إبلاغ الإدارة!"
+      ? "\n🔇 تم إسكاتك **ساعتين**. لو عدت تاني الإدارة هتقرر مصيرك."
       : action === "owner_report"
-      ? "\n🚨 تجاوزت الحد! تم إبلاغ الإدارة وهيقرروا مصيرك."
-      : "\n📌 الرسالة اتحذفت. تحذير تاني → إسكات ساعتين، وتالت → إبلاغ الإدارة.",
+      ? "\n🚨 تجاوزت الحد! الإدارة هتقرر مصيرك."
+      : "\n📌 الرسالة اتحذفت. تحذير تاني → إسكات ساعتين، وتالت → قرار الإدارة.",
   ];
 
   user.send(dmLines.join("\n")).catch(() => {});
