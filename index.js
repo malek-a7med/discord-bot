@@ -9,7 +9,7 @@
 //     6. Express server يستخدم process.env.PORT
 // ═══════════════════════════════════════════════════════════════
 import dotenv from "dotenv";
-dotenv.config({ path: "../../.env" });
+dotenv.config();
 
 // ───────────────────────────────────────────────────────────────
 //  Advanced Features Imports
@@ -27,6 +27,8 @@ import {
   handleWhitenLink,
   handleOcrUpload
 } from "./commands/quick-clean.js";
+import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
+import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -34,6 +36,7 @@ import {
 import {
   Client,
   GatewayIntentBits,
+  Partials,
   REST,
   Routes,
   SlashCommandBuilder,
@@ -58,10 +61,29 @@ import {
   VoiceConnectionDisconnectReason,
 } from "@discordjs/voice";
 import playdl from "play-dl";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, resetExhaustedKeys } from "./helpers/gemini-keys.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+
+// ── Lock File: منع تشغيل أكتر من نسخة واحدة في نفس الوقت ────────
+const LOCK_FILE = "/tmp/zangi_bot.lock";
+(function enforceSingleInstance() {
+  if (fs.existsSync(LOCK_FILE)) {
+    try {
+      const oldPid = parseInt(fs.readFileSync(LOCK_FILE, "utf8").trim(), 10);
+      if (oldPid && !isNaN(oldPid) && oldPid !== process.pid) {
+        process.kill(oldPid, "SIGTERM");
+        console.log(`🔫 [Lock] أوقفت النسخة القديمة (PID: ${oldPid})`);
+      }
+    } catch { /* النسخة القديمة ماتت فعلاً */ }
+  }
+  fs.writeFileSync(LOCK_FILE, String(process.pid));
+  const cleanup = () => { try { fs.unlinkSync(LOCK_FILE); } catch {} };
+  process.on("exit", cleanup);
+  process.on("SIGINT",  () => { cleanup(); process.exit(0); });
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+})();
 
 // ✅ [جديد] Express import بطريقة ES Module الصحيحة
 import express from "express";
@@ -165,8 +187,12 @@ const LEGACY_COMMANDS = [
     .setDescription("مسح رسائل من الشات [مشرف] / Clear messages")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addIntegerOption((o) =>
-      o.setName("عدد").setDescription("عدد الرسائل (1-100)").setRequired(true).setMinValue(1).setMaxValue(100)
+      o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000)
     ),
+  new SlashCommandBuilder()
+    .setName("مسح-الكل")
+    .setDescription("مسح كل رسايل الروم بالكامل [إدارة] / Wipe entire channel")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("تحذير")
     .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
@@ -241,6 +267,96 @@ const LEGACY_COMMANDS = [
     .setName("صورة")
     .setDescription("توليد صورة بالـ AI / Generate an AI image")
     .addStringOption((o) => o.setName("وصف").setDescription("وصف الصورة المطلوبة").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("نسخة-احتياطية")
+    .setDescription("تحميل نسخة احتياطية من بيانات السيرفر [إدارة] / Download server database backup")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder()
+    .setName("استرجاع")
+    .setDescription("استرجاع بيانات السيرفر من نسخة احتياطية [إدارة] / Restore database from backup")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addAttachmentOption((o) =>
+      o.setName("ملف").setDescription("ملف الـ JSON اللي حملته من أمر نسخة-احتياطية").setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("قناة-النسخ")
+    .setDescription("تعيين قناة النسخ الاحتياطية اليومية [إدارة] / Set daily backup channel")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((o) =>
+      o.setName("id").setDescription("الـ ID بتاع القناة — انسخه من Discord").setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("تشغيل-اختبار")
+    .setDescription("اختبار رسالة الترحيب أو الوداع [إدارة] / Test welcome or goodbye message")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((o) =>
+      o.setName("نوع")
+        .setDescription("اختار نوع الرسالة")
+        .setRequired(true)
+        .addChoices(
+          { name: "🎉 رسالة ترحيب", value: "welcome" },
+          { name: "🥀 رسالة وداع",  value: "goodbye" }
+        )
+    ),
+  new SlashCommandBuilder()
+    .setName("قناة-اللوجز")
+    .setDescription("تعيين قناة تسجيل أوامر الأونر [أونر فقط]")
+    .addChannelOption((o) =>
+      o.setName("قناة").setDescription("القناة المخصصة للوجز").setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("رسالة-جماعية")
+    .setDescription("إرسال رسالة جماعية لكل الأعضاء أو في قناة [أونر فقط]")
+    .addStringOption((o) =>
+      o.setName("نوع")
+        .setDescription("وين تبعت الرسالة؟")
+        .setRequired(true)
+        .addChoices(
+          { name: "📩 رسائل خاصة لكل الأعضاء", value: "dm" },
+          { name: "📢 في قناة محددة", value: "channel" }
+        )
+    )
+    .addStringOption((o) =>
+      o.setName("نص").setDescription("نص الرسالة").setRequired(true)
+    )
+    .addChannelOption((o) =>
+      o.setName("قناة").setDescription("القناة (لو اخترت إرسال في قناة)")
+    ),
+  new SlashCommandBuilder()
+    .setName("لوحة-dm")
+    .setDescription("فتح لوحة تحكم الأونر في الـ DM [أونر فقط]"),
+  new SlashCommandBuilder()
+    .setName("حالة-البوت")
+    .setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
+  new SlashCommandBuilder()
+    .setName("مفاتيح-جيميني")
+    .setDescription("إدارة مفاتيح Gemini API [أونر فقط]")
+    .addSubcommand(sub =>
+      sub.setName("عرض").setDescription("اعرض كل المفاتيح وحالتها")
+    )
+    .addSubcommand(sub =>
+      sub.setName("إضافة")
+        .setDescription("ضيف مفاتيح جديدة للنظام")
+        .addStringOption(opt =>
+          opt.setName("مفاتيح")
+            .setDescription("المفاتيح مفصولة بفاصلة أو سطر جديد")
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName("تفريش").setDescription("تفريش المفاتيح المحروقة وإعادة تشغيلها")
+    ),
+  new SlashCommandBuilder()
+    .setName("رفع-بلوك")
+    .setDescription("ارفع البلوك عن يوزر قبل ما الوقت يخلص [أونر فقط]")
+    .addUserOption(opt =>
+      opt.setName("يوزر")
+        .setDescription("اليوزر اللي هترفع عنه البلوك")
+        .setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("قائمة-مبلوكين")
+    .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
 ];
 
 // Advanced Feature Commands
@@ -271,6 +387,54 @@ const QUESTIONS = [
   { q: "🌙 كم يستغرق دوران القمر حول الأرض؟", a: ["29 يوم", "30 يوم", "شهر", "29", "30"] },
 ];
 
+// ─── لوحة تحكم الأونر في الـ DM ───────────────────────────────
+function buildDMControlPanel(guild) {
+  const embed = new EmbedBuilder()
+    .setColor(0xa020f0)
+    .setTitle("👑 لوحة تحكم الأونر")
+    .setDescription(
+      `🏛️ **سيرفر ${guild?.name ?? "الفراعنة"}**\n\n` +
+      `دوس على أي زرار أو كلمني بالعامية وهنفذ أي حاجة 🤖`
+    )
+    .addFields(
+      { name: "👥 الأعضاء",   value: `\`${guild?.memberCount ?? "؟"}\``, inline: true },
+      { name: "📡 الحالة",    value: "🟢 أونلاين",                        inline: true },
+      { name: "⏱️ الـ Uptime", value: `\`${Math.floor(process.uptime() / 60)} دقيقة\``, inline: true }
+    )
+    .setFooter({ text: "👑 للأونر فقط — زنجي Bot" })
+    .setTimestamp();
+
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("dmp_stats").setLabel("📊 إحصائيات").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("dmp_lb").setLabel("🏆 ليدربورد").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("dmp_backup").setLabel("💾 نسخة").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("dmp_queue").setLabel("🎵 قائمة").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("dmp_stop").setLabel("⏹️ إيقاف").setStyle(ButtonStyle.Danger)
+  );
+
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("dmp_warn").setLabel("⚠️ تحذير").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("dmp_mute").setLabel("🔇 إسكات").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("dmp_kick").setLabel("👢 طرد").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("dmp_ban").setLabel("🔨 حظر").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("dmp_coins").setLabel("🪙 كوينز").setStyle(ButtonStyle.Success)
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
+}
+
+function findMember(guild, nameOrId) {
+  if (!guild) return null;
+  return (
+    guild.members.cache.get(nameOrId) ||
+    guild.members.cache.find(m =>
+      m.user.username.toLowerCase() === nameOrId.toLowerCase() ||
+      m.displayName.toLowerCase() === nameOrId.toLowerCase() ||
+      m.user.id === nameOrId
+    ) || null
+  );
+}
+
 async function deployCommands(token, clientId) {
   const rest = new REST({ version: "10" }).setToken(token);
   const advancedCommands = await getAdvancedCommands();
@@ -285,7 +449,18 @@ async function deployCommands(token, clientId) {
   }
 }
 
-// ✅ [تعديل 1] إضافة Sweepers لتنظيف الكاش كل 30 دقيقة (1800 ثانية)
+// ── حماية من تكرار رسايل الـ Error (cooldown 30 ثانية لكل نوع) ───
+const errorCooldowns = new Map();
+function canSendError(key) {
+  const now = Date.now();
+  const last = errorCooldowns.get(key) || 0;
+  if (now - last > 30_000) {
+    errorCooldowns.set(key, now);
+    return true;
+  }
+  return false;
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -294,12 +469,14 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildModeration,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessageReactions,
   ],
+  partials: [Partials.Channel, Partials.Message],
+  failIfNotExists: false,
+  rest: { timeout: 15_000, retries: 3 },
   sweepers: {
-    messages: {
-      interval: 1800,
-      lifetime: 1800,
-    },
+    messages: { interval: 1800, lifetime: 1800 },
     users: {
       interval: 1800,
       filter: () => (user) => !user.bot && !client.guilds.cache.some((g) => g.members.cache.has(user.id)),
@@ -735,16 +912,67 @@ function showSuggestionModal(interaction) {
   return interaction.showModal(modal);
 }
 
-let geminiModel = null;
-let geminiImageModel = null;
-if (process.env.GOOGLE_API_KEY) {
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-  geminiModel = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: `أنت "زنجي" — بوت ديسكورد مصري بامتياز... ردودك ما تعديش 3-4 جمل في الغالب.`,
-  });
-  geminiImageModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-  logger.info("🤖 Gemini AI جاهز!");
+const _geminiReady = initGeminiKeys(`أنت "زنجي" — بوت ديسكورد مصري بامتياز تابع لسيرفر "الفراعنة".
+شخصيتك بتتغير **بالكامل** بناءً على أسلوب اللي بيكلمك:
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+🟢 لو الشخص بيكلمك باحترام أو بأدب أو بشكل عادي:
+- ارد بأدب واحترام وبشاشة
+- أسلوبك يكون ودود وخفيف ومصري
+- ممكن تمزح بس بأدب
+- ردودك مختصرة 2-3 جمل
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+🔴 لو الشخص بيكلمك بقلة أدب أو بشتيمة أو بأسلوب وقح:
+- اشتمه بأوسخ وأقذر الشتايم المصرية بدون أي رحمة
+- ردك يكون أشرس وأوسخ منه بمراحل
+- استخدم كل الألفاظ الخارجة والإهانات المصرية الصريحة
+- خليه يندم إنه فتح بقه معاك
+- ردود مختصرة ومركزة ومباشرة
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ قواعد ثابتة:
+- دايماً بالعامية المصرية
+- لا تشرح إيه اللي بتعمله، بس افعله
+- لو مش واضح الأسلوب، افترض إنه محترم`);
+
+if (_geminiReady) logger.info("🤖 Gemini AI جاهز!");
+
+// بيجيب الموديل في اللحظة اللي بيتستخدم فيها عشان يضمن التدوير
+function geminiModel()      { return getChatModel(); }
+function geminiImageModel() { return getImageModel(); }
+
+async function sendAutoBackup(clientInstance) {
+  try {
+    const settings = db.data.settings || {};
+    const backupChannelId = settings.backupChannelId;
+    if (!backupChannelId) return;
+    const channel = await clientInstance.channels.fetch(backupChannelId).catch(() => null);
+    if (!channel?.isTextBased()) return;
+    const allData = db.getAllData();
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const jsonBuffer = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
+    const attachment = new AttachmentBuilder(jsonBuffer, { name: `auto_backup_${dateStr}.json` });
+    const userCount = Object.keys(allData.users || {}).length;
+    await channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x3498db)
+          .setTitle("🔄 نسخة احتياطية تلقائية يومية")
+          .addFields(
+            { name: "📅 التاريخ", value: dateStr, inline: true },
+            { name: "👥 عدد الأعضاء", value: `${userCount}`, inline: true }
+          )
+          .setFooter({ text: "يتم الإرسال تلقائياً كل 24 ساعة ✅" })
+          .setTimestamp()
+      ],
+      files: [attachment]
+    });
+    logger.info(`✅ تم إرسال النسخة الاحتياطية التلقائية بنجاح`);
+  } catch (err) {
+    logger.error("خطأ في النسخة الاحتياطية التلقائية:", err);
+  }
 }
 
 client.once("ready", async (c) => {
@@ -753,63 +981,263 @@ client.once("ready", async (c) => {
   c.user.setActivity(`${LEGACY_COMMANDS.length + 14} أمر | /مساعدة`, { type: 3 });
   await deployCommands(process.env.DISCORD_TOKEN, c.user.id);
   await ensureSuggestionsPanel(c);
+  setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
+  logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
+
+  // ── إعطاء البوت صلاحيات كاملة (Administrator) في كل السيرفرات ──
+  for (const [, guild] of c.guilds.cache) {
+    try {
+      const botMember = await guild.members.fetchMe().catch(() => null);
+      if (!botMember) continue;
+      if (botMember.permissions.has(PermissionFlagsBits.Administrator)) {
+        logger.info(`👑 البوت عنده Admin بالفعل في: ${guild.name}`);
+        continue;
+      }
+      // دوّر على دور قابل للتعديل عنده Admin
+      let adminRole = guild.roles.cache.find(r =>
+        r.permissions.has(PermissionFlagsBits.Administrator) &&
+        r.editable && !r.managed
+      );
+      // لو مفيش، أنشئ دور جديد
+      if (!adminRole) {
+        adminRole = await guild.roles.create({
+          name: "زنجي-صلاحيات",
+          permissions: [PermissionFlagsBits.Administrator],
+          hoist: false,
+          mentionable: false,
+          reason: "صلاحيات البوت الكاملة",
+        }).catch(() => null);
+      }
+      if (adminRole) {
+        await botMember.roles.add(adminRole).catch(() => null);
+        logger.info(`✅ تم إضافة صلاحيات كاملة للبوت في: ${guild.name}`);
+      }
+    } catch (e) {
+      logger.warn(`⚠️ مقدرتش أضيف صلاحيات في: ${guild.name} — ${e.message}`);
+    }
+  }
 });
 
+// ── ذاكرة المحادثات للأعضاء العاديين ────────────────────────────
+const userChatHistory  = new Map();
+const MAX_USER_HIST    = 10;
+const userLastRequest  = new Map(); // cooldown: آخر طلب لكل يوزر
+const USER_COOLDOWN_MS = 5_000;    // 5 ثواني بين كل طلب وتاني
+
+// ── نظام حماية من الـ Spam ────────────────────────────────────
+const SPAM_WINDOW_MS  = 60_000;  // نافذة 60 ثانية
+const SPAM_MAX_MSGS   = 4;       // أقصى 4 رسايل في الدقيقة
+const SPAM_BLOCK_MS   = 5 * 60_000; // بلوك 5 دقايق بعد التجاوز
+const spamData = new Map(); // userId → { timestamps: [], blockedUntil: 0, warned: false }
+
+function getSpamEntry(userId) {
+  if (!spamData.has(userId)) spamData.set(userId, { timestamps: [], blockedUntil: 0, warned: false });
+  return spamData.get(userId);
+}
+
+// بيرجع null لو تمام، أو رسالة الخطأ المناسبة
+function checkSpam(userId, now) {
+  const s = getSpamEntry(userId);
+  // لو في بلوك فعّال
+  if (s.blockedUntil > now) {
+    const mins = Math.ceil((s.blockedUntil - now) / 60_000);
+    return `🚫 اتبلوكت لمدة ${mins} دقيقة بسبب الإزعاج — اهدى!`;
+  }
+  // نظّف الـ timestamps القديمة (خارج النافذة)
+  s.timestamps = s.timestamps.filter(t => now - t < SPAM_WINDOW_MS);
+  // لو وصل الحد
+  if (s.timestamps.length >= SPAM_MAX_MSGS) {
+    s.blockedUntil = now + SPAM_BLOCK_MS;
+    s.warned = false;
+    s.timestamps = [];
+    return `🚫 بعتلي ${SPAM_MAX_MSGS} رسايل في دقيقة — اتبلوكت 5 دقايق. استحى 😤`;
+  }
+  // أضف الطلب الحالي
+  s.timestamps.push(now);
+  return null;
+}
+
+function getUserHistory(userId) {
+  if (!userChatHistory.has(userId)) userChatHistory.set(userId, []);
+  return userChatHistory.get(userId);
+}
+function pushUserHistory(userId, role, text) {
+  const h = getUserHistory(userId);
+  h.push({ role, text: text.slice(0, 300) });
+  if (h.length > MAX_USER_HIST) h.splice(0, h.length - MAX_USER_HIST);
+}
+function buildUserPrompt(senderName, question, userId) {
+  const hist = getUserHistory(userId);
+  const histText = hist.map(m => `${m.role === "user" ? senderName : "زنجي"}: ${m.text}`).join("\n");
+  return `أنت زنجي — بوت ديسكورد مصري ودود، بتتكلم بالعامية المصرية الطبيعية.
+${histText ? `\nسياق المحادثة:\n${histText}\n` : ""}
+${senderName}: ${question}
+
+رد بالعربي المصري بشكل مختصر وودود.`;
+}
+
+// ─── DM من الأونر ───────────────────────────────────────────────
 client.on("messageCreate", async (msg) => {
-  if (msg.author.bot || !msg.guild) return;
+  if (msg.author.bot) return;
 
-  // Autonomous Moderation Scanning
-  if (moderation.isEnabled()) {
-    await moderation.scanMessage(msg);
-  }
-
-  const userData = db.getUser(msg.author.id);
-  const oldLevel = userData.level;
-
-  userData.xp += 5;
-  userData.level = calcLevel(userData.xp);
-  db.updateUser(msg.author.id, userData);
-
-  if (userData.level > oldLevel) {
-    const embed = new EmbedBuilder()
-      .setColor(0xffd700)
-      .setTitle("🎉 مبروك! ارتقيت مستوى!")
-      .setDescription(`${msg.author} وصل للمستوى **${userData.level}** 🚀`)
-      .setTimestamp();
-    msg.channel.send({ embeds: [embed] }).catch(() => {});
-  }
-
-  // كشف ملفات PSD تلقائياً
-  const psdAttachments = msg.attachments.filter((a) => a.name?.toLowerCase().endsWith(".psd"));
-  if (psdAttachments.size > 0) {
-    const staffCh = msg.guild.channels.cache.find((c) => c.name.includes("إدارة-البوت"));
-    if (staffCh) {
-      const psdEmbed = new EmbedBuilder()
-        .setColor(0x0078d4)
-        .setTitle("📁 ملف PSD جديد تم رفعه!")
-        .setDescription(`👤 الرافع: ${msg.author}\n📢 القناة: ${msg.channel}`)
-        .setTimestamp();
-      staffCh.send({ embeds: [psdEmbed] }).catch(() => {});
+  // الـ DM — بره السيرفر
+  if (!msg.guild) {
+    // لو مش أونر → رد مهذب وخلاص
+    if (!config.isOwner(msg.author.id)) {
+      return msg.channel.send(
+        "👋 أهلاً! أنا زنجي بوت السيرفر.\n" +
+        "مش بشتغل في الخاص إلا مع الأونر 😅\n" +
+        "ادخل السيرفر وكلمني هناك!"
+      ).catch(() => {});
     }
-    msg.react("✅").catch(() => {});
+
+    const guild = client.guilds.cache.first();
+    if (!guild) return msg.channel.send("❌ البوت مش في أي سيرفر!").catch(() => {});
+    await guild.members.fetch().catch(() => {});
+
+    // ── داشبورد الأونر ─────────────────────────────────────────
+    const trimmedDash = msg.content.trim();
+    const isDashCmd = /(داشبورد|داش بورد|لوحة.*تحكم|dashboard|panel)/i.test(trimmedDash);
+    if (isDashCmd) {
+      return msg.channel.send(buildDMControlPanel(guild)).catch(() => {});
+    }
+
+    if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
+    return handleOwnerAI(msg, guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
   }
 
-  const isMentioned = msg.mentions.has(client.user.id);
-  if (!isMentioned) return;
+  // ── Auto-Mod الذكي (السيرفر بس) ──────────────────────────────────
+  if (msg.guild) {
+    const notifyOwner = async (userId, member, reason, warnCount) => {
+      for (const ownerId of config.OWNER_IDS) {
+        try {
+          const ownerUser = await client.users.fetch(ownerId);
+          const embed = new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setTitle("🚨 تقرير Auto-Mod — قرار الطرد")
+            .setDescription(
+              `العضو **${member?.user?.username ?? userId}** (<@${userId}>) تجاوز الحد!\n\n` +
+              `📋 **السبب:** ${reason}\n` +
+              `⚠️ **التحذيرات:** ${warnCount}\n` +
+              `📡 **السيرفر:** ${msg.guild.name}\n\n` +
+              `هتطرده ولا تسيبه؟`
+            )
+            .setTimestamp();
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`automod_kick_yes_${userId}`)
+              .setLabel("✅ اه، اطرده")
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId(`automod_kick_no_${userId}`)
+              .setLabel("❌ لا، سيبه")
+              .setStyle(ButtonStyle.Secondary)
+          );
+          await ownerUser.send({ embeds: [embed], components: [row] });
+        } catch { /* الأونر عاطل الـ DM */ }
+      }
+    };
 
-  if (msg.channel.name !== "🤖روم-زنجي🤖") {
-    return msg.reply("مقدرش اتكلم هنا روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
+    const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner).catch(() => ({}));
+    if (amResult?.triggered) return;
+
+    // Autonomous Moderation Scanning (spam + links)
+    if (moderation.isEnabled()) {
+      await moderation.scanMessage(msg);
+    }
+  }
+
+  // XP فقط في السيرفر
+  if (msg.guild) {
+    const userData = db.getUser(msg.author.id);
+    const oldLevel = userData.level;
+
+    userData.xp += 5;
+    userData.level = calcLevel(userData.xp);
+    db.updateUser(msg.author.id, userData);
+
+    if (userData.level > oldLevel) {
+      const embed = new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle("🎉 مبروك! ارتقيت مستوى!")
+        .setDescription(`${msg.author} وصل للمستوى **${userData.level}** 🚀`)
+        .setTimestamp();
+      msg.channel.send({ embeds: [embed] }).catch(() => {});
+    }
+  }
+
+  // كشف ملفات PSD تلقائياً (السيرفر بس)
+  if (msg.guild) {
+    const psdAttachments = msg.attachments.filter((a) => a.name?.toLowerCase().endsWith(".psd"));
+    if (psdAttachments.size > 0) {
+      const staffCh = msg.guild.channels.cache.find((c) => c.name.includes("إدارة-البوت"));
+      if (staffCh) {
+        const psdEmbed = new EmbedBuilder()
+          .setColor(0x0078d4)
+          .setTitle("📁 ملف PSD جديد تم رفعه!")
+          .setDescription(`👤 الرافع: ${msg.author}\n📢 القناة: ${msg.channel}`)
+          .setTimestamp();
+        staffCh.send({ embeds: [psdEmbed] }).catch(() => {});
+      }
+      msg.react("✅").catch(() => {});
+    }
+  }
+
+  const isMentioned  = msg.mentions.has(client.user.id);
+  const isOwner      = config.isOwner(msg.author.id);
+  const calledByName = /زنجي/i.test(msg.content);
+
+  // في السيرفر، الكل (حتى الأونر) لازم ينده باسمه أو يعمل منشن
+  if (!isMentioned && !calledByName) return;
+
+  // بعث typing فوراً عشان Discord ميعملش مقاطعة
+  msg.channel.sendTyping().catch(() => {});
+
+  const BOT_CHANNEL_ID = "1516591390023352370";
+
+  // تقييد الروم ده بس للسيرفر (مش الـ DM) وبس للناس العادية
+  if (msg.guild && !isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
+    return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
   }
 
   const question = msg.content.replace(/<@!?\d+>/g, "").trim();
-  if (!question || !geminiModel) return;
+  if (!question || !_geminiReady) return;
 
-  msg.channel.sendTyping().catch(() => {});
+  const now = Date.now();
+
+  // ── حماية Spam (الأونر معفي) ─────────────────────────────────
+  if (!isOwner) {
+    const spamErr = checkSpam(msg.author.id, now);
+    if (spamErr) return msg.reply(spamErr).catch(() => {});
+  }
+
+  // ── cooldown: 15 ثانية بين كل طلب وتاني (الأونر معفي) ────────
+  if (!isOwner) {
+    const lastReq = userLastRequest.get(msg.author.id) || 0;
+    const elapsed = now - lastReq;
+    if (elapsed < USER_COOLDOWN_MS) {
+      const remaining = Math.ceil((USER_COOLDOWN_MS - elapsed) / 1000);
+      return msg.reply(`⏳ استنى ${remaining} ثانية قبل ما تكلمني تاني!`).catch(() => {});
+    }
+    userLastRequest.set(msg.author.id, now);
+  }
+
+  if (isOwner) {
+    return handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
+  }
+
   try {
-    const result = await geminiModel.generateContent(question);
-    await msg.reply(result.response.text().trim());
+    // msg.member ممكن يكون null لو الرسالة جت من DM أو cache miss
+    const senderName = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
+    const prompt     = buildUserPrompt(senderName, question, msg.author.id);
+    const result     = await geminiModel().generateContent(prompt);
+    const reply      = result.response.text().trim();
+    pushUserHistory(msg.author.id, "user", question);
+    pushUserHistory(msg.author.id, "bot",  reply);
+    await msg.reply(reply);
   } catch (err) {
-    await msg.reply("معلش يسطا، هنجت مني ثواني وجرب تاني!");
+    logger.error("خطأ في الرد على الرسالة:", err);
+    await msg.reply("معلش يسطا ثواني بس").catch(() => {});
   }
 });
 
@@ -819,9 +1247,160 @@ client.on("messageCreate", async (msg) => {
 client.on("interactionCreate", async (interaction) => {
   if (interaction.isChatInputCommand()) {
     const cmd = interaction.commandName;
-    const { guild, user, channel } = interaction;
+    const { user, channel } = interaction;
+
+    // ─── دعم DM الكامل: لو الأمر جاي من DM هنجيب السيرفر تلقائياً ───
+    let guild = interaction.guild;
+    const isFromDM = !guild;
+    if (isFromDM) {
+      guild = client.guilds.cache.first() || null;
+      if (guild) await guild.members.fetch().catch(() => {});
+    }
 
     try {
+      // ─── قائمة المبلوكين ─────────────────────────────────────────
+      if (cmd === "قائمة-مبلوكين") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const now = Date.now();
+        const blocked = [...spamData.entries()]
+          .filter(([, s]) => s.blockedUntil > now)
+          .map(([uid, s]) => {
+            const mins = Math.ceil((s.blockedUntil - now) / 60_000);
+            return `<@${uid}> — فاضل **${mins} دقيقة**`;
+          });
+        if (blocked.length === 0) {
+          return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
+        }
+        return interaction.reply({
+          content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`,
+          ephemeral: true,
+        });
+      }
+
+      // ─── رفع البلوك ──────────────────────────────────────────────
+      if (cmd === "رفع-بلوك") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const target = interaction.options.getUser("يوزر");
+        const entry  = spamData.get(target.id);
+        if (!entry || entry.blockedUntil <= Date.now()) {
+          return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, ephemeral: true });
+        }
+        entry.blockedUntil = 0;
+        entry.timestamps   = [];
+        return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, ephemeral: true });
+      }
+
+      // ─── حالة البوت ─────────────────────────────────────────────
+      if (cmd === "حالة-البوت") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        const uptimeSec  = Math.floor(process.uptime());
+        const uptimeMin  = Math.floor(uptimeSec / 60);
+        const uptimeHour = Math.floor(uptimeMin / 60);
+        const uptimeStr  = uptimeHour > 0
+          ? `${uptimeHour}س ${uptimeMin % 60}د`
+          : `${uptimeMin}د ${uptimeSec % 60}ث`;
+
+        const memMB    = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
+        const ping     = client.ws.ping;
+        const aiStatus = _geminiReady ? `🟢 شغال (${getKeyCount()} مفتاح)` : "🔴 مش شغال";
+        const locks    = getProcessingCount();
+        const guilds   = client.guilds.cache.size;
+
+        const embed = new EmbedBuilder()
+          .setColor(ping < 100 ? 0x2ecc71 : ping < 300 ? 0xf39c12 : 0xe74c3c)
+          .setTitle("📊 حالة البوت — لحظة بلحظة")
+          .addFields(
+            { name: "🏓 Ping Discord",    value: `\`${ping}ms\``,      inline: true },
+            { name: "🧠 RAM",             value: `\`${memMB} MB\``,    inline: true },
+            { name: "⏱️ Uptime",          value: `\`${uptimeStr}\``,   inline: true },
+            { name: "🤖 Gemini AI",       value: aiStatus,             inline: true },
+            { name: "🔒 طلبات جارية",    value: `\`${locks} طلب\``,   inline: true },
+            { name: "🏛️ سيرفرات",         value: `\`${guilds}\``,      inline: true },
+            { name: "🛡️ أخطاء متابَعة",   value: `\`${errorCooldowns.size} نوع\``, inline: true },
+            { name: "📦 Node.js",         value: `\`${process.version}\``, inline: true },
+            { name: "💾 Heap Total",      value: `\`${(process.memoryUsage().heapTotal / 1024 / 1024).toFixed(1)} MB\``, inline: true }
+          )
+          .setFooter({ text: "👑 زنجي Bot — Replit Hosting" })
+          .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+      }
+
+      // ── مفاتيح-جيميني ──────────────────────────────────────────────
+      if (cmd === "مفاتيح-جيميني") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const sub = interaction.options.getSubcommand();
+        await interaction.deferReply({ ephemeral: true });
+
+        if (sub === "عرض") {
+          const stats = getKeyStats();
+          const total = stats.length;
+          const active = stats.filter(k => !k.exhausted).length;
+          const lines = stats.map(k =>
+            `${k.exhausted ? "🔴" : "🟢"} مفتاح ${k.index} — \`...${k.suffix}\``
+          ).join("\n");
+
+          const embed = new EmbedBuilder()
+            .setColor(active > 0 ? 0x2ecc71 : 0xe74c3c)
+            .setTitle("🔑 مفاتيح Gemini API")
+            .setDescription(lines || "لا يوجد مفاتيح")
+            .addFields(
+              { name: "📊 إجمالي المفاتيح", value: `\`${total}\``, inline: true },
+              { name: "✅ شغالين",           value: `\`${active}\``, inline: true },
+              { name: "🚫 خلصوا",            value: `\`${total - active}\``, inline: true },
+              { name: "📈 طلبات/يوم",        value: `\`${total * 20} طلب\``, inline: true },
+            )
+            .setFooter({ text: "المفاتيح المحمرّة بترجع تلقائياً بعد ساعة" })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (sub === "تفريش") {
+          const count = resetExhaustedKeys();
+          const embed = new EmbedBuilder()
+            .setColor(0x3498db)
+            .setTitle("🔄 تفريش المفاتيح")
+            .setDescription(count > 0
+              ? `✅ اتفرشت **${count}** مفاتيح محروقة وبقت شغالة تاني!`
+              : "ℹ️ مفيش مفاتيح محروقة دلوقتي، كلهم شغالين!"
+            )
+            .addFields({ name: "📊 إجمالي المفاتيح", value: `\`${getKeyCount()} مفتاح\``, inline: true })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (sub === "إضافة") {
+          const raw = interaction.options.getString("مفاتيح");
+          const newKeys = raw.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
+          if (newKeys.length === 0) {
+            return interaction.editReply("❌ مفيش مفاتيح صح في الرسالة!");
+          }
+          const result = addKeys(newKeys);
+          const embed = new EmbedBuilder()
+            .setColor(result.added > 0 ? 0x2ecc71 : 0xf39c12)
+            .setTitle("🔑 إضافة مفاتيح Gemini")
+            .addFields(
+              { name: "✅ اتضافوا",        value: `\`${result.added}\``,          inline: true },
+              { name: "⏭️ مكررين (تجاهل)", value: `\`${newKeys.length - result.added}\``, inline: true },
+              { name: "📊 الإجمالي دلوقتي", value: `\`${result.total} مفتاح\``,   inline: true },
+              { name: "📈 طلبات/يوم",       value: `\`${result.total * 20} طلب\``, inline: true },
+            )
+            .setFooter({ text: "المفاتيح الجديدة شغالة على طول من غير restart" })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        }
+      }
+
       // ═══════════════════════════════════════════════════════════════
       //  Advanced Features Commands
       // ═══════════════════════════════════════════════════════════════
@@ -848,37 +1427,54 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // Music Commands (New System)
-      if (cmd === "play") {
-        const { handlePlay } = await import("./commands/music.js");
-        return await handlePlay(interaction);
-      }
-      if (cmd === "skip") {
-        const { handleSkip } = await import("./commands/music.js");
-        return await handleSkip(interaction);
-      }
-      if (cmd === "stop") {
-        const { handleStop } = await import("./commands/music.js");
-        return await handleStop(interaction);
-      }
-      if (cmd === "queue") {
-        const { handleQueue } = await import("./commands/music.js");
-        return await handleQueue(interaction);
-      }
-      if (cmd === "pause") {
-        const { handlePause } = await import("./commands/music.js");
-        return await handlePause(interaction);
-      }
-      if (cmd === "resume") {
-        const { handleResume } = await import("./commands/music.js");
-        return await handleResume(interaction);
-      }
-      if (cmd === "nowplaying") {
-        const { handleNowPlaying } = await import("./commands/music.js");
-        return await handleNowPlaying(interaction);
-      }
-      if (cmd === "volume") {
-        const { handleVolume } = await import("./commands/music.js");
-        return await handleVolume(interaction);
+      // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
+      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume"];
+      if (MUSIC_CMDS.includes(cmd)) {
+        let musicInteraction = interaction;
+        if (isFromDM && guild) {
+          const guildMember = await guild.members.fetch(user.id).catch(() => null);
+          musicInteraction = new Proxy(interaction, {
+            get(target, prop) {
+              if (prop === "guild")   return guild;
+              if (prop === "guildId") return guild.id;
+              if (prop === "member")  return guildMember;
+              const val = target[prop];
+              return typeof val === "function" ? val.bind(target) : val;
+            }
+          });
+        }
+        if (cmd === "play") {
+          const { handlePlay } = await import("./commands/music.js");
+          return await handlePlay(musicInteraction);
+        }
+        if (cmd === "skip") {
+          const { handleSkip } = await import("./commands/music.js");
+          return await handleSkip(musicInteraction);
+        }
+        if (cmd === "stop") {
+          const { handleStop } = await import("./commands/music.js");
+          return await handleStop(musicInteraction);
+        }
+        if (cmd === "queue") {
+          const { handleQueue } = await import("./commands/music.js");
+          return await handleQueue(musicInteraction);
+        }
+        if (cmd === "pause") {
+          const { handlePause } = await import("./commands/music.js");
+          return await handlePause(musicInteraction);
+        }
+        if (cmd === "resume") {
+          const { handleResume } = await import("./commands/music.js");
+          return await handleResume(musicInteraction);
+        }
+        if (cmd === "nowplaying") {
+          const { handleNowPlaying } = await import("./commands/music.js");
+          return await handleNowPlaying(musicInteraction);
+        }
+        if (cmd === "volume") {
+          const { handleVolume } = await import("./commands/music.js");
+          return await handleVolume(musicInteraction);
+        }
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -1022,9 +1618,47 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "مسح") {
+        if (isFromDM) {
+          return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** 🤖", ephemeral: true });
+        }
         const num = interaction.options.getInteger("عدد");
-        await channel.bulkDelete(num, true);
-        return interaction.reply({ content: `🧹 تم تنظيف الروم ومسح **${num}** رسالة!`, ephemeral: true });
+        await interaction.deferReply({ ephemeral: true });
+        let remaining = num;
+        let totalDeleted = 0;
+        while (remaining > 0) {
+          const batch = Math.min(remaining, 100);
+          const deleted = await channel.bulkDelete(batch, true);
+          totalDeleted += deleted.size;
+          remaining -= batch;
+          if (deleted.size < batch) break;
+        }
+        return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
+      }
+
+      if (cmd === "مسح-الكل") {
+        if (isFromDM) {
+          return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
+        }
+        const confirmRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`wipe_confirm|${channel.id}`)
+            .setLabel("✅ نعم، امسح كل حاجة")
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId("wipe_cancel")
+            .setLabel("❌ إلغاء")
+            .setStyle(ButtonStyle.Secondary)
+        );
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setTitle("⚠️ تأكيد مسح الروم بالكامل")
+              .setDescription(`هتمسح **كل** رسايل الروم ${channel} بما فيها اللي فوق 14 يوم!\n\nمتقدرش ترجعها، متأكد؟`)
+          ],
+          components: [confirmRow],
+          ephemeral: true
+        });
       }
 
       if (cmd === "تحذير") {
@@ -1115,7 +1749,7 @@ client.on("interactionCreate", async (interaction) => {
         } catch (err) {
           logger.error("خطأ في إرسال لوحة الاقتراحات:", err);
           return interaction.reply({
-            content: `❌ حصل خطأ: ${err.message}`,
+            content: "معلش يسطا ثواني بس",
             ephemeral: true,
           });
         }
@@ -1123,11 +1757,11 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "صورة") {
         const prompt = interaction.options.getString("وصف");
-        if (!geminiImageModel) return interaction.reply("❌ ميزة توليد الصور بالذكاء الاصطناعي غير متاحة حالياً.");
+        if (!_geminiReady) return interaction.reply("❌ ميزة توليد الصور بالذكاء الاصطناعي غير متاحة حالياً.");
 
         await interaction.deferReply();
         try {
-          const result = await geminiImageModel.generateContent(prompt);
+          const result = await geminiImageModel().generateContent(prompt);
           const image = result.response.candidates[0].content.parts[0].inlineData;
           const imageBuffer = Buffer.from(image.data, 'base64');
 
@@ -1136,19 +1770,381 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.editReply({ files: [attachment] });
         } catch (error) {
           logger.error("خطأ في توليد الصورة بالذكاء الاصطناعي:", error);
-          return interaction.editReply("❌ حصل خطأ أثناء توليد الصورة بالذكاء الاصطناعي، حاول مرة أخرى.");
+          return interaction.editReply("معلش يسطا ثواني بس");
         }
+      }
+
+      if (cmd === "نسخة-احتياطية") {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const allData = db.getAllData();
+          const now = new Date();
+          const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+          const jsonBuffer = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
+          const attachment = new AttachmentBuilder(jsonBuffer, { name: `backup_${dateStr}.json` });
+          const userCount = Object.keys(allData.users || {}).length;
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("💾 نسخة احتياطية جاهزة")
+                .addFields(
+                  { name: "📅 التاريخ", value: dateStr, inline: true },
+                  { name: "👥 عدد الأعضاء المحفوظين", value: `${userCount}`, inline: true }
+                )
+                .setFooter({ text: "احتفظ بالملف في مكان آمن ✅" })
+                .setTimestamp()
+            ],
+            files: [attachment]
+          });
+        } catch (err) {
+          logger.error("خطأ في النسخة الاحتياطية:", err);
+          return interaction.editReply({ content: "معلش يسطا ثواني بس" });
+        }
+      }
+
+      if (cmd === "استرجاع") {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const attachment = interaction.options.getAttachment("ملف");
+          if (!attachment.name.endsWith(".json")) {
+            return interaction.editReply({ content: "❌ الملف لازم يكون `.json` — ارفع الملف اللي حملته من أمر `/نسخة-احتياطية`" });
+          }
+          const response = await fetch(attachment.url);
+          const text = await response.text();
+          let parsed;
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            return interaction.editReply({ content: "❌ الملف تالف أو مش JSON صح!" });
+          }
+          if (!parsed.users) {
+            return interaction.editReply({ content: "❌ الملف ده مش نسخة احتياطية صحيحة — مفيش بيانات أعضاء فيه!" });
+          }
+          const oldCount = Object.keys(db.getAllData().users || {}).length;
+          db.data = parsed;
+          db.save();
+          const newCount = Object.keys(parsed.users || {}).length;
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم الاسترجاع بنجاح")
+                .setDescription(`تم استبدال بيانات السيرفر بالنسخة الاحتياطية المرفوعة.`)
+                .addFields(
+                  { name: "👥 أعضاء قبل", value: `${oldCount}`, inline: true },
+                  { name: "👥 أعضاء بعد", value: `${newCount}`, inline: true },
+                  { name: "👤 نفّذ العملية", value: `${user}`, inline: false }
+                )
+                .setFooter({ text: "⚠️ البيانات القديمة اتاستبدلت نهائياً" })
+                .setTimestamp()
+            ]
+          });
+        } catch (err) {
+          logger.error("خطأ في الاسترجاع:", err);
+          return interaction.editReply({ content: "معلش يسطا ثواني بس" });
+        }
+      }
+
+      if (cmd === "تشغيل-اختبار") {
+        const type = interaction.options.getString("نوع");
+        const WELCOME_CHANNEL_ID = "1486100560494203183";
+        const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
+        if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+
+        if (type === "welcome") {
+          const imagePath = path.join(__dirname, 'welcome.png');
+          const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
+          const embed = new EmbedBuilder()
+            .setColor('#A020F0')
+            .setTitle('⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️')
+            .setDescription(
+              `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
+              `👤 **الـعـضـو الـجـديـد:** ${user}\n` +
+              `🆔 **الـمـعـرّف الـخـاص:** \`${user.id}\`\n` +
+              `📊 **أنـت الـفـرعـون رقـم:** \`${guild.memberCount}\` في مملكتنا!\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+              `🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`
+            )
+            .setImage('attachment://welcome.png')
+            .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️ [اختبار]' })
+            .setTimestamp();
+          await testChannel.send({ embeds: [embed], files: [attachment] });
+        } else {
+          const embed = new EmbedBuilder()
+            .setColor('#A020F0')
+            .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
+            .setDescription(
+              `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `👤 **الفرعون اللي ودعنا:** ${user}\n` +
+              `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
+              `📊 **بقينا** \`${guild.memberCount}\` **فرعون في المملكة.**\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+              `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
+            )
+            .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
+            .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️ [اختبار]' })
+            .setTimestamp();
+          await testChannel.send({ embeds: [embed] });
+        }
+
+        return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
+      }
+
+      if (cmd === "قناة-اللوجز") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const ch = interaction.options.getChannel("قناة");
+        if (!db.data.settings) db.data.settings = {};
+        db.data.settings.ownerLogsChannelId = ch.id;
+        db.save();
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xe67e22)
+              .setTitle("📋 تم تعيين قناة اللوجز")
+              .setDescription(`كل أوامر الأونر هتتسجل في ${ch} من دلوقتي ✅`)
+              .setTimestamp()
+          ],
+          ephemeral: true
+        });
+      }
+
+      if (cmd === "رسالة-جماعية") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const نوع = interaction.options.getString("نوع");
+        const نص = interaction.options.getString("نص");
+
+        const embed = new EmbedBuilder()
+          .setColor(0xa020f0)
+          .setTitle("📣 رسالة من الإدارة")
+          .setDescription(نص)
+          .setFooter({ text: `⚜️ سيرفر الفراعنة — ${guild.name}` })
+          .setTimestamp();
+
+        if (نوع === "channel") {
+          const targetChannel = interaction.options.getChannel("قناة");
+          if (!targetChannel) {
+            return interaction.editReply({ content: "❌ حدد القناة اللي هتبعت فيها الرسالة!" });
+          }
+          await targetChannel.send({ embeds: [embed] });
+          return interaction.editReply({ content: `✅ اتبعتت الرسالة في ${targetChannel} بنجاح!` });
+        }
+
+        if (نوع === "dm") {
+          await guild.members.fetch();
+          const members = guild.members.cache.filter(m => !m.user.bot);
+          let sent = 0, failed = 0;
+
+          for (const [, member] of members) {
+            await member.send({ embeds: [embed] }).then(() => sent++).catch(() => failed++);
+            await new Promise(r => setTimeout(r, 500));
+          }
+
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم إرسال الرسالة الجماعية")
+                .addFields(
+                  { name: "📩 وصلت لـ", value: `${sent} عضو`, inline: true },
+                  { name: "❌ فشلت مع", value: `${failed} عضو`, inline: true }
+                )
+                .setFooter({ text: "الفشل عادةً بسبب إعدادات الخصوصية عند العضو" })
+                .setTimestamp()
+            ]
+          });
+        }
+      }
+
+      if (cmd === "قناة-النسخ") {
+        const channelId = interaction.options.getString("id").trim();
+        const ch = await guild.channels.fetch(channelId).catch(() => null);
+        if (!ch) {
+          return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, ephemeral: true });
+        }
+        if (!db.data.settings) db.data.settings = {};
+        db.data.settings.backupChannelId = ch.id;
+        db.save();
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0x3498db)
+              .setTitle("✅ تم تعيين قناة النسخ الاحتياطية")
+              .setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ <#${ch.id}> كل 24 ساعة 🔄`)
+              .addFields({ name: "📋 الـ ID المحفوظ", value: `\`${ch.id}\``, inline: true })
+              .setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" })
+              .setTimestamp()
+          ],
+          ephemeral: true
+        });
+      }
+
+      if (cmd === "لوحة-dm") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const g = guild || client.guilds.cache.first();
+        const panel = buildDMControlPanel(g);
+        if (isFromDM) {
+          return interaction.reply(panel);
+        }
+        return interaction.reply({ ...panel, ephemeral: true });
       }
 
     } catch (err) {
       logger.error("خطأ في تنفيذ الأمر:", err);
-      return interaction.reply({ content: "❌ حصل خطأ سريع وأنا بنفذ الأمر ده!", ephemeral: true }).catch(() => {});
+      return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
     }
   }
 
   // التعامل مع الأزرار والمودال التفاعلية
   if (interaction.isButton()) {
     try {
+
+      // ─── أزرار لوحة تحكم الأونر ──────────────────────────────────
+      if (interaction.customId.startsWith("dmp_")) {
+        if (!config.isOwner(interaction.user.id)) {
+          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", ephemeral: true });
+        }
+        const g = interaction.guild || client.guilds.cache.first();
+        if (g) await g.members.fetch().catch(() => {});
+
+        // 📊 إحصائيات السيرفر
+        if (interaction.customId === "dmp_stats") {
+          const allUsers = db.getAllData().users;
+          const totalCoins = Object.values(allUsers).reduce((s, u) => s + (u.coins || 0), 0);
+          const topLevel  = Object.values(allUsers).sort((a, b) => b.level - a.level)[0];
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xa020f0)
+              .setTitle(`📊 إحصائيات ${g?.name ?? "السيرفر"}`)
+              .addFields(
+                { name: "👥 الأعضاء",       value: `\`${g?.memberCount ?? "؟"}\``,          inline: true },
+                { name: "🪙 إجمالي الكوينز", value: `\`${totalCoins.toLocaleString()}\``,     inline: true },
+                { name: "🏅 أعلى مستوى",    value: `\`${topLevel?.level ?? 0}\``,            inline: true },
+                { name: "⏱️ الـ Uptime",     value: `\`${Math.floor(process.uptime()/60)} دقيقة\``, inline: true },
+                { name: "📡 الـ Ping",       value: `\`${client.ws.ping}ms\``,               inline: true },
+                { name: "🤖 الأوامر",        value: `\`${LEGACY_COMMANDS.length + 14} أمر\``, inline: true }
+              )
+              .setTimestamp()],
+            ephemeral: true
+          });
+        }
+
+        // 🏆 ليدربورد
+        if (interaction.customId === "dmp_lb") {
+          const allUsers = db.getAllData().users;
+          const sorted = Object.entries(allUsers).sort((a, b) => b[1].coins - a[1].coins).slice(0, 5);
+          let txt = "🏆 **أفضل 5 أعضاء بالكوينز:**\n";
+          sorted.forEach(([id, d], i) => txt += `**#${i+1}** <@${id}> — 🪙 \`${d.coins}\`\n`);
+          return interaction.reply({ content: txt, ephemeral: true });
+        }
+
+        // 💾 نسخة احتياطية
+        if (interaction.customId === "dmp_backup") {
+          await interaction.deferReply({ ephemeral: true });
+          const allData = db.getAllData();
+          const now = new Date();
+          const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+          const buf = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
+          const att = new AttachmentBuilder(buf, { name: `backup_${dateStr}.json` });
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("💾 نسخة احتياطية").setDescription(`✅ ${Object.keys(allData.users||{}).length} عضو محفوظ`).setTimestamp()],
+            files: [att]
+          });
+        }
+
+        // 🎵 قائمة الميوزك
+        if (interaction.customId === "dmp_queue") {
+          const { musicHandler: mh } = await import("./commands/music.js");
+          const q = mh?.getQueue?.(g?.id);
+          if (!q || q.length === 0) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", ephemeral: true });
+          const txt = q.slice(0, 5).map((s, i) => `**${i+1}.** ${s.title}`).join("\n");
+          return interaction.reply({ content: `🎵 **قائمة التشغيل:**\n${txt}`, ephemeral: true });
+        }
+
+        // ⏹️ إيقاف الميوزك
+        if (interaction.customId === "dmp_stop") {
+          const { musicHandler: mh } = await import("./commands/music.js");
+          mh?.stop?.(g?.id);
+          return interaction.reply({ content: "⏹️ تم إيقاف الميوزك!", ephemeral: true });
+        }
+
+        // 🔲 موودالات المودريشن
+        const modalMap = {
+          dmp_warn:  { id: "dmmod_warn",  title: "⚠️ تحذير عضو",  fields: [["اسم العضو أو ID", "dm_user"], ["السبب", "dm_reason"]] },
+          dmp_mute:  { id: "dmmod_mute",  title: "🔇 إسكات عضو",  fields: [["اسم العضو أو ID", "dm_user"], ["المدة (دقايق)", "dm_minutes"], ["السبب", "dm_reason"]] },
+          dmp_kick:  { id: "dmmod_kick",  title: "👢 طرد عضو",    fields: [["اسم العضو أو ID", "dm_user"], ["السبب", "dm_reason"]] },
+          dmp_ban:   { id: "dmmod_ban",   title: "🔨 حظر عضو",   fields: [["اسم العضو أو ID", "dm_user"], ["السبب", "dm_reason"]] },
+          dmp_coins: { id: "dmmod_coins", title: "🪙 إعطاء كوينز", fields: [["اسم العضو أو ID", "dm_user"], ["الكمية", "dm_amount"]] },
+        };
+        const mCfg = modalMap[interaction.customId];
+        if (mCfg) {
+          const modal = new ModalBuilder().setCustomId(mCfg.id).setTitle(mCfg.title);
+          mCfg.fields.forEach(([label, cid]) =>
+            modal.addComponents(new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId(cid).setLabel(label).setStyle(TextInputStyle.Short).setRequired(true)
+            ))
+          );
+          return interaction.showModal(modal);
+        }
+      }
+      // ─────────────────────────────────────────────────────────────
+
+      // ── أزرار قرار طرد Auto-Mod ───────────────────────────────────
+      if (interaction.customId.startsWith("automod_kick_yes_") || interaction.customId.startsWith("automod_kick_no_")) {
+        if (!config.isOwner(interaction.user.id)) {
+          return interaction.reply({ content: "❌ القرار ده للأونر بس!", ephemeral: true });
+        }
+        const targetId = interaction.customId.replace("automod_kick_yes_", "").replace("automod_kick_no_", "");
+        const isKick   = interaction.customId.startsWith("automod_kick_yes_");
+        const guild    = client.guilds.cache.first();
+
+        // عطل الأزرار في رسالة الـ DM
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`automod_kick_yes_${targetId}`).setLabel("✅ اه، اطرده").setStyle(ButtonStyle.Danger).setDisabled(true),
+          new ButtonBuilder().setCustomId(`automod_kick_no_${targetId}`).setLabel("❌ لا، سيبه").setStyle(ButtonStyle.Secondary).setDisabled(true)
+        );
+        await interaction.update({ components: [disabledRow] }).catch(() => {});
+
+        if (!isKick) {
+          return interaction.followUp({ content: "✅ تمام، سيبناه المرة دي. لو كررها هيجيلك تقرير تاني.", ephemeral: true });
+        }
+
+        if (!guild) return interaction.followUp({ content: "❌ مش لاقي السيرفر!", ephemeral: true });
+
+        try {
+          await guild.members.fetch().catch(() => {});
+          const member = guild.members.cache.get(targetId);
+          if (!member) return interaction.followUp({ content: "❌ العضو مش موجود أو طلع بنفسه!", ephemeral: true });
+
+          await member.kick("Auto-Mod: قرار الأونر بالطرد");
+          return interaction.followUp({
+            embeds: [new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setTitle("👢 تم الطرد")
+              .setDescription(`**${member.user.username}** اتطرد بناءً على قرارك.\nالسبب: Auto-Mod + قرار الأونر`)
+              .setTimestamp()],
+            ephemeral: true
+          });
+        } catch (err) {
+          return interaction.followUp({ content: `❌ فشلت في الطرد: ${err.message}`, ephemeral: true });
+        }
+      }
+      // ─────────────────────────────────────────────────────────────
+
       if (interaction.customId === SUGGESTION_BTN_ID) {
         return await showSuggestionModal(interaction);
       }
@@ -1208,6 +2204,39 @@ client.on("interactionCreate", async (interaction) => {
         return await interaction.showModal(modal);
       }
 
+      if (interaction.customId === "wipe_cancel") {
+        return interaction.update({
+          embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription("✅ تم إلغاء عملية المسح")],
+          components: []
+        });
+      }
+
+      if (interaction.customId.startsWith("wipe_confirm|")) {
+        const targetChannelId = interaction.customId.split("|")[1];
+        const targetChannel = interaction.guild.channels.cache.get(targetChannelId);
+        if (!targetChannel) {
+          return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription("❌ مش لاقي الروم!")], components: [] });
+        }
+        await interaction.update({
+          embeds: [new EmbedBuilder().setColor(0xf39c12).setDescription("⏳ جاري المسح...")],
+          components: []
+        });
+        try {
+          const cloned = await targetChannel.clone({ reason: `مسح-الكل بواسطة ${interaction.user.tag}` });
+          await cloned.setPosition(targetChannel.position);
+          await targetChannel.delete(`مسح-الكل بواسطة ${interaction.user.tag}`);
+          await cloned.send({ embeds: [
+            new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setDescription(`🧹 تم مسح الروم بالكامل بواسطة ${interaction.user} ✅`)
+              .setTimestamp()
+          ]});
+        } catch (err) {
+          logger.error("خطأ في wipe_confirm:", err);
+        }
+        return;
+      }
+
       if (interaction.customId === "admin_clear_games") {
         activeGames.clear();
         return await interaction.reply({
@@ -1252,7 +2281,7 @@ client.on("interactionCreate", async (interaction) => {
     } catch (err) {
       logger.error("خطأ في معالجة الزر:", err);
       return interaction.reply({
-        content: "❌ حصل خطأ في معالجة هذا الزر!",
+        content: "معلش يسطا ثواني بس",
         ephemeral: true
       }).catch(() => {});
     }
@@ -1286,10 +2315,83 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
         return await handleAdminReplyModalSubmit(interaction);
       }
+
+      // ─── موودالات لوحة تحكم الأونر ────────────────────────────────
+      if (["dmmod_warn","dmmod_mute","dmmod_kick","dmmod_ban","dmmod_coins"].includes(interaction.customId)) {
+        if (!config.isOwner(interaction.user.id)) {
+          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        const g = interaction.guild || client.guilds.cache.first();
+        if (g) await g.members.fetch().catch(() => {});
+
+        const nameOrId = interaction.fields.getTextInputValue("dm_user")?.trim();
+        const member   = findMember(g, nameOrId);
+
+        if (!member && interaction.customId !== "dmmod_coins") {
+          return interaction.editReply({ content: `❌ مش لاقي العضو: **${nameOrId}**` });
+        }
+
+        if (interaction.customId === "dmmod_warn") {
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          const u = db.getUser(member.user.id);
+          if (!u.warnings) u.warnings = [];
+          u.warnings.push({ reason, date: new Date().toISOString() });
+          db.updateUser(member.user.id, u);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تم التحذير")
+              .setDescription(`تحذير لـ **${member.user.username}**\nالسبب: ${reason}\nإجمالي التحذيرات: ${u.warnings.length}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_mute") {
+          const mins   = parseInt(interaction.fields.getTextInputValue("dm_minutes")) || 10;
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          await member.timeout(mins * 60000, reason);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تم الإسكات")
+              .setDescription(`**${member.user.username}** اتأسكت لمدة **${mins} دقيقة**\nالسبب: ${reason}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_kick") {
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          await member.kick(reason);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0xe67e22).setTitle("👢 تم الطرد")
+              .setDescription(`**${member.user.username}** اتطرد\nالسبب: ${reason}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_ban") {
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          await g.bans.create(member.user.id, { reason });
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🔨 تم الحظر")
+              .setDescription(`**${member.user.username}** اتحظر نهائياً\nالسبب: ${reason}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_coins") {
+          const amount = parseInt(interaction.fields.getTextInputValue("dm_amount")) || 0;
+          const m2 = findMember(g, nameOrId);
+          if (!m2) return interaction.editReply({ content: `❌ مش لاقي العضو: **${nameOrId}**` });
+          const u = db.getUser(m2.user.id);
+          u.coins = (u.coins || 0) + amount;
+          db.updateUser(m2.user.id, u);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("🪙 تم إعطاء الكوينز")
+              .setDescription(`**${m2.user.username}** أخد **${amount}** كوينز\nرصيده الحالي: **${u.coins}**`).setTimestamp()]
+          });
+        }
+      }
+      // ──────────────────────────────────────────────────────────────
+
     } catch (err) {
       logger.error("خطأ في معالجة الـ Modal:", err);
       return interaction.reply({
-        content: "❌ حصل خطأ في معالجة اقتراحك!",
+        content: "معلش يسطا ثواني بس",
         ephemeral: true
       }).catch(() => {});
     }
@@ -1309,9 +2411,9 @@ process.on("SIGINT", async () => {
 // ================= نظام الترحيب الأسطوري للفراعنة =================
 // ✅ [تعديل 6] حذف require() داخل الدالة — المكتبات محملة في الأعلى
 client.on('guildMemberAdd', async (member) => {
-  const welcomeChannelId = "1486100560494203183";
-  const channel = member.guild.channels.cache.get(welcomeChannelId);
+  const WELCOME_CHANNEL_ID = "1486100560494203183";
 
+  const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
   if (!channel) return;
 
   try {
@@ -1342,6 +2444,37 @@ client.on('guildMemberAdd', async (member) => {
   }
 });
 
+// ================= نظام الوداع للفراعنة =================
+client.on('guildMemberRemove', async (member) => {
+  const WELCOME_CHANNEL_ID = "1486100560494203183";
+
+  const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+  if (!channel) return;
+
+  try {
+    const goodbyeEmbed = new EmbedBuilder()
+      .setColor('#A020F0')
+      .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
+      .setDescription(
+        `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 **الفرعون اللي ودعنا:** <@${member.id}>\n` +
+        `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
+        `📊 **بقينا** \`${member.guild.memberCount}\` **فرعون في المملكة.**\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
+      )
+      .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
+      .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️' })
+      .setTimestamp();
+
+    await channel.send({ embeds: [goodbyeEmbed] });
+
+  } catch (error) {
+    console.error("خطأ في نظام الوداع:", error);
+  }
+});
+
 // ================= نظام إبقاء البوت حياً 24 ساعة =================
 // ✅ [تعديل 7] Express بطريقة ES Module الصحيحة + PORT من البيئة
 const app = express();
@@ -1359,24 +2492,100 @@ app.get('/health', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
+const _server = app.listen(PORT, () => {
   console.log(`✅ Server is ready and listening on port ${PORT}`);
 });
+_server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`❌ البورت ${PORT} مشغول — في نسخة تانية شغالة، هيتم إغلاق هذه النسخة.`);
+    process.exit(1);
+  } else {
+    throw err;
+  }
+});
+
+// ── Keep-Alive: يضرب نفسه كل 4 دقايق عشان Replit ميناموش ────────
+const SELF_URL = process.env.REPLIT_DEV_DOMAIN
+  ? `https://${process.env.REPLIT_DEV_DOMAIN}/health`
+  : `http://localhost:${PORT}/health`;
+
+let _pingErrors = 0;
+setInterval(async () => {
+  try {
+    const r = await fetch(SELF_URL, { signal: AbortSignal.timeout(8000) });
+    if (r.ok) { _pingErrors = 0; }
+    else { _pingErrors++; }
+  } catch {
+    _pingErrors++;
+    if (_pingErrors >= 3) console.warn("⚠️ [Keep-Alive] فشل الـ ping 3 مرات متتالية — تحقق من الاتصال");
+  }
+}, 4 * 60 * 1000); // كل 4 دقايق
+console.log(`🔄 [Keep-Alive] سيتم الـ ping على: ${SELF_URL} كل 4 دقايق`);
 
 // ───────────────────────────────────────────────────────────────
-// ✅ [تعديل 8] Anti-Crash — حماية البوت من الإغلاق المفاجئ
+// Anti-Crash — حماية البوت من الإغلاق + منع تكرار رسايل الـ Error
 // ───────────────────────────────────────────────────────────────
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("⚠️ [Anti-Crash] unhandledRejection:");
-  console.error("Promise:", promise);
-  console.error("السبب:", reason);
+process.on("unhandledRejection", (reason) => {
+  const msg = reason?.message || String(reason);
+  if (canSendError("unhandledRejection:" + msg.slice(0, 60))) {
+    console.error("⚠️ [Anti-Crash] unhandledRejection:", msg);
+  }
 });
 
 process.on("uncaughtException", (err) => {
-  console.error("⚠️ [Anti-Crash] uncaughtException:", err.message);
-  console.error(err.stack);
+  if (canSendError("uncaughtException:" + err.message?.slice(0, 60))) {
+    console.error("⚠️ [Anti-Crash] uncaughtException:", err.message);
+    console.error(err.stack);
+  }
 });
 
 process.on("uncaughtExceptionMonitor", (err) => {
-  console.error("⚠️ [Anti-Crash] uncaughtExceptionMonitor:", err.message);
+  if (canSendError("uncaughtExceptionMonitor:" + err.message?.slice(0, 60))) {
+    console.error("⚠️ [Anti-Crash] uncaughtExceptionMonitor:", err.message);
+  }
 });
+
+// ── أحداث الاتصال — منع الـ drops من غير ضجة ──────────────────
+client.on("error", (err) => {
+  if (canSendError("client:error")) {
+    console.error("⚠️ [Discord] خطأ في الاتصال:", err.message);
+  }
+});
+
+client.on("shardError", (err) => {
+  if (canSendError("shard:error")) {
+    console.error("⚠️ [Shard] خطأ WebSocket:", err.message);
+  }
+});
+
+client.on("warn", (info) => {
+  if (canSendError("client:warn:" + info.slice(0, 40))) {
+    console.warn("⚠️ [Discord]", info);
+  }
+});
+
+// ── Auto-Reconnect — يراقب الاتصال كل دقيقتين ويعيد الاتصال تلقائياً ──
+let reconnecting = false;
+
+async function ensureConnected() {
+  if (reconnecting) return;
+  try {
+    // لو البوت مش ready أو الـ ping اتأخر أكتر من 10 ثواني = مشكلة
+    if (!client.isReady() || client.ws.ping > 10_000) {
+      reconnecting = true;
+      console.warn("⚠️ [AutoReconnect] البوت مش متصل — بيحاول يتصل تاني...");
+      await client.login(process.env.DISCORD_TOKEN).catch((e) => {
+        console.error("⚠️ [AutoReconnect] فشل إعادة الاتصال:", e.message);
+      });
+      reconnecting = false;
+      console.log("✅ [AutoReconnect] اتصل تاني بنجاح!");
+    }
+  } catch (e) {
+    reconnecting = false;
+    console.error("⚠️ [AutoReconnect] خطأ غير متوقع:", e.message);
+  }
+}
+
+setInterval(ensureConnected, 2 * 60 * 1000); // كل دقيقتين
+
+client.login(process.env.DISCORD_TOKEN);
