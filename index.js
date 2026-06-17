@@ -61,7 +61,7 @@ import {
   VoiceConnectionDisconnectReason,
 } from "@discordjs/voice";
 import playdl from "play-dl";
-import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys } from "./helpers/gemini-keys.js";
+import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, resetExhaustedKeys } from "./helpers/gemini-keys.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -342,6 +342,9 @@ const LEGACY_COMMANDS = [
             .setDescription("المفاتيح مفصولة بفاصلة أو سطر جديد")
             .setRequired(true)
         )
+    )
+    .addSubcommand(sub =>
+      sub.setName("تفريش").setDescription("تفريش المفاتيح المحروقة وإعادة تشغيلها")
     ),
   new SlashCommandBuilder()
     .setName("رفع-بلوك")
@@ -1077,9 +1080,17 @@ ${senderName}: ${question}
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-  // الـ DM للأونر — بره السيرفر (أي رسالة من غير ما يعمل reply)
+  // الـ DM — بره السيرفر
   if (!msg.guild) {
-    if (!config.isOwner(msg.author.id)) return;
+    // لو مش أونر → رد مهذب وخلاص
+    if (!config.isOwner(msg.author.id)) {
+      return msg.channel.send(
+        "👋 أهلاً! أنا زنجي بوت السيرفر.\n" +
+        "مش بشتغل في الخاص إلا مع الأونر 😅\n" +
+        "ادخل السيرفر وكلمني هناك!"
+      ).catch(() => {});
+    }
+
     const guild = client.guilds.cache.first();
     if (!guild) return msg.channel.send("❌ البوت مش في أي سيرفر!").catch(() => {});
     await guild.members.fetch().catch(() => {});
@@ -1095,8 +1106,8 @@ client.on("messageCreate", async (msg) => {
     return handleOwnerAI(msg, guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
   }
 
-  // ── Auto-Mod الذكي ─────────────────────────────────────────────
-  {
+  // ── Auto-Mod الذكي (السيرفر بس) ──────────────────────────────────
+  if (msg.guild) {
     const notifyOwner = async (userId, member, reason, warnCount) => {
       for (const ownerId of config.OWNER_IDS) {
         try {
@@ -1128,44 +1139,48 @@ client.on("messageCreate", async (msg) => {
     };
 
     const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner).catch(() => ({}));
-    // لو الرسالة اتحذفت بواسطة automod، وقف الباقي
     if (amResult?.triggered) return;
-  }
 
-  // Autonomous Moderation Scanning (spam + links)
-  if (moderation.isEnabled()) {
-    await moderation.scanMessage(msg);
-  }
-
-  const userData = db.getUser(msg.author.id);
-  const oldLevel = userData.level;
-
-  userData.xp += 5;
-  userData.level = calcLevel(userData.xp);
-  db.updateUser(msg.author.id, userData);
-
-  if (userData.level > oldLevel) {
-    const embed = new EmbedBuilder()
-      .setColor(0xffd700)
-      .setTitle("🎉 مبروك! ارتقيت مستوى!")
-      .setDescription(`${msg.author} وصل للمستوى **${userData.level}** 🚀`)
-      .setTimestamp();
-    msg.channel.send({ embeds: [embed] }).catch(() => {});
-  }
-
-  // كشف ملفات PSD تلقائياً
-  const psdAttachments = msg.attachments.filter((a) => a.name?.toLowerCase().endsWith(".psd"));
-  if (psdAttachments.size > 0) {
-    const staffCh = msg.guild.channels.cache.find((c) => c.name.includes("إدارة-البوت"));
-    if (staffCh) {
-      const psdEmbed = new EmbedBuilder()
-        .setColor(0x0078d4)
-        .setTitle("📁 ملف PSD جديد تم رفعه!")
-        .setDescription(`👤 الرافع: ${msg.author}\n📢 القناة: ${msg.channel}`)
-        .setTimestamp();
-      staffCh.send({ embeds: [psdEmbed] }).catch(() => {});
+    // Autonomous Moderation Scanning (spam + links)
+    if (moderation.isEnabled()) {
+      await moderation.scanMessage(msg);
     }
-    msg.react("✅").catch(() => {});
+  }
+
+  // XP فقط في السيرفر
+  if (msg.guild) {
+    const userData = db.getUser(msg.author.id);
+    const oldLevel = userData.level;
+
+    userData.xp += 5;
+    userData.level = calcLevel(userData.xp);
+    db.updateUser(msg.author.id, userData);
+
+    if (userData.level > oldLevel) {
+      const embed = new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle("🎉 مبروك! ارتقيت مستوى!")
+        .setDescription(`${msg.author} وصل للمستوى **${userData.level}** 🚀`)
+        .setTimestamp();
+      msg.channel.send({ embeds: [embed] }).catch(() => {});
+    }
+  }
+
+  // كشف ملفات PSD تلقائياً (السيرفر بس)
+  if (msg.guild) {
+    const psdAttachments = msg.attachments.filter((a) => a.name?.toLowerCase().endsWith(".psd"));
+    if (psdAttachments.size > 0) {
+      const staffCh = msg.guild.channels.cache.find((c) => c.name.includes("إدارة-البوت"));
+      if (staffCh) {
+        const psdEmbed = new EmbedBuilder()
+          .setColor(0x0078d4)
+          .setTitle("📁 ملف PSD جديد تم رفعه!")
+          .setDescription(`👤 الرافع: ${msg.author}\n📢 القناة: ${msg.channel}`)
+          .setTimestamp();
+        staffCh.send({ embeds: [psdEmbed] }).catch(() => {});
+      }
+      msg.react("✅").catch(() => {});
+    }
   }
 
   const isMentioned  = msg.mentions.has(client.user.id);
@@ -1180,7 +1195,8 @@ client.on("messageCreate", async (msg) => {
 
   const BOT_CHANNEL_ID = "1516591390023352370";
 
-  if (!isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
+  // تقييد الروم ده بس للسيرفر (مش الـ DM) وبس للناس العادية
+  if (msg.guild && !isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
     return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
   }
 
@@ -1211,7 +1227,8 @@ client.on("messageCreate", async (msg) => {
   }
 
   try {
-    const senderName = msg.member?.displayName || msg.author.username;
+    // msg.member ممكن يكون null لو الرسالة جت من DM أو cache miss
+    const senderName = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
     const prompt     = buildUserPrompt(senderName, question, msg.author.id);
     const result     = await geminiModel().generateContent(prompt);
     const reply      = result.response.text().trim();
@@ -1219,7 +1236,8 @@ client.on("messageCreate", async (msg) => {
     pushUserHistory(msg.author.id, "bot",  reply);
     await msg.reply(reply);
   } catch (err) {
-    await msg.reply("معلش يسطا ثواني بس");
+    logger.error("خطأ في الرد على الرسالة:", err);
+    await msg.reply("معلش يسطا ثواني بس").catch(() => {});
   }
 });
 
@@ -1347,7 +1365,19 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.editReply({ embeds: [embed] });
         }
 
-        if (sub === "إضافة") {
+        if (sub === "تفريش") {
+          const count = resetExhaustedKeys();
+          const embed = new EmbedBuilder()
+            .setColor(0x3498db)
+            .setTitle("🔄 تفريش المفاتيح")
+            .setDescription(count > 0
+              ? `✅ اتفرشت **${count}** مفاتيح محروقة وبقت شغالة تاني!`
+              : "ℹ️ مفيش مفاتيح محروقة دلوقتي، كلهم شغالين!"
+            )
+            .addFields({ name: "📊 إجمالي المفاتيح", value: `\`${getKeyCount()} مفتاح\``, inline: true })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        }
           const raw = interaction.options.getString("مفاتيح");
           const newKeys = raw.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
           if (newKeys.length === 0) {
