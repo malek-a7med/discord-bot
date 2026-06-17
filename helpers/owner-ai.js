@@ -90,25 +90,64 @@ function buildUnifiedPrompt(text, ownerName, guild, history) {
 ${history ? `\nسياق المحادثة:\n${history}\n` : ""}
 رسالة الأونر: "${text}"
 
-رد بـ JSON فقط:
-- كلام عادي/سؤال: {"action":"chat","reply":"ردك بالعربي المصري"}
-- داشبورد/لوحة تحكم/panel: {"action":"dashboard"}
+رد بـ JSON فقط — اختار الأكشن الأنسب لطلب الأونر:
+
+── تفاعل وإدارة أعضاء ──
+- كلام عادي/سؤال: {"action":"chat","reply":"ردك"}
+- داشبورد: {"action":"dashboard"}
 - طرد: {"action":"kick","user_id":"ID","reason":"سبب"}
 - حظر: {"action":"ban","user_id":"ID","reason":"سبب"}
 - رفع حظر: {"action":"unban","user_id":"ID"}
-- إسكات: {"action":"timeout","user_id":"ID","minutes":10,"reason":"سبب"}
+- إسكات مؤقت: {"action":"timeout","user_id":"ID","minutes":10,"reason":"سبب"}
 - رفع إسكات: {"action":"untimeout","user_id":"ID"}
-- مسح رسايل: {"action":"delete_messages","count":10,"channel_id":"ID أو null"}
+- تحذير: {"action":"warn","user_id":"ID","reason":"سبب"}
+- مسح تحذيرات: {"action":"clear_warnings","user_id":"ID"}
+- تغيير نيك نيم: {"action":"nickname","user_id":"ID","nick":"الاسم الجديد أو null للإزالة"}
+- إبعات DM: {"action":"dm_user","user_id":"ID","message":"نص"}
+
+── Voice ──
+- نقل عضو بين voice: {"action":"move_member","user_id":"ID","channel_id":"ID القناة المقصودة"}
+- صوت مؤقت (server mute): {"action":"voice_mute","user_id":"ID"}
+- رفع صوت مؤقت: {"action":"voice_unmute","user_id":"ID"}
+- كتم سماع (deafen): {"action":"voice_deafen","user_id":"ID"}
+- رفع كتم سماع: {"action":"voice_undeafen","user_id":"ID"}
+- طرد من voice: {"action":"voice_kick","user_id":"ID"}
+
+── قنوات ──
 - إرسال رسالة: {"action":"send_message","channel_id":"ID","message":"نص"}
-- إعطاء رتبة: {"action":"give_role","user_id":"ID","role_id":"ID"}
-- سحب رتبة: {"action":"remove_role","user_id":"ID","role_id":"ID"}
+- إرسال embed: {"action":"send_embed","channel_id":"ID","title":"عنوان","description":"نص","color":"hex مثل #ff0000"}
+- مسح رسايل: {"action":"delete_messages","count":10,"channel_id":"ID أو null"}
+- مسح رسايل عضو معين: {"action":"purge_user","user_id":"ID","channel_id":"ID أو null","count":20}
+- قفل قناة: {"action":"lock_channel","channel_id":"ID أو null"}
+- فتح قناة: {"action":"unlock_channel","channel_id":"ID أو null"}
+- سلو مود: {"action":"slowmode","channel_id":"ID أو null","seconds":10}
+- إنشاء قناة: {"action":"create_channel","name":"اسم","type":"text أو voice","category_id":"ID أو null"}
+- حذف قناة: {"action":"delete_channel","channel_id":"ID"}
 - تغيير اسم قناة: {"action":"rename_channel","channel_id":"ID أو null","name":"اسم"}
 - موضوع قناة: {"action":"set_topic","channel_id":"ID أو null","topic":"نص"}
-- إنشاء قناة: {"action":"create_channel","name":"اسم","type":"text أو voice"}
-- حذف قناة: {"action":"delete_channel","channel_id":"ID"}
-- تحذير: {"action":"warn","user_id":"ID","reason":"سبب"}
-- كوينز: {"action":"give_coins","user_id":"ID","amount":100}
-- DM عضو: {"action":"dm_user","user_id":"ID","message":"نص"}
+- قفل كل السيرفر: {"action":"server_lock"}
+- فتح كل السيرفر: {"action":"server_unlock"}
+
+── رتب ──
+- إعطاء رتبة: {"action":"give_role","user_id":"ID","role_id":"ID"}
+- سحب رتبة: {"action":"remove_role","user_id":"ID","role_id":"ID"}
+- إنشاء رتبة: {"action":"create_role","name":"اسم","color":"hex مثل #ff0000","hoist":false}
+- حذف رتبة: {"action":"delete_role","role_id":"ID"}
+- تغيير لون رتبة: {"action":"role_color","role_id":"ID","color":"hex"}
+- تغيير اسم رتبة: {"action":"rename_role","role_id":"ID","name":"اسم"}
+
+── كوينز وـ XP ──
+- إعطاء كوينز: {"action":"give_coins","user_id":"ID","amount":100}
+- خصم كوينز: {"action":"take_coins","user_id":"ID","amount":100}
+- تعيين كوينز: {"action":"set_coins","user_id":"ID","amount":500}
+- إعطاء XP: {"action":"give_xp","user_id":"ID","amount":100}
+- خصم XP: {"action":"take_xp","user_id":"ID","amount":100}
+- تعيين XP: {"action":"set_xp","user_id":"ID","amount":500}
+
+── السيرفر ──
+- تغيير اسم السيرفر: {"action":"rename_server","name":"اسم جديد"}
+- حالة البوت: {"action":"bot_status","text":"نص الحالة","type":"PLAYING أو WATCHING أو LISTENING"}
+- إعلان (announcement): {"action":"announce","channel_id":"ID","message":"نص","ping":true}
 
 JSON:`;
 }
@@ -369,6 +408,273 @@ export async function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard 
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, ownerName, d);
       return send(ok("📩 تم الإرسال في الخاص", `الرسالة وصلت لـ **${m.user.username}** ✅`));
+    }
+
+    // ─── مسح تحذيرات ─────────────────────────────────────────────
+    if (action === "clear_warnings") {
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      const u = db.getUser(m.user.id);
+      const old = (u.warnings || []).length;
+      u.warnings = [];
+      db.updateUser(m.user.id, u);
+      const d = `تم مسح ${old} تحذير لـ ${m.user.username}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🧹 تم مسح التحذيرات", d));
+    }
+
+    // ─── تغيير nickname ───────────────────────────────────────────
+    if (action === "nickname") {
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      const oldNick = m.displayName;
+      await m.setNickname(parsed.nick || null).catch(() => null);
+      const d = `تغيير نيك نيم ${oldNick} → ${parsed.nick || "(الاسم الأصلي)"}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("✏️ تم تغيير الاسم", d));
+    }
+
+    // ─── Voice: نقل عضو ───────────────────────────────────────────
+    if (action === "move_member") {
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      if (!m.voice.channel) return send(`❌ **${m.displayName}** مش في أي voice دلوقتي!`);
+      const ch = guild.channels.cache.get(parsed.channel_id);
+      if (!ch) return send("❌ مش لاقي القناة!");
+      await m.voice.setChannel(ch).catch(() => null);
+      const d = `نقل ${m.user.username} → ${ch.name}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🔀 تم النقل", d));
+    }
+
+    // ─── Voice: كتم/فك كتم ───────────────────────────────────────
+    if (action === "voice_mute" || action === "voice_unmute") {
+      const mute = action === "voice_mute";
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      await m.voice.setMute(mute).catch(() => null);
+      const d = `${mute ? "كتم" : "فك كتم"} صوت ${m.user.username} في الـ voice`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok(mute ? "🔇 تم الكتم" : "🔊 تم فك الكتم", d));
+    }
+
+    // ─── Voice: deafen/undeafen ───────────────────────────────────
+    if (action === "voice_deafen" || action === "voice_undeafen") {
+      const deaf = action === "voice_deafen";
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      await m.voice.setDeaf(deaf).catch(() => null);
+      const d = `${deaf ? "كتم سماع" : "فك كتم سماع"} ${m.user.username}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok(deaf ? "🔕 تم كتم السماع" : "🔔 تم فك كتم السماع", d));
+    }
+
+    // ─── Voice: طرد من voice ──────────────────────────────────────
+    if (action === "voice_kick") {
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      if (!m.voice.channel) return send(`❌ **${m.displayName}** مش في voice أصلاً!`);
+      await m.voice.disconnect().catch(() => null);
+      const d = `طرد ${m.user.username} من الـ voice`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("👢 تم الطرد من الـ Voice", d));
+    }
+
+    // ─── إرسال embed ──────────────────────────────────────────────
+    if (action === "send_embed") {
+      const ch = guild.channels.cache.get(parsed.channel_id) || msg.channel;
+      const color = parsed.color ? parseInt(parsed.color.replace("#", ""), 16) : 0x5865f2;
+      const emb = new EmbedBuilder()
+        .setTitle(parsed.title || "إعلان")
+        .setDescription(parsed.description || "")
+        .setColor(color)
+        .setTimestamp()
+        .setFooter({ text: `بأمر ${ownerName} 👑` });
+      await ch.send({ embeds: [emb] }).catch(() => null);
+      const d = `embed في #${ch.name}: "${parsed.title}"`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("📢 تم الإرسال", d));
+    }
+
+    // ─── مسح رسايل عضو معين ───────────────────────────────────────
+    if (action === "purge_user") {
+      const ch = (parsed.channel_id ? guild.channels.cache.get(parsed.channel_id) : null) || msg.channel;
+      const target = parsed.user_id;
+      const limit = Math.min(parsed.count || 20, 100);
+      const fetched = await ch.messages.fetch({ limit: 100 }).catch(() => null);
+      if (!fetched) return send("❌ مقدرتش أجيب الرسايل!");
+      const toDelete = fetched.filter(m2 => m2.author.id === target && Date.now() - m2.createdTimestamp < 1209600000).first(limit);
+      await ch.bulkDelete(toDelete, true).catch(() => null);
+      const d = `حذف ${toDelete.length} رسالة للعضو ${target} في #${ch.name}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🗑️ تم الحذف", d));
+    }
+
+    // ─── قفل/فتح قناة ────────────────────────────────────────────
+    if (action === "lock_channel" || action === "unlock_channel") {
+      const lock = action === "lock_channel";
+      const ch = (parsed.channel_id ? guild.channels.cache.get(parsed.channel_id) : null) || msg.channel;
+      await ch.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: lock ? false : null }).catch(() => null);
+      const d = `${lock ? "قفل" : "فتح"} قناة #${ch.name}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok(lock ? "🔒 تم قفل القناة" : "🔓 تم فتح القناة", d));
+    }
+
+    // ─── سلو مود ─────────────────────────────────────────────────
+    if (action === "slowmode") {
+      const ch = (parsed.channel_id ? guild.channels.cache.get(parsed.channel_id) : null) || msg.channel;
+      const secs = parsed.seconds ?? 0;
+      await ch.setRateLimitPerUser(secs).catch(() => null);
+      const d = secs === 0 ? `إزالة الـ slowmode من #${ch.name}` : `slowmode ${secs} ثانية في #${ch.name}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("⏱️ تم ضبط الـ Slowmode", d));
+    }
+
+    // ─── قفل/فتح كل السيرفر ──────────────────────────────────────
+    if (action === "server_lock" || action === "server_unlock") {
+      const lock = action === "server_lock";
+      const textChannels = guild.channels.cache.filter(c => c.type === 0);
+      let count = 0;
+      for (const [, ch] of textChannels) {
+        await ch.permissionOverwrites.edit(guild.roles.everyone, { SendMessages: lock ? false : null }).catch(() => {});
+        count++;
+      }
+      const d = `${lock ? "قفل" : "فتح"} ${count} قناة في السيرفر`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok(lock ? "🔒 السيرفر اتقفل" : "🔓 السيرفر اتفتح", d));
+    }
+
+    // ─── إنشاء رتبة ───────────────────────────────────────────────
+    if (action === "create_role") {
+      const color = parsed.color ? parseInt(parsed.color.replace("#", ""), 16) : 0x99aab5;
+      const newRole = await guild.roles.create({
+        name: parsed.name || "رتبة جديدة",
+        color,
+        hoist: parsed.hoist || false,
+        reason: `بأمر ${ownerName}`
+      }).catch(() => null);
+      if (!newRole) return send("❌ مقدرتش أعمل الرتبة!");
+      const d = `إنشاء رتبة "${newRole.name}"`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("✨ تم إنشاء الرتبة", `**${newRole.name}** — ID: \`${newRole.id}\``));
+    }
+
+    // ─── حذف رتبة ─────────────────────────────────────────────────
+    if (action === "delete_role") {
+      const role = guild.roles.cache.get(parsed.role_id);
+      if (!role) return send("❌ مش لاقي الرتبة!");
+      const rname = role.name;
+      await role.delete(`بأمر ${ownerName}`).catch(() => null);
+      const d = `حذف رتبة "${rname}"`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🗑️ تم حذف الرتبة", d));
+    }
+
+    // ─── تغيير لون رتبة ───────────────────────────────────────────
+    if (action === "role_color") {
+      const role = guild.roles.cache.get(parsed.role_id);
+      if (!role) return send("❌ مش لاقي الرتبة!");
+      const color = parseInt(parsed.color.replace("#", ""), 16);
+      await role.setColor(color).catch(() => null);
+      const d = `تغيير لون رتبة "${role.name}" → ${parsed.color}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🎨 تم تغيير اللون", d));
+    }
+
+    // ─── تغيير اسم رتبة ───────────────────────────────────────────
+    if (action === "rename_role") {
+      const role = guild.roles.cache.get(parsed.role_id);
+      if (!role) return send("❌ مش لاقي الرتبة!");
+      const old = role.name;
+      await role.setName(parsed.name).catch(() => null);
+      const d = `تغيير اسم رتبة "${old}" → "${parsed.name}"`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("✏️ تم تغيير اسم الرتبة", d));
+    }
+
+    // ─── كوينز: خصم / تعيين ──────────────────────────────────────
+    if (action === "take_coins" || action === "set_coins") {
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      const u = db.getUser(m.user.id);
+      if (action === "take_coins") {
+        u.coins = Math.max(0, (u.coins || 0) - (parsed.amount || 0));
+      } else {
+        u.coins = parsed.amount || 0;
+      }
+      db.updateUser(m.user.id, u);
+      const label = action === "take_coins" ? `خصم ${parsed.amount} كوينز` : `تعيين الكوينز على ${parsed.amount}`;
+      const d = `${label} لـ ${m.user.username} — الرصيد الجديد: ${u.coins}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🪙 تم تعديل الكوينز", d));
+    }
+
+    // ─── XP: إعطاء / خصم / تعيين ─────────────────────────────────
+    if (action === "give_xp" || action === "take_xp" || action === "set_xp") {
+      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      if (!m) return send("❌ مش لاقي العضو!");
+      const u = db.getUser(m.user.id);
+      if (action === "give_xp") {
+        u.xp = (u.xp || 0) + (parsed.amount || 0);
+      } else if (action === "take_xp") {
+        u.xp = Math.max(0, (u.xp || 0) - (parsed.amount || 0));
+      } else {
+        u.xp = parsed.amount || 0;
+      }
+      db.updateUser(m.user.id, u);
+      const label = action === "give_xp" ? `إعطاء ${parsed.amount} XP` : action === "take_xp" ? `خصم ${parsed.amount} XP` : `تعيين XP على ${parsed.amount}`;
+      const d = `${label} لـ ${m.user.username} — الرصيد الجديد: ${u.xp} XP`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("⭐ تم تعديل الـ XP", d));
+    }
+
+    // ─── تغيير اسم السيرفر ────────────────────────────────────────
+    if (action === "rename_server") {
+      const old = guild.name;
+      await guild.setName(parsed.name).catch(() => null);
+      const d = `تغيير اسم السيرفر "${old}" → "${parsed.name}"`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🏷️ تم تغيير اسم السيرفر", d));
+    }
+
+    // ─── تغيير حالة البوت ─────────────────────────────────────────
+    if (action === "bot_status") {
+      const typeMap = { PLAYING: 0, WATCHING: 3, LISTENING: 2, COMPETING: 5 };
+      const t = typeMap[(parsed.type || "PLAYING").toUpperCase()] ?? 0;
+      msg.client.user.setActivity(parsed.text || "بوت زنجي", { type: t });
+      const d = `تغيير حالة البوت → "${parsed.text}" (${parsed.type || "PLAYING"})`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🟢 تم تغيير الحالة", d));
+    }
+
+    // ─── إعلان (announce) ─────────────────────────────────────────
+    if (action === "announce") {
+      const ch = guild.channels.cache.get(parsed.channel_id) || msg.channel;
+      const content = (parsed.ping ? "@everyone\n" : "") + parsed.message;
+      await ch.send(content).catch(() => null);
+      const d = `إعلان في #${ch.name}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("📣 تم الإعلان", d));
     }
 
     // fallback: chat
