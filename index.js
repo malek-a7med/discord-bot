@@ -28,6 +28,7 @@ import {
   handleOcrUpload
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
+import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -357,6 +358,7 @@ const LEGACY_COMMANDS = [
   new SlashCommandBuilder()
     .setName("قائمة-مبلوكين")
     .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
+  battleCommand,
 ];
 
 // Advanced Feature Commands
@@ -1572,6 +1574,10 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
       }
 
+      if (cmd === "مصارعة") {
+        return await handleBattleCommand(interaction, db, geminiModel());
+      }
+
       if (cmd === "العاب") {
         if (activeGames.has(channel.id)) return interaction.reply({ content: "❌ فيه لعبة شغالة هنا بالفعل!", ephemeral: true });
         activeGames.set(channel.id, true);
@@ -2059,6 +2065,11 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     try {
 
+      // ─── أزرار مصارعة الكلام ──────────────────────────────────────
+      if (interaction.customId.startsWith("btl_")) {
+        return await handleBattleButton(interaction, db, geminiModel());
+      }
+
       // ─── أزرار لوحة تحكم الأونر ──────────────────────────────────
       if (interaction.customId.startsWith("dmp_")) {
         if (!config.isOwner(interaction.user.id)) {
@@ -2335,6 +2346,11 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      // ─── مودال مصارعة الكلام ────────────────────────────────────
+      if (interaction.customId.startsWith("btl_modal_")) {
+        return await handleBattleModal(interaction, db, geminiModel());
+      }
+
       if (interaction.customId === SUGGESTION_MODAL_ID) {
         const text = interaction.fields.getTextInputValue(SUGGESTION_INPUT_ID);
         return await handleSuggestionModalSubmit(interaction, text);
