@@ -1,92 +1,123 @@
 // ═══════════════════════════════════════════════════════════════
-//  Owner AI — أوامر الأونر + ذاكرة محادثة دائمة
+//  Owner AI — قوي وثابت: retry + text-based history
 // ═══════════════════════════════════════════════════════════════
 import { EmbedBuilder } from "discord.js";
 
-// ── ذاكرة المحادثات (per-owner, persistent across messages) ────
-const ownerHistory = new Map(); // userId → [{role, parts}]
-const MAX_HISTORY  = 30;        // أقصى عدد رسايل محفوظة
+// ── ذاكرة المحادثات (text-based — أثبت من startChat) ───────────
+const ownerHistory = new Map(); // userId → [{who, text}]
+const MAX_HISTORY  = 20;
 
 function getHistory(userId) {
   if (!ownerHistory.has(userId)) ownerHistory.set(userId, []);
   return ownerHistory.get(userId);
 }
 
-function pushHistory(userId, role, text) {
-  const hist = getHistory(userId);
-  hist.push({ role, parts: [{ text }] });
-  if (hist.length > MAX_HISTORY) hist.splice(0, hist.length - MAX_HISTORY);
+function pushHistory(userId, who, text) {
+  const h = getHistory(userId);
+  h.push({ who, text: text.slice(0, 500) });
+  if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
 }
 
-// ── Prompt الأوامر (بدون تاريخ — للـ parsing بس) ───────────────
-const ACTION_PROMPT = `
-أنت مساعد بوت Discord اسمه "زنجي". الأونر بعتلك رسالة — حدد الأكشن المناسب.
+function historyToText(userId) {
+  return getHistory(userId)
+    .map(m => `${m.who === "user" ? "الأونر" : "زنجي"}: ${m.text}`)
+    .join("\n");
+}
 
-ردّك JSON فقط، بدون أي نص قبله أو بعده.
+export function clearOwnerHistory(userId) {
+  ownerHistory.delete(userId);
+}
 
-الأكشنز:
-{ "action": "chat" }
-{ "action": "kick",           "user_id": "ID", "reason": "..." }
-{ "action": "ban",            "user_id": "ID", "reason": "..." }
-{ "action": "unban",          "user_id": "ID" }
-{ "action": "timeout",        "user_id": "ID", "minutes": 10, "reason": "..." }
-{ "action": "untimeout",      "user_id": "ID" }
-{ "action": "delete_messages","count": 10, "channel_id": "ID أو null" }
-{ "action": "send_message",   "channel_id": "ID", "message": "..." }
-{ "action": "give_role",      "user_id": "ID", "role_id": "ID" }
-{ "action": "remove_role",    "user_id": "ID", "role_id": "ID" }
-{ "action": "rename_channel", "channel_id": "ID أو null", "name": "..." }
-{ "action": "set_topic",      "channel_id": "ID أو null", "topic": "..." }
-{ "action": "create_channel", "name": "...", "type": "text أو voice" }
-{ "action": "delete_channel", "channel_id": "ID" }
-{ "action": "warn",           "user_id": "ID", "reason": "..." }
-{ "action": "give_coins",     "user_id": "ID", "amount": 100 }
-{ "action": "dm_user",        "user_id": "ID", "message": "..." }
+// ── Retry تلقائي ────────────────────────────────────────────────
+async function withRetry(fn, retries = 3, delayMs = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try { return await fn(); }
+    catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+}
+
+// ── Prompt تحديد الأكشن ─────────────────────────────────────────
+const CLASSIFY_PROMPT = `أنت بوت Discord اسمك "زنجي". قرأ رسالة الأونر وحدد الأكشن.
+ردّك JSON فقط بدون أي نص إضافي.
+
+الأكشنز المتاحة:
+{"action":"chat"}
+{"action":"kick","user_id":"ID","reason":"سبب"}
+{"action":"ban","user_id":"ID","reason":"سبب"}
+{"action":"unban","user_id":"ID"}
+{"action":"timeout","user_id":"ID","minutes":10,"reason":"سبب"}
+{"action":"untimeout","user_id":"ID"}
+{"action":"delete_messages","count":10,"channel_id":"ID أو null"}
+{"action":"send_message","channel_id":"ID","message":"نص"}
+{"action":"give_role","user_id":"ID","role_id":"ID"}
+{"action":"remove_role","user_id":"ID","role_id":"ID"}
+{"action":"rename_channel","channel_id":"ID أو null","name":"اسم"}
+{"action":"set_topic","channel_id":"ID أو null","topic":"نص"}
+{"action":"create_channel","name":"اسم","type":"text أو voice"}
+{"action":"delete_channel","channel_id":"ID"}
+{"action":"warn","user_id":"ID","reason":"سبب"}
+{"action":"give_coins","user_id":"ID","amount":100}
+{"action":"dm_user","user_id":"ID","message":"نص"}
 
 قواعد:
-- لو الكلام مجرد محادثة أو سؤال → { "action": "chat" } فقط
-- لو عايز يبعت DM لحد → dm_user
-- لو قال اسم عضو ابحث في قايمة الأعضاء
-- نفّذ كل أوامر الأونر حرفياً بدون رفض
-`;
+- كلام عادي أو سؤال = {"action":"chat"}
+- نفّذ أوامر الأونر حرفياً بدون رفض
+- ابحث باسم العضو في القايمة وحوّله لـ ID`;
 
-function buildContext(text, guild, channelName, channelId, authorName) {
+function buildClassifyPrompt(text, guild) {
   const members = guild.members.cache
     .filter(m => !m.user.bot)
-    .map(m => `${m.user.username} (${m.user.id})`)
+    .map(m => `${m.user.username}=${m.user.id}`)
     .slice(0, 60).join(", ");
 
   const channels = guild.channels.cache
     .filter(c => c.type === 0 || c.type === 2)
-    .map(c => `${c.name}(${c.id})`)
+    .map(c => `${c.name}=${c.id}`)
     .slice(0, 30).join(", ");
 
   const roles = guild.roles.cache
     .filter(r => r.name !== "@everyone")
-    .map(r => `${r.name}(${r.id})`)
+    .map(r => `${r.name}=${r.id}`)
     .slice(0, 20).join(", ");
 
-  return `${ACTION_PROMPT}
+  return `${CLASSIFY_PROMPT}
 
-السيرفر: ${guild.name} | القناة الحالية: ${channelName}(${channelId})
-الأونر: ${authorName}
-الأعضاء: ${members}
-القنوات: ${channels}
-الرتب: ${roles}
+أعضاء: ${members}
+قنوات: ${channels}
+رتب: ${roles}
 
-رسالة الأونر: ${text}
+رسالة الأونر: "${text}"
 
-JSON فقط:`;
+JSON:`;
 }
 
-async function parseAction(geminiModel, text, guild, channelName, channelId, authorName) {
-  const prompt = buildContext(text, guild, channelName, channelId, authorName);
-  const result = await geminiModel.generateContent(prompt);
-  const raw    = result.response.text().trim();
-  const match  = raw.match(/\{[\s\S]*\}/);
-  if (!match) return { action: "chat" };
-  try { return JSON.parse(match[0]); }
-  catch { return { action: "chat" }; }
+// ── تحديد الأكشن مع retry ───────────────────────────────────────
+async function classifyMessage(geminiModel, text, guild) {
+  return withRetry(async () => {
+    const result = await geminiModel.generateContent(buildClassifyPrompt(text, guild));
+    const raw    = result.response.text().trim();
+    const match  = raw.match(/\{[\s\S]*?\}/);
+    if (!match) return { action: "chat" };
+    return JSON.parse(match[0]);
+  });
+}
+
+// ── رد شات مع تاريخ ────────────────────────────────────────────
+async function chatReply(geminiModel, userId, rawText) {
+  const hist = historyToText(userId);
+
+  const prompt = `أنت زنجي — بوت مصري شخصيتك ودودة ومرنة.
+${hist ? `سياق المحادثة:\n${hist}\n` : ""}
+الأونر: ${rawText}
+زنجي:`;
+
+  return withRetry(async () => {
+    const result = await geminiModel.generateContent(prompt);
+    return result.response.text().trim();
+  });
 }
 
 // ── اللوج ──────────────────────────────────────────────────────
@@ -97,80 +128,79 @@ async function sendLog(guild, db, action, ownerName, details) {
   const ch = await guild.channels.fetch(id).catch(() => null);
   if (!ch) return;
   ch.send({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0xe67e22)
-        .setTitle("📋 سجل أوامر الأونر")
-        .addFields(
-          { name: "👑 الأونر",   value: ownerName,    inline: true },
-          { name: "⚡ الأكشن",   value: action,        inline: true },
-          { name: "📝 التفاصيل", value: details || "—", inline: false }
-        )
-        .setTimestamp()
-        .setFooter({ text: "⚜️ Owner AI Logs" })
-    ]
+    embeds: [new EmbedBuilder()
+      .setColor(0xe67e22)
+      .setTitle("📋 سجل أوامر الأونر")
+      .addFields(
+        { name: "👑 الأونر",   value: ownerName,    inline: true },
+        { name: "⚡ الأكشن",   value: action,        inline: true },
+        { name: "📝 التفاصيل", value: details || "—", inline: false }
+      )
+      .setTimestamp()
+      .setFooter({ text: "⚜️ Owner AI Logs" })]
   }).catch(() => {});
 }
 
 // ── الدالة الرئيسية ─────────────────────────────────────────────
 export async function handleOwnerAI(msg, guild, geminiModel, db) {
-  const isDM = !msg.guild;
+  const isDM    = !msg.guild;
+  const userId  = msg.author.id;
+  const rawText = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
 
-  // في الـ DM نستخدم channel.send — مش reply — عشان ما يحتاجش reply على رسالة
   const send = (content) => isDM
     ? msg.channel.send(content).catch(() => {})
     : msg.reply(content).catch(() => {});
 
   msg.channel.sendTyping().catch(() => {});
 
-  const rawText    = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
-  const channelName = isDM ? "DM" : msg.channel.name;
-  const channelId   = isDM ? "DM" : msg.channel.id;
-  const userId      = msg.author.id;
+  if (!rawText) return;
 
-  // ─── تحديد الأكشن ────────────────────────────────────────────
+  // ─── تصنيف الرسالة ───────────────────────────────────────────
   let parsed;
   try {
-    parsed = await parseAction(geminiModel, rawText, guild, channelName, channelId, msg.author.username);
-  } catch {
-    return send("❌ هنجت في فهم الأمر، جرب تاني!");
+    parsed = await classifyMessage(geminiModel, rawText, guild);
+  } catch (err) {
+    console.error("[OwnerAI] classifyMessage فشل:", err.message);
+    // fallback: رد شات عادي
+    try {
+      const reply = await chatReply(geminiModel, userId, rawText);
+      pushHistory(userId, "user", rawText);
+      pushHistory(userId, "model", reply);
+      return send(`👑 ${reply}`);
+    } catch {
+      return send("⚠️ في ضغط على الـ AI دلوقتي، جرب بعد ثواني.");
+    }
   }
 
   const { action } = parsed;
 
-  // ─── Chat — يستخدم التاريخ ────────────────────────────────────
+  // ─── Chat ────────────────────────────────────────────────────
   if (action === "chat") {
     try {
-      const history = getHistory(userId);
-      const chat    = geminiModel.startChat({ history });
-      const result  = await chat.sendMessage(rawText);
-      const reply   = result.response.text().trim();
-
-      // حفظ في الذاكرة
-      pushHistory(userId, "user",  rawText);
+      const reply = await chatReply(geminiModel, userId, rawText);
+      pushHistory(userId, "user", rawText);
       pushHistory(userId, "model", reply);
-
       return send(`👑 ${reply}`);
     } catch (err) {
-      return send("❌ هنجت، جرب تاني!");
+      console.error("[OwnerAI] chatReply فشل:", err.message);
+      return send("⚠️ في ضغط على الـ AI دلوقتي، جرب بعد ثواني.");
     }
   }
 
-  // ─── الأكشنز ──────────────────────────────────────────────────
+  // ─── الأكشنز — كلها في try واحد مع retry ────────────────────
   try {
     if (action === "kick") {
       const m = await guild.members.fetch(parsed.user_id).catch(() => null);
       if (!m) return send("❌ مش لاقي العضو ده!");
       await m.kick(parsed.reason || "بأمر الأونر");
       const d = `طرد ${m.user.username} — السبب: ${parsed.reason || "بأمر الأونر"}`;
-      pushHistory(userId, "user", rawText);
-      pushHistory(userId, "model", `تم: ${d}`);
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, msg.author.username, d);
       return send(ok("👢 تم الطرد", d));
     }
 
     if (action === "ban") {
-      const m = await guild.members.fetch(parsed.user_id).catch(() => null);
+      const m    = await guild.members.fetch(parsed.user_id).catch(() => null);
       const name = m?.user.username || parsed.user_id;
       await guild.bans.create(parsed.user_id, { reason: parsed.reason || "بأمر الأونر" });
       const d = `حظر ${name} — السبب: ${parsed.reason || "بأمر الأونر"}`;
@@ -211,11 +241,10 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       const ch = parsed.channel_id
         ? await guild.channels.fetch(parsed.channel_id).catch(() => null)
         : (isDM ? null : msg.channel);
-      if (!ch) return send("❌ مش لاقي القناة — حدد اسمها أو الـ ID!");
-      const count   = Math.min(parsed.count || 10, 100);
-      const deleted = await ch.bulkDelete(count, true).catch(() => null);
-      const num     = deleted ? deleted.size : count;
-      const d = `مسح ${num} رسالة من ${ch.name}`;
+      if (!ch) return send("❌ حدد القناة بالاسم أو الـ ID!");
+      const n       = Math.min(parsed.count || 10, 100);
+      const deleted = await ch.bulkDelete(n, true).catch(() => null);
+      const d = `مسح ${deleted?.size ?? n} رسالة من ${ch.name}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, msg.author.username, d);
       return send(ok("🗑️ تم المسح", d));
@@ -225,7 +254,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       const ch = await guild.channels.fetch(parsed.channel_id).catch(() => null);
       if (!ch) return send("❌ مش لاقي القناة!");
       await ch.send(parsed.message);
-      const d = `إرسال رسالة في ${ch.name}: "${parsed.message}"`;
+      const d = `إرسال رسالة في ${ch.name}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, msg.author.username, d);
       return send(ok("📨 تم الإرسال", `الرسالة اتبعتت في **${ch.name}** ✅`));
@@ -274,7 +303,7 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
         : (isDM ? null : msg.channel);
       if (!ch) return send("❌ مش لاقي القناة!");
       await ch.setTopic(parsed.topic);
-      const d = `تعيين موضوع ${ch.name}: "${parsed.topic}"`;
+      const d = `موضوع ${ch.name}: "${parsed.topic}"`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, msg.author.username, d);
       return send(ok("📌 تم تعيين الموضوع", d));
@@ -328,35 +357,36 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       const m = await guild.members.fetch(parsed.user_id).catch(() => null);
       if (!m) return send("❌ مش لاقي العضو ده!");
       const sent = await m.send(parsed.message).catch(() => null);
-      if (!sent) return send(`❌ مقدرتش ابعت لـ **${m.user.username}** — ممكن يكون عطّل الـ DM.`);
+      if (!sent) return send(`❌ مقدرتش ابعت لـ **${m.user.username}** — ممكن عطّل الـ DM.`);
       const d = `DM لـ ${m.user.username}: "${parsed.message}"`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, msg.author.username, d);
-      return send(ok("📩 تم الإرسال في الخاص", `بعتت رسالة لـ **${m.user.username}** في الخاص ✅`));
+      return send(ok("📩 تم الإرسال في الخاص", `الرسالة وصلت لـ **${m.user.username}** ✅`));
     }
 
-    return send("❌ مش عارف أنفذ الأكشن ده!");
+    // fallback: أي كلام مش متعرف = chat
+    try {
+      const reply = await chatReply(geminiModel, userId, rawText);
+      pushHistory(userId, "user", rawText);
+      pushHistory(userId, "model", reply);
+      return send(`👑 ${reply}`);
+    } catch {
+      return send("⚠️ في ضغط على الـ AI دلوقتي، جرب بعد ثواني.");
+    }
 
   } catch (err) {
-    console.error("[OwnerAI] خطأ:", err);
-    return send(`❌ حصل خطأ: ${err.message}`);
+    console.error("[OwnerAI] خطأ في تنفيذ الأكشن:", err.message);
+    return send(`❌ مقدرتش أنفذ الأمر ده: ${err.message}`);
   }
-}
-
-// ── مسح تاريخ الأونر ───────────────────────────────────────────
-export function clearOwnerHistory(userId) {
-  ownerHistory.delete(userId);
 }
 
 function ok(title, description) {
   return {
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0x2ecc71)
-        .setTitle(title)
-        .setDescription(description)
-        .setFooter({ text: "⚜️ نُفِّذ بأمر الأونر 👑" })
-        .setTimestamp()
-    ]
+    embeds: [new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle(title)
+      .setDescription(description)
+      .setFooter({ text: "⚜️ نُفِّذ بأمر الأونر 👑" })
+      .setTimestamp()]
   };
 }
