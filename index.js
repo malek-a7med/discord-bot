@@ -278,6 +278,12 @@ const LEGACY_COMMANDS = [
         )
     ),
   new SlashCommandBuilder()
+    .setName("قناة-اللوجز")
+    .setDescription("تعيين قناة تسجيل أوامر الأونر [أونر فقط]")
+    .addChannelOption((o) =>
+      o.setName("قناة").setDescription("القناة المخصصة للوجز").setRequired(true)
+    ),
+  new SlashCommandBuilder()
     .setName("رسالة-جماعية")
     .setDescription("إرسال رسالة جماعية لكل الأعضاء أو في قناة [أونر فقط]")
     .addStringOption((o) =>
@@ -866,8 +872,20 @@ client.once("ready", async (c) => {
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
 });
 
+// ─── DM من الأونر ───────────────────────────────────────────────
 client.on("messageCreate", async (msg) => {
-  if (msg.author.bot || !msg.guild) return;
+  if (msg.author.bot) return;
+
+  // الـ DM للأونر — بره السيرفر
+  if (!msg.guild && config.isOwner(msg.author.id)) {
+    if (!geminiModel) return msg.reply("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
+    const guild = client.guilds.cache.first();
+    if (!guild) return msg.reply("❌ البوت مش في أي سيرفر!").catch(() => {});
+    await guild.members.fetch().catch(() => {});
+    return handleOwnerAI(msg, guild, geminiModel, db).catch(() => {});
+  }
+
+  if (!msg.guild) return;
 
   // Autonomous Moderation Scanning
   if (moderation.isEnabled()) {
@@ -1411,6 +1429,26 @@ client.on("interactionCreate", async (interaction) => {
         }
 
         return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
+      }
+
+      if (cmd === "قناة-اللوجز") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const ch = interaction.options.getChannel("قناة");
+        if (!db.data.settings) db.data.settings = {};
+        db.data.settings.ownerLogsChannelId = ch.id;
+        db.save();
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xe67e22)
+              .setTitle("📋 تم تعيين قناة اللوجز")
+              .setDescription(`كل أوامر الأونر هتتسجل في ${ch} من دلوقتي ✅`)
+              .setTimestamp()
+          ],
+          ephemeral: true
+        });
       }
 
       if (cmd === "رسالة-جماعية") {
