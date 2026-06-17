@@ -889,8 +889,11 @@ client.on("messageCreate", async (msg) => {
   const isMentioned = msg.mentions.has(client.user.id);
   if (!isMentioned) return;
 
-  if (msg.channel.name !== "🤖روم-زنجي🤖") {
-    return msg.reply("مقدرش اتكلم هنا روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
+  const BOT_CHANNEL_ID = "1516591390023352370";
+  const isOwner = config.isOwner(msg.author.id);
+
+  if (!isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
+    return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
   }
 
   const question = msg.content.replace(/<@!?\d+>/g, "").trim();
@@ -898,9 +901,10 @@ client.on("messageCreate", async (msg) => {
 
   msg.channel.sendTyping().catch(() => {});
   try {
+    const ownerTag = isOwner ? "يا باشا 👑 " : "";
     const prompt = `اسم اللي بيكلمك: ${msg.author.username}\nالرسالة: ${question}`;
     const result = await geminiModel.generateContent(prompt);
-    await msg.reply(result.response.text().trim());
+    await msg.reply(`${ownerTag}${result.response.text().trim()}`);
   } catch (err) {
     await msg.reply("معلش يسطا، هنجت مني ثواني وجرب تاني!");
   }

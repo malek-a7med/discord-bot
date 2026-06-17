@@ -59,6 +59,14 @@ class Config {
     return process.env.YOUTUBE_API_KEY || null;
   }
 
+  get OWNER_IDS() {
+    return ['954816748140503090', '1448840687763325018'];
+  }
+
+  isOwner(userId) {
+    return this.OWNER_IDS.includes(userId);
+  }
+
   get ANTI_SPAM_THRESHOLD() {
     return parseInt(process.env.ANTI_SPAM_THRESHOLD || '5', 10);
   }
