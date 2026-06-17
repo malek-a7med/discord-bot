@@ -302,6 +302,9 @@ const LEGACY_COMMANDS = [
     .addChannelOption((o) =>
       o.setName("قناة").setDescription("القناة (لو اخترت إرسال في قناة)")
     ),
+  new SlashCommandBuilder()
+    .setName("لوحة-dm")
+    .setDescription("فتح لوحة تحكم الأونر في الـ DM [أونر فقط]"),
 ];
 
 // Advanced Feature Commands
@@ -331,6 +334,54 @@ const QUESTIONS = [
   { q: "📚 كم عدد سور القرآن الكريم؟", a: ["114", "١١٤", "مئة وأربع عشرة"] },
   { q: "🌙 كم يستغرق دوران القمر حول الأرض؟", a: ["29 يوم", "30 يوم", "شهر", "29", "30"] },
 ];
+
+// ─── لوحة تحكم الأونر في الـ DM ───────────────────────────────
+function buildDMControlPanel(guild) {
+  const embed = new EmbedBuilder()
+    .setColor(0xa020f0)
+    .setTitle("👑 لوحة تحكم الأونر")
+    .setDescription(
+      `🏛️ **سيرفر ${guild?.name ?? "الفراعنة"}**\n\n` +
+      `دوس على أي زرار أو كلمني بالعامية وهنفذ أي حاجة 🤖`
+    )
+    .addFields(
+      { name: "👥 الأعضاء",   value: `\`${guild?.memberCount ?? "؟"}\``, inline: true },
+      { name: "📡 الحالة",    value: "🟢 أونلاين",                        inline: true },
+      { name: "⏱️ الـ Uptime", value: `\`${Math.floor(process.uptime() / 60)} دقيقة\``, inline: true }
+    )
+    .setFooter({ text: "👑 للأونر فقط — زنجي Bot" })
+    .setTimestamp();
+
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("dmp_stats").setLabel("📊 إحصائيات").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("dmp_lb").setLabel("🏆 ليدربورد").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("dmp_backup").setLabel("💾 نسخة").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("dmp_queue").setLabel("🎵 قائمة").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("dmp_stop").setLabel("⏹️ إيقاف").setStyle(ButtonStyle.Danger)
+  );
+
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("dmp_warn").setLabel("⚠️ تحذير").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("dmp_mute").setLabel("🔇 إسكات").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("dmp_kick").setLabel("👢 طرد").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("dmp_ban").setLabel("🔨 حظر").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("dmp_coins").setLabel("🪙 كوينز").setStyle(ButtonStyle.Success)
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
+}
+
+function findMember(guild, nameOrId) {
+  if (!guild) return null;
+  return (
+    guild.members.cache.get(nameOrId) ||
+    guild.members.cache.find(m =>
+      m.user.username.toLowerCase() === nameOrId.toLowerCase() ||
+      m.displayName.toLowerCase() === nameOrId.toLowerCase() ||
+      m.user.id === nameOrId
+    ) || null
+  );
+}
 
 async function deployCommands(token, clientId) {
   const rest = new REST({ version: "10" }).setToken(token);
@@ -1564,6 +1615,18 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
+      if (cmd === "لوحة-dm") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const g = guild || client.guilds.cache.first();
+        const panel = buildDMControlPanel(g);
+        if (isFromDM) {
+          return interaction.reply(panel);
+        }
+        return interaction.reply({ ...panel, ephemeral: true });
+      }
+
     } catch (err) {
       logger.error("خطأ في تنفيذ الأمر:", err);
       return interaction.reply({ content: "❌ حصل خطأ سريع وأنا بنفذ الأمر ده!", ephemeral: true }).catch(() => {});
@@ -1573,6 +1636,97 @@ client.on("interactionCreate", async (interaction) => {
   // التعامل مع الأزرار والمودال التفاعلية
   if (interaction.isButton()) {
     try {
+
+      // ─── أزرار لوحة تحكم الأونر ──────────────────────────────────
+      if (interaction.customId.startsWith("dmp_")) {
+        if (!config.isOwner(interaction.user.id)) {
+          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", ephemeral: true });
+        }
+        const g = interaction.guild || client.guilds.cache.first();
+        if (g) await g.members.fetch().catch(() => {});
+
+        // 📊 إحصائيات السيرفر
+        if (interaction.customId === "dmp_stats") {
+          const allUsers = db.getAllData().users;
+          const totalCoins = Object.values(allUsers).reduce((s, u) => s + (u.coins || 0), 0);
+          const topLevel  = Object.values(allUsers).sort((a, b) => b.level - a.level)[0];
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xa020f0)
+              .setTitle(`📊 إحصائيات ${g?.name ?? "السيرفر"}`)
+              .addFields(
+                { name: "👥 الأعضاء",       value: `\`${g?.memberCount ?? "؟"}\``,          inline: true },
+                { name: "🪙 إجمالي الكوينز", value: `\`${totalCoins.toLocaleString()}\``,     inline: true },
+                { name: "🏅 أعلى مستوى",    value: `\`${topLevel?.level ?? 0}\``,            inline: true },
+                { name: "⏱️ الـ Uptime",     value: `\`${Math.floor(process.uptime()/60)} دقيقة\``, inline: true },
+                { name: "📡 الـ Ping",       value: `\`${client.ws.ping}ms\``,               inline: true },
+                { name: "🤖 الأوامر",        value: `\`${LEGACY_COMMANDS.length + 14} أمر\``, inline: true }
+              )
+              .setTimestamp()],
+            ephemeral: true
+          });
+        }
+
+        // 🏆 ليدربورد
+        if (interaction.customId === "dmp_lb") {
+          const allUsers = db.getAllData().users;
+          const sorted = Object.entries(allUsers).sort((a, b) => b[1].coins - a[1].coins).slice(0, 5);
+          let txt = "🏆 **أفضل 5 أعضاء بالكوينز:**\n";
+          sorted.forEach(([id, d], i) => txt += `**#${i+1}** <@${id}> — 🪙 \`${d.coins}\`\n`);
+          return interaction.reply({ content: txt, ephemeral: true });
+        }
+
+        // 💾 نسخة احتياطية
+        if (interaction.customId === "dmp_backup") {
+          await interaction.deferReply({ ephemeral: true });
+          const allData = db.getAllData();
+          const now = new Date();
+          const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+          const buf = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
+          const att = new AttachmentBuilder(buf, { name: `backup_${dateStr}.json` });
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("💾 نسخة احتياطية").setDescription(`✅ ${Object.keys(allData.users||{}).length} عضو محفوظ`).setTimestamp()],
+            files: [att]
+          });
+        }
+
+        // 🎵 قائمة الميوزك
+        if (interaction.customId === "dmp_queue") {
+          const { musicHandler: mh } = await import("./commands/music.js");
+          const q = mh?.getQueue?.(g?.id);
+          if (!q || q.length === 0) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", ephemeral: true });
+          const txt = q.slice(0, 5).map((s, i) => `**${i+1}.** ${s.title}`).join("\n");
+          return interaction.reply({ content: `🎵 **قائمة التشغيل:**\n${txt}`, ephemeral: true });
+        }
+
+        // ⏹️ إيقاف الميوزك
+        if (interaction.customId === "dmp_stop") {
+          const { musicHandler: mh } = await import("./commands/music.js");
+          mh?.stop?.(g?.id);
+          return interaction.reply({ content: "⏹️ تم إيقاف الميوزك!", ephemeral: true });
+        }
+
+        // 🔲 موودالات المودريشن
+        const modalMap = {
+          dmp_warn:  { id: "dmmod_warn",  title: "⚠️ تحذير عضو",  fields: [["اسم العضو أو ID", "dm_user"], ["السبب", "dm_reason"]] },
+          dmp_mute:  { id: "dmmod_mute",  title: "🔇 إسكات عضو",  fields: [["اسم العضو أو ID", "dm_user"], ["المدة (دقايق)", "dm_minutes"], ["السبب", "dm_reason"]] },
+          dmp_kick:  { id: "dmmod_kick",  title: "👢 طرد عضو",    fields: [["اسم العضو أو ID", "dm_user"], ["السبب", "dm_reason"]] },
+          dmp_ban:   { id: "dmmod_ban",   title: "🔨 حظر عضو",   fields: [["اسم العضو أو ID", "dm_user"], ["السبب", "dm_reason"]] },
+          dmp_coins: { id: "dmmod_coins", title: "🪙 إعطاء كوينز", fields: [["اسم العضو أو ID", "dm_user"], ["الكمية", "dm_amount"]] },
+        };
+        const mCfg = modalMap[interaction.customId];
+        if (mCfg) {
+          const modal = new ModalBuilder().setCustomId(mCfg.id).setTitle(mCfg.title);
+          mCfg.fields.forEach(([label, cid]) =>
+            modal.addComponents(new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId(cid).setLabel(label).setStyle(TextInputStyle.Short).setRequired(true)
+            ))
+          );
+          return interaction.showModal(modal);
+        }
+      }
+      // ─────────────────────────────────────────────────────────────
+
       if (interaction.customId === SUGGESTION_BTN_ID) {
         return await showSuggestionModal(interaction);
       }
@@ -1743,6 +1897,79 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
         return await handleAdminReplyModalSubmit(interaction);
       }
+
+      // ─── موودالات لوحة تحكم الأونر ────────────────────────────────
+      if (["dmmod_warn","dmmod_mute","dmmod_kick","dmmod_ban","dmmod_coins"].includes(interaction.customId)) {
+        if (!config.isOwner(interaction.user.id)) {
+          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        const g = interaction.guild || client.guilds.cache.first();
+        if (g) await g.members.fetch().catch(() => {});
+
+        const nameOrId = interaction.fields.getTextInputValue("dm_user")?.trim();
+        const member   = findMember(g, nameOrId);
+
+        if (!member && interaction.customId !== "dmmod_coins") {
+          return interaction.editReply({ content: `❌ مش لاقي العضو: **${nameOrId}**` });
+        }
+
+        if (interaction.customId === "dmmod_warn") {
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          const u = db.getUser(member.user.id);
+          if (!u.warnings) u.warnings = [];
+          u.warnings.push({ reason, date: new Date().toISOString() });
+          db.updateUser(member.user.id, u);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تم التحذير")
+              .setDescription(`تحذير لـ **${member.user.username}**\nالسبب: ${reason}\nإجمالي التحذيرات: ${u.warnings.length}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_mute") {
+          const mins   = parseInt(interaction.fields.getTextInputValue("dm_minutes")) || 10;
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          await member.timeout(mins * 60000, reason);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تم الإسكات")
+              .setDescription(`**${member.user.username}** اتأسكت لمدة **${mins} دقيقة**\nالسبب: ${reason}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_kick") {
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          await member.kick(reason);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0xe67e22).setTitle("👢 تم الطرد")
+              .setDescription(`**${member.user.username}** اتطرد\nالسبب: ${reason}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_ban") {
+          const reason = interaction.fields.getTextInputValue("dm_reason");
+          await g.bans.create(member.user.id, { reason });
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🔨 تم الحظر")
+              .setDescription(`**${member.user.username}** اتحظر نهائياً\nالسبب: ${reason}`).setTimestamp()]
+          });
+        }
+
+        if (interaction.customId === "dmmod_coins") {
+          const amount = parseInt(interaction.fields.getTextInputValue("dm_amount")) || 0;
+          const m2 = findMember(g, nameOrId);
+          if (!m2) return interaction.editReply({ content: `❌ مش لاقي العضو: **${nameOrId}**` });
+          const u = db.getUser(m2.user.id);
+          u.coins = (u.coins || 0) + amount;
+          db.updateUser(m2.user.id, u);
+          return interaction.editReply({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("🪙 تم إعطاء الكوينز")
+              .setDescription(`**${m2.user.username}** أخد **${amount}** كوينز\nرصيده الحالي: **${u.coins}**`).setTimestamp()]
+          });
+        }
+      }
+      // ──────────────────────────────────────────────────────────────
+
     } catch (err) {
       logger.error("خطأ في معالجة الـ Modal:", err);
       return interaction.reply({
