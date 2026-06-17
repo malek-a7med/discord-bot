@@ -104,10 +104,10 @@ export function initGeminiKeys(systemInstruction) {
   _keys = collectKeys();
   if (_keys.length === 0) return false;
 
-  _chatModel  = new RotatingGeminiModel(_keys, "gemini-2.5-flash", systemInstruction);
-  _imageModel = new RotatingGeminiModel(_keys, "gemini-2.5-flash");
+  _chatModel  = new RotatingGeminiModel(_keys, "gemini-1.5-flash", systemInstruction);
+  _imageModel = new RotatingGeminiModel(_keys, "gemini-1.5-flash");
 
-  console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (${_keys.length * 500} طلب/يوم)`);
+  console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (${_keys.length * 1500} طلب/يوم)`);
   return true;
 }
 
