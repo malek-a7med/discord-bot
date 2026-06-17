@@ -31,6 +31,10 @@ export function clearOwnerHistory(userId) {
   ownerHistory.delete(userId);
 }
 
+export function getProcessingCount() {
+  return processingLock.size;
+}
+
 // ── Retry تلقائي (3 محاولات بس — أسرع وأقل إزعاج) ──────────────
 async function withRetry(fn, retries = 3, delayMs = 800) {
   for (let i = 0; i < retries; i++) {

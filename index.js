@@ -27,7 +27,7 @@ import {
   handleWhitenLink,
   handleOcrUpload
 } from "./commands/quick-clean.js";
-import { handleOwnerAI } from "./helpers/owner-ai.js";
+import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -306,6 +306,9 @@ const LEGACY_COMMANDS = [
   new SlashCommandBuilder()
     .setName("لوحة-dm")
     .setDescription("فتح لوحة تحكم الأونر في الـ DM [أونر فقط]"),
+  new SlashCommandBuilder()
+    .setName("حالة-البوت")
+    .setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
 ];
 
 // Advanced Feature Commands
@@ -398,7 +401,18 @@ async function deployCommands(token, clientId) {
   }
 }
 
-// ✅ [تعديل 1] إضافة Sweepers لتنظيف الكاش كل 30 دقيقة (1800 ثانية)
+// ── حماية من تكرار رسايل الـ Error (cooldown 30 ثانية لكل نوع) ───
+const errorCooldowns = new Map();
+function canSendError(key) {
+  const now = Date.now();
+  const last = errorCooldowns.get(key) || 0;
+  if (now - last > 30_000) {
+    errorCooldowns.set(key, now);
+    return true;
+  }
+  return false;
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -411,11 +425,10 @@ const client = new Client({
     GatewayIntentBits.DirectMessageReactions,
   ],
   partials: [Partials.Channel, Partials.Message],
+  failIfNotExists: false,
+  rest: { timeout: 15_000, retries: 3 },
   sweepers: {
-    messages: {
-      interval: 1800,
-      lifetime: 1800,
-    },
+    messages: { interval: 1800, lifetime: 1800 },
     users: {
       interval: 1800,
       filter: () => (user) => !user.bot && !client.guilds.cache.some((g) => g.members.cache.has(user.id)),
@@ -1063,6 +1076,46 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     try {
+      // ─── حالة البوت ─────────────────────────────────────────────
+      if (cmd === "حالة-البوت") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        const uptimeSec  = Math.floor(process.uptime());
+        const uptimeMin  = Math.floor(uptimeSec / 60);
+        const uptimeHour = Math.floor(uptimeMin / 60);
+        const uptimeStr  = uptimeHour > 0
+          ? `${uptimeHour}س ${uptimeMin % 60}د`
+          : `${uptimeMin}د ${uptimeSec % 60}ث`;
+
+        const memMB    = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
+        const ping     = client.ws.ping;
+        const aiStatus = geminiModel ? "🟢 شغال" : "🔴 مش شغال";
+        const locks    = getProcessingCount();
+        const guilds   = client.guilds.cache.size;
+
+        const embed = new EmbedBuilder()
+          .setColor(ping < 100 ? 0x2ecc71 : ping < 300 ? 0xf39c12 : 0xe74c3c)
+          .setTitle("📊 حالة البوت — لحظة بلحظة")
+          .addFields(
+            { name: "🏓 Ping Discord",    value: `\`${ping}ms\``,      inline: true },
+            { name: "🧠 RAM",             value: `\`${memMB} MB\``,    inline: true },
+            { name: "⏱️ Uptime",          value: `\`${uptimeStr}\``,   inline: true },
+            { name: "🤖 Gemini AI",       value: aiStatus,             inline: true },
+            { name: "🔒 طلبات جارية",    value: `\`${locks} طلب\``,   inline: true },
+            { name: "🏛️ سيرفرات",         value: `\`${guilds}\``,      inline: true },
+            { name: "🛡️ أخطاء متابَعة",   value: `\`${errorCooldowns.size} نوع\``, inline: true },
+            { name: "📦 Node.js",         value: `\`${process.version}\``, inline: true },
+            { name: "💾 Heap Total",      value: `\`${(process.memoryUsage().heapTotal / 1024 / 1024).toFixed(1)} MB\``, inline: true }
+          )
+          .setFooter({ text: "👑 زنجي Bot — Replit Hosting" })
+          .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
+      }
+
       // ═══════════════════════════════════════════════════════════════
       //  Advanced Features Commands
       // ═══════════════════════════════════════════════════════════════
@@ -2159,21 +2212,45 @@ app.listen(PORT, () => {
 });
 
 // ───────────────────────────────────────────────────────────────
-// ✅ [تعديل 8] Anti-Crash — حماية البوت من الإغلاق المفاجئ
+// Anti-Crash — حماية البوت من الإغلاق + منع تكرار رسايل الـ Error
 // ───────────────────────────────────────────────────────────────
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("⚠️ [Anti-Crash] unhandledRejection:");
-  console.error("Promise:", promise);
-  console.error("السبب:", reason);
+process.on("unhandledRejection", (reason) => {
+  const msg = reason?.message || String(reason);
+  if (canSendError("unhandledRejection:" + msg.slice(0, 60))) {
+    console.error("⚠️ [Anti-Crash] unhandledRejection:", msg);
+  }
 });
 
 process.on("uncaughtException", (err) => {
-  console.error("⚠️ [Anti-Crash] uncaughtException:", err.message);
-  console.error(err.stack);
+  if (canSendError("uncaughtException:" + err.message?.slice(0, 60))) {
+    console.error("⚠️ [Anti-Crash] uncaughtException:", err.message);
+    console.error(err.stack);
+  }
 });
 
 process.on("uncaughtExceptionMonitor", (err) => {
-  console.error("⚠️ [Anti-Crash] uncaughtExceptionMonitor:", err.message);
+  if (canSendError("uncaughtExceptionMonitor:" + err.message?.slice(0, 60))) {
+    console.error("⚠️ [Anti-Crash] uncaughtExceptionMonitor:", err.message);
+  }
+});
+
+// ── أحداث الاتصال — منع الـ drops من غير ضجة ──────────────────
+client.on("error", (err) => {
+  if (canSendError("client:error")) {
+    console.error("⚠️ [Discord] خطأ في الاتصال:", err.message);
+  }
+});
+
+client.on("shardError", (err) => {
+  if (canSendError("shard:error")) {
+    console.error("⚠️ [Shard] خطأ WebSocket:", err.message);
+  }
+});
+
+client.on("warn", (info) => {
+  if (canSendError("client:warn:" + info.slice(0, 40))) {
+    console.warn("⚠️ [Discord]", info);
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);
