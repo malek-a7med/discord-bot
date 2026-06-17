@@ -42,8 +42,8 @@ export function getProcessingCount() {
   return isProcessing.size;
 }
 
-// ── Retry أسرع (2 محاولة فقط) ───────────────────────────────────
-async function withRetry(fn, retries = 3, delayMs = 800) {
+// ── Retry مرة واحدة بس عشان ما نبعتش رسايل متكررة ──────────────
+async function withRetry(fn, retries = 1, delayMs = 800) {
   for (let i = 0; i < retries; i++) {
     try { return await fn(); }
     catch (err) {
@@ -53,8 +53,8 @@ async function withRetry(fn, retries = 3, delayMs = 800) {
   }
 }
 
-// ── Timeout wrapper عشان Gemini مياخدش وقت أكتر من اللازم ────────
-function withTimeout(promise, ms = 25000) {
+// ── Timeout قصير عشان الرد يكون سريع ────────────────────────────
+function withTimeout(promise, ms = 15000) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
@@ -214,8 +214,16 @@ async function _runQueue(userId) {
   }
 }
 
+// ── حماية من تكرار نفس الرسالة (لو في أكتر من نسخة أو event اتبعت مرتين) ──
+const processedOwnerMsgs = new Set();
+
 // ── الدالة الرئيسية — تُضيف للقائمة وتشغّل لو مش شغّال ──────────
 export function handleOwnerAI(msg, guild, geminiModel, db, buildDashboard = null) {
+  // منع تكرار نفس الرسالة تماماً
+  if (processedOwnerMsgs.has(msg.id)) return;
+  processedOwnerMsgs.add(msg.id);
+  setTimeout(() => processedOwnerMsgs.delete(msg.id), 120_000);
+
   const userId  = msg.author.id;
   const rawText = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
   if (!rawText) return;
@@ -252,7 +260,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 45000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 15000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
       return send("❌ الـ AI اتأخر أكتر من المعتاد، حاول تاني بعد ثانية!");
