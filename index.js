@@ -28,6 +28,7 @@ import {
   handleOcrUpload
 } from "./commands/quick-clean.js";
 import { handleOwnerAI } from "./helpers/owner-ai.js";
+import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -941,7 +942,44 @@ client.on("messageCreate", async (msg) => {
     return handleOwnerAI(msg, guild, geminiModel, db).catch(() => {});
   }
 
-  // Autonomous Moderation Scanning
+  // ── Auto-Mod الذكي ─────────────────────────────────────────────
+  {
+    const notifyOwner = async (userId, member, reason, warnCount) => {
+      for (const ownerId of config.OWNER_IDS) {
+        try {
+          const ownerUser = await client.users.fetch(ownerId);
+          const embed = new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setTitle("🚨 تقرير Auto-Mod — قرار الطرد")
+            .setDescription(
+              `العضو **${member?.user?.username ?? userId}** (<@${userId}>) تجاوز الحد!\n\n` +
+              `📋 **السبب:** ${reason}\n` +
+              `⚠️ **التحذيرات:** ${warnCount}\n` +
+              `📡 **السيرفر:** ${msg.guild.name}\n\n` +
+              `هتطرده ولا تسيبه؟`
+            )
+            .setTimestamp();
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`automod_kick_yes_${userId}`)
+              .setLabel("✅ اه، اطرده")
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId(`automod_kick_no_${userId}`)
+              .setLabel("❌ لا، سيبه")
+              .setStyle(ButtonStyle.Secondary)
+          );
+          await ownerUser.send({ embeds: [embed], components: [row] });
+        } catch { /* الأونر عاطل الـ DM */ }
+      }
+    };
+
+    const amResult = await autoModScan(msg, db, geminiImageModel, notifyOwner).catch(() => ({}));
+    // لو الرسالة اتحذفت بواسطة automod، وقف الباقي
+    if (amResult?.triggered) return;
+  }
+
+  // Autonomous Moderation Scanning (spam + links)
   if (moderation.isEnabled()) {
     await moderation.scanMessage(msg);
   }
@@ -1723,6 +1761,48 @@ client.on("interactionCreate", async (interaction) => {
             ))
           );
           return interaction.showModal(modal);
+        }
+      }
+      // ─────────────────────────────────────────────────────────────
+
+      // ── أزرار قرار طرد Auto-Mod ───────────────────────────────────
+      if (interaction.customId.startsWith("automod_kick_yes_") || interaction.customId.startsWith("automod_kick_no_")) {
+        if (!config.isOwner(interaction.user.id)) {
+          return interaction.reply({ content: "❌ القرار ده للأونر بس!", ephemeral: true });
+        }
+        const targetId = interaction.customId.replace("automod_kick_yes_", "").replace("automod_kick_no_", "");
+        const isKick   = interaction.customId.startsWith("automod_kick_yes_");
+        const guild    = client.guilds.cache.first();
+
+        // عطل الأزرار في رسالة الـ DM
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`automod_kick_yes_${targetId}`).setLabel("✅ اه، اطرده").setStyle(ButtonStyle.Danger).setDisabled(true),
+          new ButtonBuilder().setCustomId(`automod_kick_no_${targetId}`).setLabel("❌ لا، سيبه").setStyle(ButtonStyle.Secondary).setDisabled(true)
+        );
+        await interaction.update({ components: [disabledRow] }).catch(() => {});
+
+        if (!isKick) {
+          return interaction.followUp({ content: "✅ تمام، سيبناه المرة دي. لو كررها هيجيلك تقرير تاني.", ephemeral: true });
+        }
+
+        if (!guild) return interaction.followUp({ content: "❌ مش لاقي السيرفر!", ephemeral: true });
+
+        try {
+          await guild.members.fetch().catch(() => {});
+          const member = guild.members.cache.get(targetId);
+          if (!member) return interaction.followUp({ content: "❌ العضو مش موجود أو طلع بنفسه!", ephemeral: true });
+
+          await member.kick("Auto-Mod: قرار الأونر بالطرد");
+          return interaction.followUp({
+            embeds: [new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setTitle("👢 تم الطرد")
+              .setDescription(`**${member.user.username}** اتطرد بناءً على قرارك.\nالسبب: Auto-Mod + قرار الأونر`)
+              .setTimestamp()],
+            ephemeral: true
+          });
+        } catch (err) {
+          return interaction.followUp({ content: `❌ فشلت في الطرد: ${err.message}`, ephemeral: true });
         }
       }
       // ─────────────────────────────────────────────────────────────
