@@ -1047,11 +1047,12 @@ client.on("messageCreate", async (msg) => {
     msg.react("✅").catch(() => {});
   }
 
-  const isMentioned  = msg.mentions.has(client.user.id);
-  const isOwner      = config.isOwner(msg.author.id);
+  const isMentioned   = msg.mentions.has(client.user.id);
+  const isOwner       = config.isOwner(msg.author.id);
+  const calledByName  = /زنجي/i.test(msg.content);
 
-  // الأونر يكلمه من غير منشن أو ريبلاي — غير الأونر لازم منشن
-  if (!isOwner && !isMentioned) return;
+  // الأونر يكلمه من غير منشن — غير الأونر لازم منشن أو يقول "زنجي"
+  if (!isOwner && !isMentioned && !calledByName) return;
 
   const BOT_CHANNEL_ID = "1516591390023352370";
 
@@ -1068,7 +1069,9 @@ client.on("messageCreate", async (msg) => {
 
   msg.channel.sendTyping().catch(() => {});
   try {
-    const prompt = `اسم اللي بيكلمك: ${msg.author.username}\nالرسالة: ${question}`;
+    const senderName = msg.member?.displayName || msg.author.username;
+    const cleanQ     = question.replace(/زنجي/gi, "").trim();
+    const prompt = `اسم اللي بيكلمك: ${senderName}\nالرسالة: ${cleanQ || question}`;
     const result = await geminiModel().generateContent(prompt);
     await msg.reply(result.response.text().trim());
   } catch (err) {

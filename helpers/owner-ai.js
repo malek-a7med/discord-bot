@@ -54,7 +54,7 @@ async function withRetry(fn, retries = 2, delayMs = 500) {
 }
 
 // ── Timeout wrapper عشان Gemini مياخدش وقت أكتر من اللازم ────────
-function withTimeout(promise, ms = 10000) {
+function withTimeout(promise, ms = 25000) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
@@ -68,17 +68,17 @@ function buildUnifiedPrompt(text, ownerName, guild, history) {
   const members = guild.members.cache
     .filter(m => !m.user.bot)
     .map(m => `${m.user.username}=${m.user.id}`)
-    .slice(0, 60).join(", ");
+    .slice(0, 30).join(", ");
 
   const channels = guild.channels.cache
     .filter(c => c.type === 0 || c.type === 2)
     .map(c => `${c.name}=${c.id}`)
-    .slice(0, 30).join(", ");
+    .slice(0, 15).join(", ");
 
   const roles = guild.roles.cache
     .filter(r => r.name !== "@everyone")
     .map(r => `${r.name}=${r.id}`)
-    .slice(0, 20).join(", ");
+    .slice(0, 10).join(", ");
 
   return `أنت زنجي — بوت Discord مصري ذكي وودود. الأونر اسمه "${ownerName}".
 
