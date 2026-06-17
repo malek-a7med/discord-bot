@@ -1024,6 +1024,9 @@ const MAX_USER_HIST    = 10;
 const userLastRequest  = new Map(); // cooldown: آخر طلب لكل يوزر
 const USER_COOLDOWN_MS = 5_000;    // 5 ثواني بين كل طلب وتاني
 
+// ── منع تكرار الردود (لو في نسختين من البوت شغالين) ────────────
+const processedMessages = new Set();
+
 // ── نظام حماية من الـ Spam ────────────────────────────────────
 const SPAM_WINDOW_MS  = 60_000;  // نافذة 60 ثانية
 const SPAM_MAX_MSGS   = 4;       // أقصى 4 رسايل في الدقيقة
@@ -1080,30 +1083,45 @@ ${senderName}: ${question}
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
+  // ── منع تكرار الردود لو في نسختين شغالين ────────────────────
+  if (processedMessages.has(msg.id)) return;
+  processedMessages.add(msg.id);
+  setTimeout(() => processedMessages.delete(msg.id), 60_000);
+
   // الـ DM — بره السيرفر
   if (!msg.guild) {
-    // لو مش أونر → رد مهذب وخلاص
-    if (!config.isOwner(msg.author.id)) {
-      return msg.channel.send(
-        "👋 أهلاً! أنا زنجي بوت السيرفر.\n" +
-        "مش بشتغل في الخاص إلا مع الأونر 😅\n" +
-        "ادخل السيرفر وكلمني هناك!"
-      ).catch(() => {});
+    const isOwner = config.isOwner(msg.author.id);
+    const guild   = client.guilds.cache.first();
+
+    // الأونر يحصل على AI كامل مع صلاحيات الإدارة
+    if (isOwner) {
+      if (!guild) return msg.channel.send("❌ البوت مش في أي سيرفر!").catch(() => {});
+      await guild.members.fetch().catch(() => {});
+      const trimmedDash = msg.content.trim();
+      const isDashCmd = /(داشبورد|داش بورد|لوحة.*تحكم|dashboard|panel)/i.test(trimmedDash);
+      if (isDashCmd) return msg.channel.send(buildDMControlPanel(guild)).catch(() => {});
+      if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
+      return handleOwnerAI(msg, guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
     }
 
-    const guild = client.guilds.cache.first();
-    if (!guild) return msg.channel.send("❌ البوت مش في أي سيرفر!").catch(() => {});
-    await guild.members.fetch().catch(() => {});
-
-    // ── داشبورد الأونر ─────────────────────────────────────────
-    const trimmedDash = msg.content.trim();
-    const isDashCmd = /(داشبورد|داش بورد|لوحة.*تحكم|dashboard|panel)/i.test(trimmedDash);
-    if (isDashCmd) {
-      return msg.channel.send(buildDMControlPanel(guild)).catch(() => {});
+    // باقي الناس يقدروا يكلموا البوت في الخاص — رد AI عادي
+    if (!_geminiReady) {
+      return msg.channel.send("👋 أهلاً! أنا زنجي 🤖\nالـ AI مش شغال دلوقتي، جرب بعدين!").catch(() => {});
     }
-
-    if (!_geminiReady) return msg.channel.send("❌ الـ AI مش شغال دلوقتي!").catch(() => {});
-    return handleOwnerAI(msg, guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
+    const question = msg.content.trim();
+    if (!question) return;
+    try {
+      msg.channel.sendTyping().catch(() => {});
+      const senderName = msg.author.globalName || msg.author.username;
+      const prompt     = buildUserPrompt(senderName, question, msg.author.id);
+      const result     = await geminiModel().generateContent(prompt);
+      const reply      = result.response.text().trim();
+      pushUserHistory(msg.author.id, "user", question);
+      pushUserHistory(msg.author.id, "bot",  reply);
+      return msg.channel.send(reply).catch(() => {});
+    } catch {
+      return msg.channel.send("معلش يسطا ثواني بس 🙏").catch(() => {});
+    }
   }
 
   // ── Auto-Mod الذكي (السيرفر بس) ──────────────────────────────────

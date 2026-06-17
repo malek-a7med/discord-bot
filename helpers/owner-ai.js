@@ -252,7 +252,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 28000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 45000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
       return send("❌ الـ AI اتأخر أكتر من المعتاد، حاول تاني بعد ثانية!");
