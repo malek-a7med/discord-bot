@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "zsDK20M36JBpbhAMLzXLN"
+uri = "file://zangi_bot_files.tar.gz"
+type = "unspecified"
+title = "ملفات بوت زنجي"
