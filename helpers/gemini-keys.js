@@ -80,6 +80,12 @@ class RotatingGeminiModel {
         if (err.message?.includes("429") || err.message?.includes("quota")) {
           markExhausted(key);
           lastErr = err;
+          // استنى الوقت اللي جيميني قاله قبل ما نجرب المفتاح الجاي
+          const delayMatch = err.message?.match(/retry in ([\d.]+)s/);
+          const waitMs = delayMatch ? Math.ceil(parseFloat(delayMatch[1]) * 1000) : 1000;
+          if (waitMs > 0 && waitMs < 30000) {
+            await new Promise(r => setTimeout(r, waitMs));
+          }
         } else {
           throw err;
         }
@@ -98,10 +104,10 @@ export function initGeminiKeys(systemInstruction) {
   _keys = collectKeys();
   if (_keys.length === 0) return false;
 
-  _chatModel  = new RotatingGeminiModel(_keys, "gemini-2.0-flash", systemInstruction);
-  _imageModel = new RotatingGeminiModel(_keys, "gemini-2.0-flash");
+  _chatModel  = new RotatingGeminiModel(_keys, "gemini-2.5-flash", systemInstruction);
+  _imageModel = new RotatingGeminiModel(_keys, "gemini-2.5-flash");
 
-  console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (${_keys.length * 1500} طلب/يوم)`);
+  console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (${_keys.length * 500} طلب/يوم)`);
   return true;
 }
 

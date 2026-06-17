@@ -953,8 +953,10 @@ client.once("ready", async (c) => {
 });
 
 // ── ذاكرة المحادثات للأعضاء العاديين ────────────────────────────
-const userChatHistory = new Map();
-const MAX_USER_HIST   = 10;
+const userChatHistory  = new Map();
+const MAX_USER_HIST    = 10;
+const userLastRequest  = new Map(); // cooldown: آخر طلب لكل يوزر
+const USER_COOLDOWN_MS = 60_000;   // 60 ثانية بين كل طلب وتاني
 
 function getUserHistory(userId) {
   if (!userChatHistory.has(userId)) userChatHistory.set(userId, []);
@@ -1085,6 +1087,16 @@ client.on("messageCreate", async (msg) => {
 
   const question = msg.content.replace(/<@!?\d+>/g, "").trim();
   if (!question || !_geminiReady) return;
+
+  // ── cooldown: 60 ثانية بين كل طلب وتاني لنفس اليوزر ──────────
+  const now      = Date.now();
+  const lastReq  = userLastRequest.get(msg.author.id) || 0;
+  const elapsed  = now - lastReq;
+  if (elapsed < USER_COOLDOWN_MS) {
+    const remaining = Math.ceil((USER_COOLDOWN_MS - elapsed) / 1000);
+    return msg.reply(`⏳ استنى ${remaining} ثانية قبل ما تكلمني تاني!`).catch(() => {});
+  }
+  userLastRequest.set(msg.author.id, now);
 
   if (isOwner) {
     return handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel).catch(() => {});
