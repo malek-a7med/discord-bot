@@ -1,7 +1,7 @@
 {
   "users": {
     "954816748140503090": {
-      "xp": 565,
+      "xp": 625,
       "level": 3,
       "coins": 140,
       "lastDaily": 1780602154196
@@ -25,8 +25,8 @@
       "lastDaily": null
     },
     "1474551986413109298": {
-      "xp": 155,
-      "level": 1,
+      "xp": 200,
+      "level": 2,
       "coins": 0,
       "lastDaily": null
     },
@@ -69,7 +69,7 @@
       "timeouts": []
     },
     "1287488619111780607": {
-      "xp": 170,
+      "xp": 175,
       "level": 1,
       "coins": 0,
       "lastDaily": null,
