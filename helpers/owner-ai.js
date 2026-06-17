@@ -3,6 +3,9 @@
 // ═══════════════════════════════════════════════════════════════
 import { EmbedBuilder } from "discord.js";
 
+// ── قفل لمنع معالجة رسالتين في نفس الوقت لنفس اليوزر ──────────
+const processingLock = new Set(); // userId → جاري المعالجة
+
 // ── ذاكرة المحادثات (text-based — أثبت من startChat) ───────────
 const ownerHistory = new Map(); // userId → [{who, text}]
 const MAX_HISTORY  = 20;
@@ -28,16 +31,26 @@ export function clearOwnerHistory(userId) {
   ownerHistory.delete(userId);
 }
 
-// ── Retry تلقائي ────────────────────────────────────────────────
-async function withRetry(fn, retries = 5, delayMs = 1500) {
+// ── Retry تلقائي (3 محاولات بس — أسرع وأقل إزعاج) ──────────────
+async function withRetry(fn, retries = 3, delayMs = 800) {
   for (let i = 0; i < retries; i++) {
     try { return await fn(); }
     catch (err) {
       if (i === retries - 1) throw err;
-      // exponential backoff: 1.5s, 3s, 6s, 12s
+      // backoff: 0.8s, 1.6s
       await new Promise(r => setTimeout(r, delayMs * Math.pow(2, i)));
     }
   }
+}
+
+// ── Timeout wrapper عشان Gemini مياخدش وقت أكتر من اللازم ────────
+function withTimeout(promise, ms = 20000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), ms)
+    )
+  ]);
 }
 
 // ── Prompt تحديد الأكشن ─────────────────────────────────────────
@@ -146,53 +159,58 @@ async function sendLog(guild, db, action, ownerName, details) {
 
 // ── الدالة الرئيسية ─────────────────────────────────────────────
 export async function handleOwnerAI(msg, guild, geminiModel, db) {
-  const isDM       = !msg.guild;
-  const userId     = msg.author.id;
-  const rawText    = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
+  const isDM        = !msg.guild;
+  const userId      = msg.author.id;
+  const rawText     = msg.content.replace(/<@!?\d+>/g, "").replace(/زنجي/gi, "").trim();
   const displayName = msg.member?.displayName || msg.author.globalName || msg.author.username;
 
   const send = (content) => isDM
     ? msg.channel.send(content).catch(() => {})
     : msg.reply(content).catch(() => {});
 
-  msg.channel.sendTyping().catch(() => {});
-
   if (!rawText) return;
 
-  // ─── تصنيف الرسالة ───────────────────────────────────────────
-  let parsed;
-  try {
-    parsed = await classifyMessage(geminiModel, rawText, guild);
-  } catch (err) {
-    console.error("[OwnerAI] classifyMessage فشل:", err.message);
-    // fallback: رد شات عادي
-    try {
-      const reply = await chatReply(geminiModel, userId, rawText, displayName);
-      pushHistory(userId, "user", rawText);
-      pushHistory(userId, "model", reply);
-      return send(`👑 ${reply}`);
-    } catch {
-      return send("ثواني يسطا بس معلش 😅");
-    }
+  // ── منع تشغيل أكتر من طلب واحد في نفس الوقت لنفس اليوزر ────────
+  if (processingLock.has(userId)) {
+    return send("⏳ لسه بعالج طلبك السابق، استنى ثانية!");
   }
+  processingLock.add(userId);
 
-  const { action } = parsed;
+  try {
+    msg.channel.sendTyping().catch(() => {});
 
-  // ─── Chat ────────────────────────────────────────────────────
-  if (action === "chat") {
+    // ─── تصنيف الرسالة ───────────────────────────────────────────
+    let parsed;
     try {
-      const reply = await chatReply(geminiModel, userId, rawText, displayName);
-      pushHistory(userId, "user", rawText);
-      pushHistory(userId, "model", reply);
-      return send(`👑 ${reply}`);
+      parsed = await withTimeout(classifyMessage(geminiModel, rawText, guild), 15000);
     } catch (err) {
-      console.error("[OwnerAI] chatReply فشل:", err.message);
-      return send("ثواني يسطا بس معلش 😅");
+      console.error("[OwnerAI] classifyMessage فشل:", err.message);
+      try {
+        const reply = await withTimeout(chatReply(geminiModel, userId, rawText, displayName), 15000);
+        pushHistory(userId, "user", rawText);
+        pushHistory(userId, "model", reply);
+        return send(`👑 ${reply}`);
+      } catch {
+        return send("ثواني يسطا بس معلش 😅");
+      }
     }
-  }
 
-  // ─── الأكشنز — كلها في try واحد مع retry ────────────────────
-  try {
+    const { action } = parsed;
+
+    // ─── Chat ────────────────────────────────────────────────────
+    if (action === "chat") {
+      try {
+        const reply = await withTimeout(chatReply(geminiModel, userId, rawText, displayName), 15000);
+        pushHistory(userId, "user", rawText);
+        pushHistory(userId, "model", reply);
+        return send(`👑 ${reply}`);
+      } catch (err) {
+        console.error("[OwnerAI] chatReply فشل:", err.message);
+        return send("ثواني يسطا بس معلش 😅");
+      }
+    }
+
+    // ─── الأكشنز ─────────────────────────────────────────────────
     if (action === "kick") {
       const m = await guild.members.fetch(parsed.user_id).catch(() => null);
       if (!m) return send("❌ مش لاقي العضو ده!");
@@ -368,9 +386,9 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
       return send(ok("📩 تم الإرسال في الخاص", `الرسالة وصلت لـ **${m.user.username}** ✅`));
     }
 
-    // fallback: أي كلام مش متعرف = chat
+    // fallback: أي أكشن مش متعرف = chat
     try {
-      const reply = await chatReply(geminiModel, userId, rawText, displayName);
+      const reply = await withTimeout(chatReply(geminiModel, userId, rawText, displayName), 15000);
       pushHistory(userId, "user", rawText);
       pushHistory(userId, "model", reply);
       return send(`👑 ${reply}`);
@@ -380,7 +398,10 @@ export async function handleOwnerAI(msg, guild, geminiModel, db) {
 
   } catch (err) {
     console.error("[OwnerAI] خطأ في تنفيذ الأكشن:", err.message);
-    return send(`❌ مقدرتش أنفذ الأمر ده: ${err.message}`);
+    send(`❌ مقدرتش أنفذ الأمر ده: ${err.message}`);
+  } finally {
+    // ── فك القفل دايماً حتى لو حصل أي error ──────────────────────
+    processingLock.delete(userId);
   }
 }
 
