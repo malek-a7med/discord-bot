@@ -1,5 +1,11 @@
 [phases.setup]
 nixPkgs = ["nodejs_22"]
 
+[phases.install]
+cmds = ["npm install --no-audit --no-fund --prefer-offline"]
+
+[phases.build]
+cmds = []
+
 [start]
 cmd = "npm run start"
