@@ -1,9 +1,5 @@
-# force rebuild
 [phases.setup]
 nixPkgs = ["nodejs_22"]
-
-[phases.install]
-cmds = ["npm install"]
 
 [start]
 cmd = "npm run start"
