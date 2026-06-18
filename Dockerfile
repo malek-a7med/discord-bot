@@ -1,4 +1,4 @@
-FROM node:22-slim
+FROM node:20-slim
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
@@ -11,11 +11,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package*.json ./
 
-RUN npm install --no-audit --ignore-scripts
-RUN npm rebuild sharp
+RUN npm install
 
 COPY . .
 
-CMD ["node", "index.js"]
+CMD ["npm", "start"]

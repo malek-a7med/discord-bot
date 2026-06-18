@@ -28,6 +28,8 @@ import {
 import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
 import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
+import { rouletteCommand, mafiaCommand, tttCommand, handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleGameButton } from "./commands/games.js";
+import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -60,7 +62,7 @@ import {
   VoiceConnectionDisconnectReason,
 } from "@discordjs/voice";
 import playdl from "play-dl";
-import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, resetExhaustedKeys } from "./helpers/gemini-keys.js";
+import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, removeKey, setActiveKeyIndex, resetExhaustedKeys } from "./helpers/gemini-keys.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -344,6 +346,20 @@ const LEGACY_COMMANDS = [
     )
     .addSubcommand(sub =>
       sub.setName("تفريش").setDescription("تفريش المفاتيح المحروقة وإعادة تشغيلها")
+    )
+    .addSubcommand(sub =>
+      sub.setName("حذف")
+        .setDescription("احذف مفتاح من النظام")
+        .addIntegerOption(opt =>
+          opt.setName("رقم").setDescription("رقم المفتاح من قائمة العرض").setRequired(true).setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName("تحديد")
+        .setDescription("حدد مفتاح معين للاستخدام")
+        .addIntegerOption(opt =>
+          opt.setName("رقم").setDescription("رقم المفتاح من قائمة العرض").setRequired(true).setMinValue(1)
+        )
     ),
   new SlashCommandBuilder()
     .setName("رفع-بلوك")
@@ -357,6 +373,11 @@ const LEGACY_COMMANDS = [
     .setName("قائمة-مبلوكين")
     .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
   battleCommand,
+  rouletteCommand,
+  mafiaCommand,
+  tttCommand,
+  shopCommand,
+  myAbilitiesCommand,
 ];
 
 // Advanced Feature Commands
@@ -485,6 +506,8 @@ const client = new Client({
 });
 
 const activeGames = new Collection();
+// إجراءات التأديب المعلقة — تنتظر تأكيد المشرف
+const pendingModActions = new Map(); // actionId → { type, targetId, reason, duration, modId, guildId }
 const moderation = new ModerationListener(client, db, logger);
 
 // ───────────────────────────────────────────────────────────────
@@ -1456,9 +1479,23 @@ client.on("interactionCreate", async (interaction) => {
               { name: "📊 الإجمالي دلوقتي", value: `\`${result.total} مفتاح\``,   inline: true },
               { name: "📈 طلبات/يوم",       value: `\`${result.total * 20} طلب\``, inline: true },
             )
-            .setFooter({ text: "المفاتيح الجديدة شغالة على طول من غير restart" })
+            .setFooter({ text: "💾 المفاتيح اتحفظت — هتبقى بعد أي restart تلقائياً" })
             .setTimestamp();
           return interaction.editReply({ embeds: [embed] });
+        }
+
+        if (sub === "حذف") {
+          const num = interaction.options.getInteger("رقم");
+          const ok = removeKey(num - 1);
+          if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /مفاتيح-جيميني عرض عشان تشوف الأرقام`);
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🗑️ تم حذف المفتاح").setDescription(`✅ تم حذف المفتاح رقم **${num}** من النظام والملف المحفوظ.\nإجمالي المفاتيح دلوقتي: **${getKeyCount()}**`).setTimestamp()] });
+        }
+
+        if (sub === "تحديد") {
+          const num = interaction.options.getInteger("رقم");
+          const ok = setActiveKeyIndex(num - 1);
+          if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /مفاتيح-جيميني عرض عشان تشوف الأرقام`);
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🎯 تم تحديد المفتاح").setDescription(`✅ البوت هيستخدم المفتاح رقم **${num}** من دلوقتي.\nالمفاتيح المحروقة اتمسحت ومستعدة.`).setTimestamp()] });
         }
       }
 
@@ -1475,6 +1512,13 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "translate_chapter") {
         return await handleTranslateChapter(interaction);
       }
+
+      // ── الألعاب الكلاسيكية ────────────────────────────────────────
+      if (cmd === "روليت")        return await handleRouletteCommand(interaction, db);
+      if (cmd === "مافيا")        return await handleMafiaCommand(interaction, db);
+      if (cmd === "اكس-اوه")     return await handleTTTCommand(interaction, db);
+      if (cmd === "متجر-قدرات")  return await handleShopCommand(interaction, db);
+      if (cmd === "قدراتي")      return await handleMyAbilitiesCommand(interaction, db);
 
       // Quick Cleaning Tools
       if (cmd === "تنظيف_صورة") {
@@ -1729,33 +1773,74 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "تحذير") {
         const target = interaction.options.getUser("عضو");
         const reason = interaction.options.getString("السبب");
-        db.addWarning(target.id, reason, "MANUAL_MODERATOR");
-        return interaction.reply({ content: `⚠️ تم توجيه تحذير لـ ${target} بسبب: ${reason}` });
+        const actionId = `modwarn_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تأكيد التحذير")
+            .setDescription(`هتحذّر ${target}؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التحذير").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "اسكات") {
         const target = interaction.options.getUser("عضو");
         const dur = interaction.options.getInteger("مدة");
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
-        const member = await guild.members.fetch(target.id);
-        await member.timeout(dur * 60 * 1000, reason);
-        db.addTimeout(target.id, dur * 60 * 1000, reason);
-        return interaction.reply({ content: `🔇 تم إسكات العضو ${target} لمدة ${dur} دقيقة.` });
+        const actionId = `modmute_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "mute", targetId: target.id, reason, duration: dur, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تأكيد الإسكات")
+            .setDescription(`هتسكّت ${target} لمدة **${dur} دقيقة**؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الإسكات").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "طرد") {
         const target = interaction.options.getUser("عضو");
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
-        const member = await guild.members.fetch(target.id);
-        await member.kick(reason);
-        return interaction.reply({ content: `👢 تم طرد العضو **${target.username}** من السيرفر.` });
+        const actionId = `modkick_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تأكيد الطرد")
+            .setDescription(`هتطرد ${target} من السيرفر؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الطرد").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "تبنيد") {
         const target = interaction.options.getUser("عضو");
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
-        await guild.members.ban(target.id, { reason });
-        return interaction.reply({ content: `🔨 طيرنا الجبهة! تم تبنيد الباشا بنجاح بسبب: ${reason}` });
+        const actionId = `modban_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تأكيد التبنيد")
+            .setDescription(`هتبند ${target} من السيرفر نهائياً؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التبنيد").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "مساعدة") {
@@ -2073,6 +2158,75 @@ client.on("interactionCreate", async (interaction) => {
       // ─── أزرار مصارعة الكلام ──────────────────────────────────────
       if (interaction.customId.startsWith("btl_")) {
         return await handleBattleButton(interaction, db, geminiModel());
+      }
+
+      // ─── أزرار الألعاب الكلاسيكية ────────────────────────────────
+      if (interaction.customId.startsWith("rlt_") ||
+          interaction.customId.startsWith("maf_") ||
+          interaction.customId.startsWith("ttt_")) {
+        return await handleGameButton(interaction, db);
+      }
+
+      // ─── أزرار متجر القدرات ──────────────────────────────────────
+      if (interaction.customId.startsWith("gshop_")) {
+        return await handleShopButton(interaction, db);
+      }
+
+      // ─── أزرار تأكيد/إلغاء أوامر التأديب ────────────────────────
+      if (interaction.customId.startsWith("modyes_") || interaction.customId.startsWith("modno_")) {
+        const isYes    = interaction.customId.startsWith("modyes_");
+        const actionId = interaction.customId.replace("modyes_", "").replace("modno_", "");
+        const action   = pendingModActions.get(actionId);
+
+        if (!action) {
+          return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("⏰ انتهى الوقت").setDescription("انتهت مهلة هذا الإجراء — أعد الأمر مرة تانية.")], components: [] });
+        }
+        if (interaction.user.id !== action.modId) {
+          return interaction.reply({ content: "❌ الزرار ده للشخص اللي نفّذ الأمر بس!", ephemeral: true });
+        }
+
+        pendingModActions.delete(actionId);
+
+        if (!isYes) {
+          return interaction.update({ embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("✅ تم الإلغاء").setDescription("تم إلغاء الإجراء التأديبي بنجاح.")], components: [] });
+        }
+
+        const modGuild = client.guilds.cache.get(action.guildId);
+        if (!modGuild) return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("❌ خطأ").setDescription("مش لاقي السيرفر!")], components: [] });
+
+        try {
+          await modGuild.members.fetch().catch(() => {});
+          const modMember = modGuild.members.cache.get(action.targetId);
+
+          if (action.type === "warn") {
+            db.addWarning(action.targetId, action.reason, interaction.user.id);
+            const warns = db.getWarnings(action.targetId);
+            return interaction.update({ embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تم التحذير").setDescription(`تم توجيه تحذير رسمي لـ <@${action.targetId}>\n📋 **السبب:** ${action.reason}\n⚠️ **إجمالي تحذيراته:** ${warns.length}`).setTimestamp()], components: [] });
+          }
+
+          if (!modMember) {
+            return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("❌ خطأ").setDescription("العضو مش موجود في السيرفر دلوقتي!")], components: [] });
+          }
+
+          if (action.type === "mute") {
+            await modMember.timeout(action.duration * 60 * 1000, action.reason);
+            db.addTimeout(action.targetId, action.duration * 60 * 1000, action.reason);
+            return interaction.update({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تم الإسكات").setDescription(`تم إسكات <@${action.targetId}> لمدة **${action.duration} دقيقة**\n📋 **السبب:** ${action.reason}`).setTimestamp()], components: [] });
+          }
+
+          if (action.type === "kick") {
+            await modMember.kick(action.reason);
+            return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تم الطرد").setDescription(`تم طرد <@${action.targetId}> من السيرفر\n📋 **السبب:** ${action.reason}`).setTimestamp()], components: [] });
+          }
+
+          if (action.type === "ban") {
+            await modGuild.members.ban(action.targetId, { reason: action.reason });
+            return interaction.update({ embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تم التبنيد").setDescription(`تم تبنيد <@${action.targetId}> من السيرفر نهائياً\n📋 **السبب:** ${action.reason}`).setTimestamp()], components: [] });
+          }
+        } catch (err) {
+          logger.error("خطأ في تنفيذ إجراء التأديب:", err);
+          return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("❌ فشل الإجراء").setDescription(`حصل خطأ: ${err.message}`)], components: [] });
+        }
       }
 
       // ─── أزرار لوحة تحكم الأونر ──────────────────────────────────

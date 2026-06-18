@@ -1,0 +1,4 @@
+- [Games Architecture](games-arch.md) — games.js uses in-memory Maps (rouletteGames/mafiaGames/tttGames); channelGames prevents two games per channel; gameId uses Date.now()+random (no underscores, safe for customId splitting)
+- [Game Abilities](game-abilities.md) — stored in user.gameAbilities in server_database.json; methods on Database class; useGameAbility returns bool and auto-deletes when count reaches 0
+- [Gemini Keys Persistence](gemini-keys-persist.md) — extra keys saved to data/gemini-keys-extra.json via saveExtraKeys(); loaded at startup in collectKeys(); env keys always take priority; removeKey/setActiveKeyIndex exported
+- [Mod Confirm Flow](mod-confirm.md) — pendingModActions Map in index.js; 90s TTL; customId prefix modyes_/modno_ + actionId; only original moderator can confirm; ephemeral reply

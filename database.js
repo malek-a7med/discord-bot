@@ -200,6 +200,32 @@ class Database {
     }
   }
 
+  // ─── قدرات الألعاب ───────────────────────────────────────────
+  getGameAbilities(userId) {
+    const user = this.ensureUser(userId);
+    if (!user.gameAbilities) { user.gameAbilities = {}; this.save(); }
+    return user.gameAbilities;
+  }
+
+  hasGameAbility(userId, type) {
+    return (this.getGameAbilities(userId)[type] || 0) > 0;
+  }
+
+  addGameAbility(userId, type, count = 1) {
+    const a = this.getGameAbilities(userId);
+    a[type] = (a[type] || 0) + count;
+    this.save();
+  }
+
+  useGameAbility(userId, type) {
+    const a = this.getGameAbilities(userId);
+    if (!a[type] || a[type] <= 0) return false;
+    a[type]--;
+    if (a[type] === 0) delete a[type];
+    this.save();
+    return true;
+  }
+
   getAllData() {
     return this.data;
   }

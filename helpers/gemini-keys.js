@@ -3,7 +3,33 @@
 // ═══════════════════════════════════════════════════════════════
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ── جمع كل المفاتيح الموجودة في الـ env ──────────────────────
+import fs   from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname2    = path.dirname(fileURLToPath(import.meta.url));
+const EXTRA_KEYS_PATH = path.join(__dirname2, "../data/gemini-keys-extra.json");
+
+function loadExtraKeys() {
+  try {
+    if (fs.existsSync(EXTRA_KEYS_PATH)) {
+      const raw = fs.readFileSync(EXTRA_KEYS_PATH, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function saveExtraKeys(keys) {
+  try {
+    fs.writeFileSync(EXTRA_KEYS_PATH, JSON.stringify(keys, null, 2), "utf8");
+  } catch (e) {
+    console.error("❌ [GeminiKeys] فشل حفظ المفاتيح:", e.message);
+  }
+}
+
+// ── جمع كل المفاتيح الموجودة في الـ env + الملف المحفوظ ───────
 // بيدعم أشكال تسمية متعددة:
 //   GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, ...
 //   GEMINI_API_KEY, GEMINI_API_KEY_2, ...
@@ -30,6 +56,11 @@ function collectKeys() {
     const label = i === 1 ? "Gemini API Key" : `Gemini API Key ${i}`;
     const v = process.env[label];
     if (v) keys.add(v);
+  }
+
+  // المفاتيح المحفوظة في الملف (تبقى حتى بعد الريستارت)
+  for (const k of loadExtraKeys()) {
+    if (k) keys.add(k);
   }
 
   return [...keys];
@@ -181,8 +212,33 @@ export function addKeys(newKeys) {
     }
   }
   if (added.length > 0) {
-    // حدّث الموديلات عشان يشوفوا المفاتيح الجديدة (هما بيستخدموا نفس الـ _keys reference)
+    // احفظ كل المفاتيح المضافة يدوياً في الملف عشان تبقى بعد الريستارت
+    const existing = loadExtraKeys();
+    const merged   = [...new Set([...existing, ...added])];
+    saveExtraKeys(merged);
     console.log(`✅ [GeminiKeys] اتضافوا ${added.length} مفتاح جديد — إجمالي: ${_keys.length} (~${_keys.length * 1500} طلب/يوم)`);
+    console.log(`💾 [GeminiKeys] تم حفظ ${merged.length} مفتاح في الملف`);
   }
   return { added: added.length, total: _keys.length };
+}
+
+// ── حذف مفتاح معين (من الذاكرة والملف) ───────────────────────
+export function removeKey(index) {
+  if (index < 0 || index >= _keys.length) return false;
+  const removed = _keys.splice(index, 1)[0];
+  // أزله من الملف لو موجود فيه
+  const existing = loadExtraKeys();
+  const updated  = existing.filter(k => k !== removed);
+  saveExtraKeys(updated);
+  console.log(`🗑️ [GeminiKeys] تم حذف المفتاح رقم ${index + 1}`);
+  return true;
+}
+
+// ── تحديد مفتاح معين للاستخدام ─────────────────────────────
+export function setActiveKeyIndex(index) {
+  if (index < 0 || index >= _keys.length) return false;
+  _currentIndex = index;
+  exhaustedKeys.clear();
+  console.log(`🎯 [GeminiKeys] تم تحديد المفتاح رقم ${index + 1} للاستخدام`);
+  return true;
 }
