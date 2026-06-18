@@ -1,0 +1,507 @@
+2026-06-18T14:14:04.060524401Z [inf]  Starting Container
+2026-06-18T14:14:04.489808203Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:04.489819380Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:04.489823695Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:04.489827660Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:04.489831704Z [err]  }
+2026-06-18T14:14:04.489835955Z [err]  
+2026-06-18T14:14:04.489839632Z [err]  Node.js v20.18.1
+2026-06-18T14:14:04.489843414Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:04.489921392Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:04.489925014Z [inf]  
+2026-06-18T14:14:04.489928399Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:04.489932059Z [inf]  > node index.js
+2026-06-18T14:14:04.489935422Z [inf]  
+2026-06-18T14:14:04.489939209Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:04.489946071Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:04.489949835Z [err]            ^
+2026-06-18T14:14:04.489954203Z [err]  
+2026-06-18T14:14:04.489957710Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:04.489962299Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:04.489966251Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:04.489970141Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:04.489973359Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:04.489976686Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:04.489980160Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:04.490840311Z [inf]  
+2026-06-18T14:14:04.490843776Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:04.490846920Z [inf]  > node index.js
+2026-06-18T14:14:04.490850072Z [inf]  
+2026-06-18T14:14:04.497734876Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:04.497741961Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:04.497753242Z [err]            ^
+2026-06-18T14:14:04.497758457Z [err]  
+2026-06-18T14:14:04.497764254Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:04.497768807Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:04.497773587Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:04.497777861Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:04.497783596Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:04.497788239Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:04.497792649Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:04.497797024Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:04.497801017Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:04.497805168Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:04.497809474Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:04.497816470Z [err]  }
+2026-06-18T14:14:04.497820753Z [err]  
+2026-06-18T14:14:04.497824520Z [err]  Node.js v20.18.1
+2026-06-18T14:14:05.483850336Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:05.483855489Z [inf]  
+2026-06-18T14:14:05.483859902Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:05.483864609Z [inf]  > node index.js
+2026-06-18T14:14:05.483869120Z [inf]  
+2026-06-18T14:14:05.490758411Z [err]  }
+2026-06-18T14:14:05.490763468Z [err]  
+2026-06-18T14:14:05.490767496Z [err]  Node.js v20.18.1
+2026-06-18T14:14:05.490784060Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:05.490789285Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:05.490794233Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:05.490795588Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:05.490799058Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:05.490801295Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:05.490804634Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:05.490807149Z [err]            ^
+2026-06-18T14:14:05.490810642Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:05.490812110Z [err]  
+2026-06-18T14:14:05.490814816Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:05.490817900Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:05.490820887Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:05.490824181Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:05.490827465Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:06.502617826Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:06.502626751Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:06.502631839Z [err]  }
+2026-06-18T14:14:06.502636420Z [err]  
+2026-06-18T14:14:06.502641065Z [err]  Node.js v20.18.1
+2026-06-18T14:14:06.502655908Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:06.502659728Z [inf]  
+2026-06-18T14:14:06.502670351Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:06.502674146Z [inf]  > node index.js
+2026-06-18T14:14:06.502678411Z [inf]  
+2026-06-18T14:14:06.502682109Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:06.502685872Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:06.502689821Z [err]            ^
+2026-06-18T14:14:06.502692710Z [err]  
+2026-06-18T14:14:06.502696441Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:06.502699497Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:06.502702538Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:06.502705867Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:06.502709665Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:06.502712470Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:06.502715419Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:06.502718653Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:06.502722573Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:07.493929037Z [inf]  > node index.js
+2026-06-18T14:14:07.493932646Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:07.493936184Z [inf]  
+2026-06-18T14:14:07.493940816Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:07.493943905Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:07.493945301Z [err]  }
+2026-06-18T14:14:07.493947578Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:07.493953260Z [err]            ^
+2026-06-18T14:14:07.493954500Z [err]  
+2026-06-18T14:14:07.493954598Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:07.493961999Z [err]  
+2026-06-18T14:14:07.493964631Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:07.493965434Z [err]  Node.js v20.18.1
+2026-06-18T14:14:07.493969828Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:07.493970154Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:07.493977106Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:07.493977734Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:07.493982086Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:07.493984085Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:07.493986813Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:07.494216303Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:07.494223517Z [inf]  
+2026-06-18T14:14:07.494227502Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:08.502831018Z [err]  Node.js v20.18.1
+2026-06-18T14:14:08.502834677Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:08.502847411Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:08.502847448Z [inf]  
+2026-06-18T14:14:08.502849935Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:08.502856413Z [err]  }
+2026-06-18T14:14:08.502860112Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:08.502860230Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:08.502863695Z [err]  
+2026-06-18T14:14:08.502865270Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:08.502868574Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:08.502868580Z [inf]  > node index.js
+2026-06-18T14:14:08.502874691Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:08.502874821Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:08.502877550Z [inf]  
+2026-06-18T14:14:08.502882113Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:08.502884789Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:08.502887772Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:08.502892813Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:08.502894171Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:08.502898949Z [err]            ^
+2026-06-18T14:14:08.502903409Z [err]  
+2026-06-18T14:14:08.502908166Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:09.503573207Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:09.522257903Z [inf]  
+2026-06-18T14:14:09.522258798Z [inf]  
+2026-06-18T14:14:09.522263450Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:09.522268907Z [inf]  > node index.js
+2026-06-18T14:14:09.555725067Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:09.555732879Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:09.555738637Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:09.555742757Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:09.555748014Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:09.555748941Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:09.555752057Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:09.555756383Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:09.555758316Z [err]            ^
+2026-06-18T14:14:09.555762764Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:09.555763569Z [err]  
+2026-06-18T14:14:09.555768303Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:09.555770846Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:09.555775195Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:09.555779141Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:09.555783011Z [err]  }
+2026-06-18T14:14:09.555787390Z [err]  
+2026-06-18T14:14:09.555791616Z [err]  Node.js v20.18.1
+2026-06-18T14:14:10.525126773Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:10.525134657Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:10.525138323Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:10.525144247Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:10.525148098Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:10.525151376Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:10.525155062Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:10.525159210Z [err]  }
+2026-06-18T14:14:10.525162629Z [err]  
+2026-06-18T14:14:10.525167842Z [err]  Node.js v20.18.1
+2026-06-18T14:14:10.525170408Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:10.525174109Z [inf]  
+2026-06-18T14:14:10.525177664Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:10.525181963Z [inf]  > node index.js
+2026-06-18T14:14:10.525185670Z [inf]  
+2026-06-18T14:14:10.525189509Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:10.525192654Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:10.525196123Z [err]            ^
+2026-06-18T14:14:10.525199541Z [err]  
+2026-06-18T14:14:10.525203114Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:10.525207267Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:10.525210418Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:10.525213618Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:11.536578847Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:11.562665621Z [inf]  
+2026-06-18T14:14:11.562668790Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:11.562672245Z [inf]  > node index.js
+2026-06-18T14:14:11.562675592Z [inf]  
+2026-06-18T14:14:11.596563777Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:11.596571786Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:11.596575623Z [err]            ^
+2026-06-18T14:14:11.596579693Z [err]  
+2026-06-18T14:14:11.596584381Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:11.596588401Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:11.596592111Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:11.596595815Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:11.596599453Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:11.596603068Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:11.596607033Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:11.596610707Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:11.596614246Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:11.596617979Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:11.596621449Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:11.596625091Z [err]  }
+2026-06-18T14:14:11.596629862Z [err]  
+2026-06-18T14:14:11.596633591Z [err]  Node.js v20.18.1
+2026-06-18T14:14:12.603971342Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:12.622165632Z [inf]  
+2026-06-18T14:14:12.622171615Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:12.622175529Z [inf]  > node index.js
+2026-06-18T14:14:12.622179505Z [inf]  
+2026-06-18T14:14:12.652849420Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:12.652854703Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:12.652860393Z [err]            ^
+2026-06-18T14:14:12.652866161Z [err]  
+2026-06-18T14:14:12.652871290Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:12.652875864Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:12.652879173Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:12.652883093Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:12.652887199Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:12.652890774Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:12.652894241Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:14:12.652897431Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:12.652901196Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:12.652909770Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:12.652913071Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:12.652916343Z [err]  }
+2026-06-18T14:14:12.652919695Z [err]  
+2026-06-18T14:14:12.652923015Z [err]  Node.js v20.18.1
+2026-06-18T14:14:13.624820696Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:14:13.637227238Z [inf]  
+2026-06-18T14:14:13.637231722Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:14:13.637234612Z [inf]  > node index.js
+2026-06-18T14:14:13.637237495Z [inf]  
+2026-06-18T14:14:13.674049847Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:14:13.674055716Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:14:13.674059968Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:14:13.674062725Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:14:13.674068469Z [err]            ^
+2026-06-18T14:14:13.674070033Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:14:13.674074209Z [err]  
+2026-06-18T14:14:13.674077401Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:14:13.674081752Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:14:13.674084912Z [err]  }
+2026-06-18T14:14:13.674088690Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:14:13.674092770Z [err]  
+2026-06-18T14:14:13.674095732Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:14:13.674101517Z [err]  Node.js v20.18.1
+2026-06-18T14:14:13.674101971Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:14:13.674105902Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:14:13.674109524Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:14:13.674113014Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.872420637Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.872427314Z [inf]  
+2026-06-18T14:15:53.872432551Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.872436768Z [inf]  > node index.js
+2026-06-18T14:15:53.872440853Z [inf]  
+2026-06-18T14:15:53.872445313Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.872449005Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.872452201Z [err]            ^
+2026-06-18T14:15:53.872455059Z [err]  
+2026-06-18T14:15:53.872458526Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.872462373Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.872465727Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.872468731Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.872471851Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.872475146Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.872478435Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.872481549Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.872484721Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.872487867Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.872492025Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.872495104Z [err]  }
+2026-06-18T14:15:53.872499215Z [err]  
+2026-06-18T14:15:53.872502838Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.872506199Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.873697583Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.873743648Z [inf]  
+2026-06-18T14:15:53.873746678Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.873749610Z [inf]  > node index.js
+2026-06-18T14:15:53.873752490Z [inf]  
+2026-06-18T14:15:53.873755576Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.873759180Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.873781548Z [err]            ^
+2026-06-18T14:15:53.873784823Z [err]  
+2026-06-18T14:15:53.873787810Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.873790567Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.873793612Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.873797102Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.873799754Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.873802501Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.873805259Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.873808141Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.873810944Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.873814438Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.873817270Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.873820026Z [err]  }
+2026-06-18T14:15:53.873823550Z [err]  
+2026-06-18T14:15:53.873826314Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.873828928Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.873831421Z [inf]  
+2026-06-18T14:15:53.875220743Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.875225863Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.875229295Z [inf]  
+2026-06-18T14:15:53.875232381Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.875235393Z [inf]  > node index.js
+2026-06-18T14:15:53.875238898Z [inf]  
+2026-06-18T14:15:53.875265030Z [inf]  > node index.js
+2026-06-18T14:15:53.875267865Z [inf]  
+2026-06-18T14:15:53.875270851Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.875273843Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.875276575Z [err]            ^
+2026-06-18T14:15:53.875279518Z [err]  
+2026-06-18T14:15:53.875282655Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.875285553Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.875288193Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.875292611Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.875295417Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.875298164Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.875301015Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.875304477Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.875307189Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.875309997Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.875312737Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.875315422Z [err]  }
+2026-06-18T14:15:53.875318019Z [err]  
+2026-06-18T14:15:53.876811262Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.876813484Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.876816961Z [err]            ^
+2026-06-18T14:15:53.876821904Z [err]  }
+2026-06-18T14:15:53.876822267Z [err]  
+2026-06-18T14:15:53.876826887Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.876829671Z [err]  
+2026-06-18T14:15:53.876833239Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.876837140Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.876838430Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.876843192Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.876844839Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.876849561Z [inf]  
+2026-06-18T14:15:53.876851228Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.876855009Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.876856584Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.876860134Z [inf]  > node index.js
+2026-06-18T14:15:53.876861609Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.876865713Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.876868457Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.876871242Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.876873867Z [inf]  
+2026-06-18T14:15:53.876878056Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.876882396Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.878463002Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.878467852Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.878471676Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.878478339Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.878480576Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.878481202Z [err]  
+2026-06-18T14:15:53.878485877Z [err]  }
+2026-06-18T14:15:53.878491445Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.878493445Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.878495079Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.878498034Z [err]  
+2026-06-18T14:15:53.878500850Z [err]            ^
+2026-06-18T14:15:53.878502195Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.878503975Z [inf]  > node index.js
+2026-06-18T14:15:53.878504232Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.878506206Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.878506772Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.878512597Z [inf]  
+2026-06-18T14:15:53.878514815Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.878515135Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.878516364Z [inf]  
+2026-06-18T14:15:53.878519857Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.878521317Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.878530097Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.880132340Z [err]  
+2026-06-18T14:15:53.880138217Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.880143724Z [err]            ^
+2026-06-18T14:15:53.880145384Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.880149514Z [err]  
+2026-06-18T14:15:53.880151557Z [inf]  
+2026-06-18T14:15:53.880155664Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.880157628Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.880162377Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.880162999Z [inf]  > node index.js
+2026-06-18T14:15:53.880168104Z [inf]  
+2026-06-18T14:15:53.880168391Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.880173442Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.880174406Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.880180131Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.880180380Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.880185865Z [err]            ^
+2026-06-18T14:15:53.880188015Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.880191310Z [err]  
+2026-06-18T14:15:53.880195449Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.880198509Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.880201510Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.880205388Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.880208808Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.880211739Z [err]  }
+2026-06-18T14:15:53.881029147Z [inf]  
+2026-06-18T14:15:53.881034345Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.881039697Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.881041406Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.881046885Z [err]  
+2026-06-18T14:15:53.881048186Z [err]            ^
+2026-06-18T14:15:53.881051562Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.881054560Z [err]  
+2026-06-18T14:15:53.881058166Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.881060267Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.881063011Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.881067790Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.881069055Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.881075659Z [inf]  
+2026-06-18T14:15:53.881077289Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.881082874Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.881085026Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.881089551Z [inf]  > node index.js
+2026-06-18T14:15:53.881092359Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.881098802Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.881103193Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.881107701Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.881113634Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.881118077Z [err]  }
+2026-06-18T14:15:53.882657289Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.882657348Z [err]  
+2026-06-18T14:15:53.882663294Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.882665903Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.882667511Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.882671482Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.882676056Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.882676921Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.882683997Z [inf]  
+2026-06-18T14:15:53.882684151Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.882691576Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.882691867Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.882699459Z [inf]  > node index.js
+2026-06-18T14:15:53.882700650Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.882706750Z [inf]  
+2026-06-18T14:15:53.882706846Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.882713242Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.882716050Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.882720148Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.882723005Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.882725719Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.882730315Z [err]            ^
+2026-06-18T14:15:53.882732606Z [err]  }
+2026-06-18T14:15:53.882736077Z [err]  
+2026-06-18T14:15:53.883786446Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:53.883790082Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.883791810Z [inf]  > node index.js
+2026-06-18T14:15:53.883797764Z [inf]  
+2026-06-18T14:15:53.883798451Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.883802231Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.883805163Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.883807789Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.883811645Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.883815508Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.883819254Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.883823396Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:53.883827010Z [err]  }
+2026-06-18T14:15:53.883831860Z [err]  
+2026-06-18T14:15:53.883834821Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.883838287Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:53.883842321Z [inf]  
+2026-06-18T14:15:53.904723125Z [err]  }
+2026-06-18T14:15:53.904731218Z [err]  
+2026-06-18T14:15:53.904738568Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:53.904738668Z [err]  Node.js v20.18.1
+2026-06-18T14:15:53.904744020Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:53.904747274Z [err]            ^
+2026-06-18T14:15:53.904750586Z [err]  
+2026-06-18T14:15:53.904753777Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:53.904758035Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:53.904760772Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:53.904763504Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:53.904766311Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:53.904769209Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:53.904772984Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:53.904775785Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:53.904778561Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:53.904781077Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:53.904783690Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:54.903486758Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:15:54.922118952Z [inf]  
+2026-06-18T14:15:54.922123389Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:15:54.922126582Z [inf]  > node index.js
+2026-06-18T14:15:54.922129663Z [inf]  
+2026-06-18T14:15:54.960746249Z [err]  node:internal/modules/esm/resolve:265
+2026-06-18T14:15:54.960749859Z [err]      throw new ERR_MODULE_NOT_FOUND(
+2026-06-18T14:15:54.960753901Z [err]            ^
+2026-06-18T14:15:54.960758113Z [err]  
+2026-06-18T14:15:54.960762196Z [err]  Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/node_modules/dotenv/config' imported from /app/index.js
+2026-06-18T14:15:54.960765743Z [err]      at finalizeResolution (node:internal/modules/esm/resolve:265:11)
+2026-06-18T14:15:54.960769161Z [err]      at moduleResolve (node:internal/modules/esm/resolve:933:10)
+2026-06-18T14:15:54.960773258Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:15:54.960776957Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:15:54.960780077Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:15:54.960783650Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:15:54.960787111Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:15:54.960790871Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:15:54.960794257Z [err]    code: 'ERR_MODULE_NOT_FOUND',
+2026-06-18T14:15:54.960801235Z [err]    url: 'file:///app/node_modules/dotenv/config'
+2026-06-18T14:15:54.960804708Z [err]  }
+2026-06-18T14:15:54.960807952Z [err]  
+2026-06-18T14:15:54.960811492Z [err]  Node.js v20.18.1
