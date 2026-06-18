@@ -1,7 +1,3 @@
-import dotenv from 'dotenv';
-
-// تعديل المسار ليعمل من الفولدر الرئيسي مباشرة حيث يوجد ملف الـ .env
-dotenv.config({ path: './.env' });
 
 class Config {
   constructor() {
