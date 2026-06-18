@@ -279,6 +279,10 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
       parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 25000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
+      const isQuota = err.message?.includes("429") || err.message?.includes("quota") || err.message?.includes("EXHAUSTED");
+      if (isQuota) {
+        return send("⏳ مفاتيح الـ AI وصلت للحد اليومي — بتتجدد في منتصف الليل تلقائياً!\nلو عايز تستخدمه دلوقتي، اضف مفتاح API جديد.");
+      }
       return send("❌ الـ AI اتأخر أكتر من المعتاد، حاول تاني بعد ثانية!");
     }
 
