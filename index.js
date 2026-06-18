@@ -8,8 +8,7 @@
 //     5. إصلاح خطأ require() داخل ES Module
 //     6. Express server يستخدم process.env.PORT
 // ═══════════════════════════════════════════════════════════════
-import dotenv from "dotenv";
-dotenv.config();
+import "dotenv/config";
 
 // ───────────────────────────────────────────────────────────────
 //  Advanced Features Imports

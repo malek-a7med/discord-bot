@@ -1,0 +1,760 @@
+2026-06-18T14:02:40.536157807Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:40.536164297Z [err]  Node.js v20.18.1
+2026-06-18T14:02:40.536165357Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:40.536165597Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:40.536169637Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:40.536173247Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:40.536176896Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:40.536180936Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:40.536181866Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:40.536185816Z [err]  }
+2026-06-18T14:02:40.536192776Z [err]  
+2026-06-18T14:02:40.536194866Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:40.536199846Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:40.536263966Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:40.536270445Z [inf]  
+2026-06-18T14:02:40.536279825Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:40.536285325Z [inf]  > node index.js
+2026-06-18T14:02:40.536290495Z [inf]  
+2026-06-18T14:02:40.536295215Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:40.536310825Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:40.536317055Z [err]                           ^
+2026-06-18T14:02:40.536322315Z [err]  
+2026-06-18T14:02:40.536327135Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:41.167651600Z [inf]  Starting Container
+2026-06-18T14:02:41.196349447Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:41.211791295Z [inf]  
+2026-06-18T14:02:41.211794805Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:41.211797995Z [inf]  > node index.js
+2026-06-18T14:02:41.211801655Z [inf]  
+2026-06-18T14:02:41.242629632Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:41.242632752Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:41.242635522Z [err]                           ^
+2026-06-18T14:02:41.242637982Z [err]  
+2026-06-18T14:02:41.242640622Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:41.242643412Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:41.242645932Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:41.242648842Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:41.242651402Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:41.242653842Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:41.242656342Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:41.242658752Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:41.242660962Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:41.242663492Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:41.242666152Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:41.242668861Z [err]  }
+2026-06-18T14:02:41.242671341Z [err]  
+2026-06-18T14:02:41.242673981Z [err]  Node.js v20.18.1
+2026-06-18T14:02:42.075741689Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:42.092317476Z [inf]  
+2026-06-18T14:02:42.092321926Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:42.092327046Z [inf]  > node index.js
+2026-06-18T14:02:42.092329896Z [inf]  
+2026-06-18T14:02:42.119873517Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:42.119879827Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:42.119884507Z [err]                           ^
+2026-06-18T14:02:42.119888907Z [err]  
+2026-06-18T14:02:42.119893056Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:42.119897036Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:42.119900986Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:42.119904876Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:42.119910586Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:42.119914056Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:42.119917516Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:42.119921146Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:42.119925036Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:42.119928956Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:42.119932536Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:42.119936516Z [err]  }
+2026-06-18T14:02:42.119941346Z [err]  
+2026-06-18T14:02:42.119945166Z [err]  Node.js v20.18.1
+2026-06-18T14:02:42.961847862Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:42.978920422Z [inf]  
+2026-06-18T14:02:42.978924192Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:42.978927442Z [inf]  > node index.js
+2026-06-18T14:02:42.978930412Z [inf]  
+2026-06-18T14:02:43.019147301Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:43.019152911Z [err]  }
+2026-06-18T14:02:43.019156621Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:43.019159091Z [err]  
+2026-06-18T14:02:43.019160371Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:43.019162401Z [err]  Node.js v20.18.1
+2026-06-18T14:02:43.019163191Z [err]                           ^
+2026-06-18T14:02:43.019165791Z [err]  
+2026-06-18T14:02:43.019168261Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:43.019170591Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:43.019173071Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:43.019175621Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:43.019178351Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:43.019180861Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:43.019183181Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:43.019186671Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:43.019189441Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:43.019192071Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:43.897668492Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:43.916337117Z [inf]  
+2026-06-18T14:02:43.916339937Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:43.916342977Z [inf]  > node index.js
+2026-06-18T14:02:43.916345557Z [inf]  
+2026-06-18T14:02:43.949168422Z [err]  
+2026-06-18T14:02:43.949175192Z [err]  Node.js v20.18.1
+2026-06-18T14:02:43.949199232Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:43.949202082Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:43.949204942Z [err]                           ^
+2026-06-18T14:02:43.949207871Z [err]  
+2026-06-18T14:02:43.949210641Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:43.949213121Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:43.949216601Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:43.949221061Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:43.949223551Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:43.949226061Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:43.949228581Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:43.949231421Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:43.949234071Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:43.949236921Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:43.949240141Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:43.949242721Z [err]  }
+2026-06-18T14:02:44.806936691Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:44.825400848Z [inf]  
+2026-06-18T14:02:44.825404228Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:44.825407887Z [inf]  > node index.js
+2026-06-18T14:02:44.825411457Z [inf]  
+2026-06-18T14:02:44.854189016Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:44.854196616Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:44.854201496Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:44.854205456Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:44.854209166Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:44.854213266Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:44.854216845Z [err]  }
+2026-06-18T14:02:44.854220845Z [err]  
+2026-06-18T14:02:44.854225025Z [err]  Node.js v20.18.1
+2026-06-18T14:02:44.854239775Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:44.854242825Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:44.854245545Z [err]                           ^
+2026-06-18T14:02:44.854248415Z [err]  
+2026-06-18T14:02:44.854251305Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:44.854253925Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:44.854257375Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:44.854260105Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:44.854262845Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:45.737616436Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:45.753374811Z [inf]  > node index.js
+2026-06-18T14:02:45.753380771Z [inf]  
+2026-06-18T14:02:45.753430990Z [inf]  
+2026-06-18T14:02:45.753433980Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:45.787492243Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:45.787496923Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:45.787501333Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:45.787509553Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:45.787509783Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:45.787514783Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:45.787517743Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:45.787517983Z [err]                           ^
+2026-06-18T14:02:45.787521973Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:45.787524683Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:45.787525773Z [err]  
+2026-06-18T14:02:45.787529853Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:45.787535653Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:45.787536483Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:45.787538112Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:45.787543432Z [err]  }
+2026-06-18T14:02:45.787548322Z [err]  
+2026-06-18T14:02:45.787552552Z [err]  Node.js v20.18.1
+2026-06-18T14:02:46.720761421Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:46.737867861Z [inf]  
+2026-06-18T14:02:46.737871761Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:46.737874961Z [inf]  > node index.js
+2026-06-18T14:02:46.737878031Z [inf]  
+2026-06-18T14:02:46.773015033Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:46.773025303Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:46.773027263Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:46.773031803Z [err]                           ^
+2026-06-18T14:02:46.773038053Z [err]  
+2026-06-18T14:02:46.773041113Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:46.773044333Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:46.773048793Z [err]  }
+2026-06-18T14:02:46.773051683Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:46.773055663Z [err]  
+2026-06-18T14:02:46.773060973Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:46.773061963Z [err]  Node.js v20.18.1
+2026-06-18T14:02:46.773066363Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:46.773071063Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:46.773074363Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:46.773078063Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:46.773081813Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:46.773085932Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:47.625631416Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:47.640959886Z [inf]  
+2026-06-18T14:02:47.640962946Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:47.640966076Z [inf]  > node index.js
+2026-06-18T14:02:47.640968876Z [inf]  
+2026-06-18T14:02:47.677155476Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:47.677160396Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:47.677164356Z [err]                           ^
+2026-06-18T14:02:47.677168196Z [err]  
+2026-06-18T14:02:47.677171876Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:47.677175266Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:47.677179216Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:47.677183396Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:47.677187496Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:47.677191356Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:47.677195006Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:47.677198786Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:47.677202496Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:47.677207236Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:47.677211556Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:47.677215756Z [err]  }
+2026-06-18T14:02:47.677219296Z [err]  
+2026-06-18T14:02:47.677223156Z [err]  Node.js v20.18.1
+2026-06-18T14:02:48.528084347Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:48.533658888Z [inf]  
+2026-06-18T14:02:48.533661618Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:48.533664988Z [inf]  > node index.js
+2026-06-18T14:02:48.533668208Z [inf]  
+2026-06-18T14:02:48.567670622Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:48.567681072Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:48.567686041Z [err]                           ^
+2026-06-18T14:02:48.567689991Z [err]  
+2026-06-18T14:02:48.567694081Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:48.567699391Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:02:48.567702761Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:48.567707021Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:48.567713211Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:48.567718031Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:48.567722521Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:48.567726851Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:48.567730711Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:48.567734771Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:48.567737891Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:48.567743021Z [err]  }
+2026-06-18T14:02:48.567747011Z [err]  
+2026-06-18T14:02:48.567751741Z [err]  Node.js v20.18.1
+2026-06-18T14:02:49.483329604Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:02:49.483340554Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:02:49.483342054Z [err]  
+2026-06-18T14:02:49.483347444Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:02:49.483352003Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:02:49.483358993Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:02:49.483359643Z [err]  Node.js v20.18.1
+2026-06-18T14:02:49.483366273Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:02:49.483370523Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:02:49.483375503Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:02:49.483380473Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:02:49.483384913Z [err]  }
+2026-06-18T14:02:49.483409373Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:02:49.483413563Z [inf]  
+2026-06-18T14:02:49.483417133Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:02:49.483420923Z [inf]  > node index.js
+2026-06-18T14:02:49.483424783Z [inf]  
+2026-06-18T14:02:49.483428183Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:02:49.483431883Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:02:49.483435923Z [err]                           ^
+2026-06-18T14:02:49.483442242Z [err]  
+2026-06-18T14:02:49.483448342Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:02:49.483453582Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.391496240Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.391496850Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.391503420Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.391504110Z [inf]  
+2026-06-18T14:06:19.391507010Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.391508300Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.391511300Z [err]  }
+2026-06-18T14:06:19.391521230Z [err]  
+2026-06-18T14:06:19.391523510Z [inf]  > node index.js
+2026-06-18T14:06:19.391528540Z [err]  Node.js v20.18.1
+2026-06-18T14:06:19.391534220Z [inf]  
+2026-06-18T14:06:19.391541199Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.391546479Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.391551349Z [err]                           ^
+2026-06-18T14:06:19.391555569Z [err]  
+2026-06-18T14:06:19.391559729Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.391563919Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.391568439Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.391572989Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.391577539Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.391585689Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.391589869Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.391594379Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.392394100Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.392398130Z [inf]  
+2026-06-18T14:06:19.392402550Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.392406250Z [inf]  > node index.js
+2026-06-18T14:06:19.392410150Z [inf]  
+2026-06-18T14:06:19.392414260Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.392417610Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.392421270Z [err]                           ^
+2026-06-18T14:06:19.392424800Z [err]  
+2026-06-18T14:06:19.392428270Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.392431770Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.392435230Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.392438690Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.392443150Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.392447270Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.392450380Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.392453459Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.392456599Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.392459719Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.392463259Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.392466459Z [err]  }
+2026-06-18T14:06:19.392470099Z [err]  
+2026-06-18T14:06:19.392473279Z [err]  Node.js v20.18.1
+2026-06-18T14:06:19.393482049Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.393486469Z [inf]  
+2026-06-18T14:06:19.393490199Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.393493639Z [inf]  > node index.js
+2026-06-18T14:06:19.393496899Z [inf]  
+2026-06-18T14:06:19.393499999Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.393503269Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.393507609Z [err]                           ^
+2026-06-18T14:06:19.393510949Z [err]  
+2026-06-18T14:06:19.393514159Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.393517459Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.393520519Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.393524049Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.393527889Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.393531069Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.393534379Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.393537729Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.393541129Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.393544749Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.393548128Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.393551488Z [err]  }
+2026-06-18T14:06:19.393554918Z [err]  
+2026-06-18T14:06:19.393558788Z [err]  Node.js v20.18.1
+2026-06-18T14:06:19.394357300Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.394360690Z [inf]  
+2026-06-18T14:06:19.394364790Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.394432349Z [inf]  > node index.js
+2026-06-18T14:06:19.394435799Z [inf]  
+2026-06-18T14:06:19.394439269Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.394442709Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.394446199Z [err]                           ^
+2026-06-18T14:06:19.394449639Z [err]  
+2026-06-18T14:06:19.394453219Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.394456279Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.394459479Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.394463078Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.394466868Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.394470228Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.394473618Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.394476698Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.394480248Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.394483978Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.394500588Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.394504338Z [err]  }
+2026-06-18T14:06:19.394508008Z [err]  
+2026-06-18T14:06:19.394511588Z [err]  Node.js v20.18.1
+2026-06-18T14:06:19.395732346Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.395738246Z [inf]  
+2026-06-18T14:06:19.395741546Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.395744936Z [inf]  > node index.js
+2026-06-18T14:06:19.395748486Z [inf]  
+2026-06-18T14:06:19.395753095Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.395756895Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.395761115Z [err]                           ^
+2026-06-18T14:06:19.395765015Z [err]  
+2026-06-18T14:06:19.395768315Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.395784045Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.395787545Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.395791565Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.395795005Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.395798205Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.395802075Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.395808735Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.395808845Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.395814685Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.395899264Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.395905044Z [err]  }
+2026-06-18T14:06:19.395909124Z [err]  
+2026-06-18T14:06:19.395913514Z [err]  Node.js v20.18.1
+2026-06-18T14:06:19.396957692Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.396963292Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.396967092Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.396970492Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.396973992Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.396980422Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.396980882Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.396987732Z [err]  }
+2026-06-18T14:06:19.396988712Z [inf]  
+2026-06-18T14:06:19.396992992Z [err]  
+2026-06-18T14:06:19.396995702Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.396999472Z [err]  Node.js v20.18.1
+2026-06-18T14:06:19.397002382Z [inf]  > node index.js
+2026-06-18T14:06:19.397007802Z [inf]  
+2026-06-18T14:06:19.397011472Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.397016482Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.397020612Z [err]                           ^
+2026-06-18T14:06:19.397024342Z [err]  
+2026-06-18T14:06:19.397028572Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.397032122Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.397035562Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.397039152Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.397042522Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.397856743Z [err]  }
+2026-06-18T14:06:19.397861543Z [err]  
+2026-06-18T14:06:19.397865723Z [err]  Node.js v20.18.1
+2026-06-18T14:06:19.397871113Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.397875312Z [inf]  
+2026-06-18T14:06:19.397878912Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.397882212Z [inf]  > node index.js
+2026-06-18T14:06:19.397885552Z [inf]  
+2026-06-18T14:06:19.397890912Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.397894652Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.397898502Z [err]                           ^
+2026-06-18T14:06:19.397902042Z [err]  
+2026-06-18T14:06:19.397905872Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.397909662Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.397913162Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.397916462Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.397921922Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.397924782Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.397927872Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.397931252Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.397934782Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.397938032Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.397941452Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.622556407Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:19.640894294Z [inf]  
+2026-06-18T14:06:19.640897044Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:19.640899374Z [inf]  > node index.js
+2026-06-18T14:06:19.640902344Z [inf]  
+2026-06-18T14:06:19.672820899Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:19.672825969Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:19.672830539Z [err]                           ^
+2026-06-18T14:06:19.672833759Z [err]  
+2026-06-18T14:06:19.672837159Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:19.672841329Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:19.672844519Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:19.672847659Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:19.672850909Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:19.672853939Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:19.672856879Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:19.672859739Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:19.672863319Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:19.672866279Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:19.672869429Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:19.672872449Z [err]  }
+2026-06-18T14:06:19.672875549Z [err]  
+2026-06-18T14:06:19.672880298Z [err]  Node.js v20.18.1
+2026-06-18T14:06:20.563501168Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:20.586844123Z [inf]  
+2026-06-18T14:06:20.586847483Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:20.586850723Z [inf]  > node index.js
+2026-06-18T14:06:20.586854303Z [inf]  
+2026-06-18T14:06:20.631633013Z [err]  
+2026-06-18T14:06:20.631641793Z [err]  Node.js v20.18.1
+2026-06-18T14:06:20.631653433Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:20.631657883Z [err]                           ^
+2026-06-18T14:06:20.631661533Z [err]  
+2026-06-18T14:06:20.631666123Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:20.631670413Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:20.631674693Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:20.631679403Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:20.631683313Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:20.631687753Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:20.631691653Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:20.631691903Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:20.631694893Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:20.631698033Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:20.631701323Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:20.631705023Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:20.631708793Z [err]  }
+2026-06-18T14:06:21.703689059Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:21.720988758Z [inf]  
+2026-06-18T14:06:21.720993618Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:21.720997228Z [inf]  > node index.js
+2026-06-18T14:06:21.721001518Z [inf]  
+2026-06-18T14:06:21.902776850Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:21.902779310Z [err]  Node.js v20.18.1
+2026-06-18T14:06:21.902781330Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:21.902785790Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:21.902785920Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:21.902790520Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:21.902793270Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:21.902794600Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:21.902797310Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:21.902806010Z [err]  }
+2026-06-18T14:06:21.902808680Z [err]  
+2026-06-18T14:06:21.902846290Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:21.902850580Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:21.902853980Z [err]                           ^
+2026-06-18T14:06:21.902858379Z [err]  
+2026-06-18T14:06:21.902864829Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:21.902870099Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:21.902874299Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:22.579873080Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:06:22.595494676Z [inf]  
+2026-06-18T14:06:22.595499036Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:06:22.595501376Z [inf]  > node index.js
+2026-06-18T14:06:22.595503726Z [inf]  
+2026-06-18T14:06:22.623559252Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:06:22.623562752Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:06:22.623567821Z [err]                           ^
+2026-06-18T14:06:22.623570741Z [err]  
+2026-06-18T14:06:22.623574011Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:06:22.623577071Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:06:22.623580081Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:06:22.623582331Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:06:22.623585151Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:06:22.623587761Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:06:22.623590911Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:06:22.623593641Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:06:22.623596171Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:06:22.623598461Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:06:22.623600751Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:06:22.623603081Z [err]  }
+2026-06-18T14:06:22.623606771Z [err]  
+2026-06-18T14:06:22.623609631Z [err]  Node.js v20.18.1
+2026-06-18T14:07:02.633718034Z [err]  Node.js v20.18.1
+2026-06-18T14:07:02.633726204Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:02.633731124Z [inf]  
+2026-06-18T14:07:02.633735014Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:02.633738304Z [inf]  > node index.js
+2026-06-18T14:07:02.633743074Z [inf]  
+2026-06-18T14:07:02.633747614Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:02.633751634Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:02.633755604Z [err]                           ^
+2026-06-18T14:07:02.633759284Z [err]  
+2026-06-18T14:07:02.633763263Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:02.633766883Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:02.633770163Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:02.633774793Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:02.633778033Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:02.633782353Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:02.633785883Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:02.633788993Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:02.633792433Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:02.633795913Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:02.633799523Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:02.633803223Z [err]  }
+2026-06-18T14:07:02.633806543Z [err]  
+2026-06-18T14:07:02.634756193Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:02.634759553Z [inf]  
+2026-06-18T14:07:02.634762923Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:02.634766313Z [inf]  > node index.js
+2026-06-18T14:07:02.634769203Z [inf]  
+2026-06-18T14:07:02.664126614Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:02.664130604Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:02.664135494Z [err]                           ^
+2026-06-18T14:07:02.664140324Z [err]  
+2026-06-18T14:07:02.664144764Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:02.664150384Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:02.664155254Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:02.664159524Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:02.664163524Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:02.664167424Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:02.664172134Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:02.664175704Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:02.664179494Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:02.664183374Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:02.664187923Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:02.664192133Z [err]  }
+2026-06-18T14:07:02.664197973Z [err]  
+2026-06-18T14:07:02.664201763Z [err]  Node.js v20.18.1
+2026-06-18T14:07:03.540938257Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:03.559894609Z [inf]  
+2026-06-18T14:07:03.559899329Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:03.559902169Z [inf]  > node index.js
+2026-06-18T14:07:03.559905669Z [inf]  
+2026-06-18T14:07:03.598833290Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:03.598835670Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:03.598839310Z [err]                           ^
+2026-06-18T14:07:03.598841760Z [err]  
+2026-06-18T14:07:03.598844040Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:03.598846460Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:03.598849710Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:03.598853010Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:03.598855250Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:03.598857490Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:03.598859750Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:03.598862000Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:03.598864440Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:03.598867850Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:03.598870140Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:03.598872520Z [err]  }
+2026-06-18T14:07:03.598874790Z [err]  
+2026-06-18T14:07:03.598877030Z [err]  Node.js v20.18.1
+2026-06-18T14:07:04.647745798Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:04.668549830Z [inf]  
+2026-06-18T14:07:04.668553140Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:04.668558540Z [inf]  > node index.js
+2026-06-18T14:07:04.668562760Z [inf]  
+2026-06-18T14:07:04.702365675Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:04.702369075Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:04.702371615Z [err]                           ^
+2026-06-18T14:07:04.702374075Z [err]  
+2026-06-18T14:07:04.702376815Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:04.702379215Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:04.702381515Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:04.702383025Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:04.702385485Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:04.702389135Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:04.702389185Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:04.702393305Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:04.702393545Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:04.702397135Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:04.702398275Z [err]  }
+2026-06-18T14:07:04.702400785Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:04.702402655Z [err]  
+2026-06-18T14:07:04.702406265Z [err]  Node.js v20.18.1
+2026-06-18T14:07:05.540642372Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:05.557131799Z [inf]  
+2026-06-18T14:07:05.557137779Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:05.557142539Z [inf]  > node index.js
+2026-06-18T14:07:05.557146759Z [inf]  
+2026-06-18T14:07:05.589827766Z [err]  Node.js v20.18.1
+2026-06-18T14:07:05.589833746Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:05.589833766Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:05.589847096Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:05.589847106Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:05.589851216Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:05.589856566Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:05.589858226Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:05.589866786Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:05.589867066Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:05.589867196Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:05.589874306Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:05.589876176Z [err]                           ^
+2026-06-18T14:07:05.589876346Z [err]  }
+2026-06-18T14:07:05.589884306Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:05.589885186Z [err]  
+2026-06-18T14:07:05.589885486Z [err]  
+2026-06-18T14:07:05.589891196Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:06.426997305Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:06.439984729Z [inf]  
+2026-06-18T14:07:06.439988409Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:06.439991239Z [inf]  > node index.js
+2026-06-18T14:07:06.439993599Z [inf]  
+2026-06-18T14:07:06.473367269Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:06.473371799Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:06.473375789Z [err]                           ^
+2026-06-18T14:07:06.473380828Z [err]  
+2026-06-18T14:07:06.473384988Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:06.473389698Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:06.473393798Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:06.473398728Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:06.473403268Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:06.473407468Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:06.473412388Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:06.473417098Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:06.473421638Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:06.473426218Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:06.473430718Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:06.473435518Z [err]  }
+2026-06-18T14:07:06.473440148Z [err]  
+2026-06-18T14:07:06.473444778Z [err]  Node.js v20.18.1
+2026-06-18T14:07:07.583775251Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:07.598302349Z [inf]  
+2026-06-18T14:07:07.598306898Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:07.598310738Z [inf]  > node index.js
+2026-06-18T14:07:07.598315408Z [inf]  
+2026-06-18T14:07:07.628317114Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:07.628323234Z [err]  }
+2026-06-18T14:07:07.628329144Z [err]  
+2026-06-18T14:07:07.628331764Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:07.628335274Z [err]  Node.js v20.18.1
+2026-06-18T14:07:07.628341624Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:07.628344874Z [err]                           ^
+2026-06-18T14:07:07.628348794Z [err]  
+2026-06-18T14:07:07.628352034Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:07.628355974Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:07.628359784Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:07.628363613Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:07.628367043Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:07.628371113Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:07.628374563Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:07.628377793Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:07.628381053Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:07.628385953Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:08.523123668Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:08.539482526Z [inf]  
+2026-06-18T14:07:08.539486056Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:08.539488446Z [inf]  > node index.js
+2026-06-18T14:07:08.539490856Z [inf]  
+2026-06-18T14:07:08.567600892Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:08.567609042Z [err]  }
+2026-06-18T14:07:08.567614211Z [err]  
+2026-06-18T14:07:08.567618801Z [err]  Node.js v20.18.1
+2026-06-18T14:07:08.567632811Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:08.567635521Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:08.567638281Z [err]                           ^
+2026-06-18T14:07:08.567642621Z [err]  
+2026-06-18T14:07:08.567645581Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:08.567648071Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:08.567651201Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:08.567654001Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:08.567656781Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:08.567659251Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:08.567662051Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:08.567664681Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:08.567667981Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:08.567670941Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:09.398328197Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:09.412421220Z [inf]  
+2026-06-18T14:07:09.412427020Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:09.412442490Z [inf]  > node index.js
+2026-06-18T14:07:09.412446910Z [inf]  
+2026-06-18T14:07:09.444945069Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:09.444951379Z [err]  }
+2026-06-18T14:07:09.444955609Z [err]  
+2026-06-18T14:07:09.444959598Z [err]  Node.js v20.18.1
+2026-06-18T14:07:09.444994368Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:09.444996908Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:09.445011648Z [err]                           ^
+2026-06-18T14:07:09.445020438Z [err]  
+2026-06-18T14:07:09.445025578Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:09.445030938Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:09.445039378Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:09.445044168Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:09.445058157Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:09.445062717Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:09.445066497Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:09.445070317Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:09.445073997Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:09.445078567Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:10.265235134Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:10.280326996Z [inf]  
+2026-06-18T14:07:10.280330876Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:10.280334226Z [inf]  > node index.js
+2026-06-18T14:07:10.280337726Z [inf]  
+2026-06-18T14:07:10.322341705Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:10.322345745Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:10.322349315Z [err]                           ^
+2026-06-18T14:07:10.322351964Z [err]  
+2026-06-18T14:07:10.322354444Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:10.322357704Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:10.322360214Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:10.322362714Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:10.322365284Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:10.322367934Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:10.322370574Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:10.322373384Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:10.322376004Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:10.322378574Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:10.322380984Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:10.322383594Z [err]  }
+2026-06-18T14:07:10.322386374Z [err]  
+2026-06-18T14:07:10.322389134Z [err]  Node.js v20.18.1
+2026-06-18T14:07:11.201576552Z [err]  npm warn config production Use `--omit=dev` instead.
+2026-06-18T14:07:11.215547156Z [inf]  
+2026-06-18T14:07:11.215551566Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-18T14:07:11.215556226Z [inf]  > node index.js
+2026-06-18T14:07:11.215560146Z [inf]  
+2026-06-18T14:07:11.251324461Z [err]  node:internal/modules/esm/resolve:215
+2026-06-18T14:07:11.251329531Z [err]    const resolvedOption = FSLegacyMainResolve(packageJsonUrlString, packageConfig.main, baseStringified);
+2026-06-18T14:07:11.251335801Z [err]                           ^
+2026-06-18T14:07:11.251341491Z [err]  
+2026-06-18T14:07:11.251345511Z [err]  Error: Cannot find package '/app/node_modules/dotenv/index.js' imported from /app/index.js
+2026-06-18T14:07:11.251348971Z [err]      at legacyMainResolve (node:internal/modules/esm/resolve:215:26)
+2026-06-18T14:07:11.251352881Z [err]      at packageResolve (node:internal/modules/esm/resolve:841:14)
+2026-06-18T14:07:11.251356491Z [err]      at moduleResolve (node:internal/modules/esm/resolve:927:18)
+2026-06-18T14:07:11.251360351Z [err]      at defaultResolve (node:internal/modules/esm/resolve:1169:11)
+2026-06-18T14:07:11.251364131Z [err]      at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:542:12)
+2026-06-18T14:07:11.251367771Z [err]      at ModuleLoader.resolve (node:internal/modules/esm/loader:510:25)
+2026-06-18T14:07:11.251371311Z [err]      at ModuleLoader.getModuleJob (node:internal/modules/esm/loader:239:38)
+2026-06-18T14:07:11.251374660Z [err]      at ModuleWrap.<anonymous> (node:internal/modules/esm/module_job:96:40)
+2026-06-18T14:07:11.251377720Z [err]      at link (node:internal/modules/esm/module_job:95:36) {
+2026-06-18T14:07:11.251381000Z [err]    code: 'ERR_MODULE_NOT_FOUND'
+2026-06-18T14:07:11.251386030Z [err]  }
+2026-06-18T14:07:11.251390070Z [err]  
+2026-06-18T14:07:11.251393770Z [err]  Node.js v20.18.1
