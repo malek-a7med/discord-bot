@@ -97,14 +97,28 @@ class RotatingGeminiModel {
         markAvailable(key);
         return result;
       } catch (err) {
-        if (err.message?.includes("429") || err.message?.includes("quota")) {
+        lastErr = err;
+        const is429 = err.message?.includes("429") || err.message?.includes("quota") || err.message?.includes("EXHAUSTED");
+        const is503 = err.message?.includes("503") || err.message?.includes("Service Unavailable") || err.message?.includes("high demand") || err.message?.includes("overloaded");
+
+        if (is429) {
           markExhausted(key);
-          lastErr = err;
-          // لو في مفتاح تاني متاح، روح عليه فوراً بدون استنا
           const hasAnotherKey = this.keys.some(k => k !== key && !isExhausted(k));
-          if (!hasAnotherKey) {
-            // مفيش مفاتيح تانية — استنى وقت قصير وبعدين افشل
-            await new Promise(r => setTimeout(r, 2000));
+          if (!hasAnotherKey) await new Promise(r => setTimeout(r, 2000));
+        } else if (is503 && this.modelName !== "gemini-2.0-flash-lite") {
+          // الموديل مزحوم — جرّب الـ fallback فوراً بنفس المفتاح
+          console.warn(`⚠️ [GeminiKeys] ${this.modelName} مزحوم (503) — بيتحول لـ gemini-2.0-flash-lite`);
+          try {
+            const genAI = new GoogleGenerativeAI(key);
+            const opts  = { model: "gemini-2.0-flash-lite" };
+            if (this.systemInstruction) opts.systemInstruction = this.systemInstruction;
+            const fallback = genAI.getGenerativeModel(opts);
+            const result   = await fallback.generateContent(prompt);
+            markAvailable(key);
+            return result;
+          } catch (fallbackErr) {
+            lastErr = fallbackErr;
+            throw fallbackErr;
           }
         } else {
           throw err;
