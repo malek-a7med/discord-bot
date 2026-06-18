@@ -3,7 +3,7 @@ nixPkgs = ["nodejs_22", "ffmpeg", "python3", "vips", "pkg-config"]
 
 [phases.install]
 cmds = [
-  "npm install --no-audit --no-fund --ignore-scripts",
+  "NODE_OPTIONS=--max-old-space-size=1024 npm ci --no-audit --ignore-scripts",
   "npm rebuild sharp --no-audit",
 ]
 
