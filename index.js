@@ -1139,7 +1139,9 @@ client.on("messageCreate", async (msg) => {
     try {
       const senderName = msg.author.globalName || msg.author.username;
       const prompt     = buildUserPrompt(senderName, question, msg.author.id);
-      const result     = await geminiModel().generateContent(prompt);
+      const aiPromise  = geminiModel().generateContent(prompt);
+      const timeout    = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000));
+      const result     = await Promise.race([aiPromise, timeout]);
       const reply      = result.response.text().trim();
       pushUserHistory(msg.author.id, "user", question);
       pushUserHistory(msg.author.id, "bot",  reply);

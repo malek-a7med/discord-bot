@@ -54,7 +54,7 @@ async function withRetry(fn, retries = 1, delayMs = 800) {
 }
 
 // ── Timeout ─────────────────────────────────────────────────────
-function withTimeout(promise, ms = 25000) {
+function withTimeout(promise, ms = 60000) {
   return Promise.race([
     promise,
     new Promise((_, reject) =>
@@ -276,7 +276,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 25000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 60000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
       const isQuota = err.message?.includes("429") || err.message?.includes("quota") || err.message?.includes("EXHAUSTED");
