@@ -4,15 +4,35 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // ── جمع كل المفاتيح الموجودة في الـ env ──────────────────────
+// بيدعم أشكال تسمية متعددة:
+//   GOOGLE_API_KEY, GOOGLE_API_KEY_2, GOOGLE_API_KEY_3, ...
+//   GEMINI_API_KEY, GEMINI_API_KEY_2, ...
+//   "Gemini API Key 2", "Gemini API Key 3", ... (Railway naming)
 function collectKeys() {
-  const keys = [];
-  if (process.env.GOOGLE_API_KEY)   keys.push(process.env.GOOGLE_API_KEY);
-  let i = 2;
-  while (process.env[`GOOGLE_API_KEY_${i}`]) {
-    keys.push(process.env[`GOOGLE_API_KEY_${i}`]);
-    i++;
+  const keys = new Set();
+
+  // الشكل الأساسي
+  if (process.env.GOOGLE_API_KEY)  keys.add(process.env.GOOGLE_API_KEY);
+  if (process.env.GEMINI_API_KEY)  keys.add(process.env.GEMINI_API_KEY);
+
+  // GOOGLE_API_KEY_N و GEMINI_API_KEY_N
+  for (let i = 2; i <= 30; i++) {
+    const g = process.env[`GOOGLE_API_KEY_${i}`];
+    const m = process.env[`GEMINI_API_KEY_${i}`];
+    if (g) keys.add(g);
+    if (m) keys.add(m);
+    // توقف لو أكتر من 5 فراغات متتالية
+    if (!g && !m && i > 10) break;
   }
-  return keys;
+
+  // "Gemini API Key N" — نمط Railway
+  for (let i = 1; i <= 20; i++) {
+    const label = i === 1 ? "Gemini API Key" : `Gemini API Key ${i}`;
+    const v = process.env[label];
+    if (v) keys.add(v);
+  }
+
+  return [...keys];
 }
 
 // ── حالة كل مفتاح ────────────────────────────────────────────
@@ -112,7 +132,7 @@ export function initGeminiKeys(systemInstruction) {
   _keys = collectKeys();
   if (_keys.length === 0) return false;
 
-  _chatModel  = new RotatingGeminiModel(_keys, "gemini-2.0-flash-lite", systemInstruction);
+  _chatModel  = new RotatingGeminiModel(_keys, "gemini-2.5-flash-preview-05-20", systemInstruction);
   _imageModel = new RotatingGeminiModel(_keys, "gemini-2.0-flash-lite");
 
   console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (~${_keys.length * 1500} طلب/يوم)`);
