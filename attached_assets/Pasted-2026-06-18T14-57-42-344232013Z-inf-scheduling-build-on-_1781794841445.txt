@@ -1,0 +1,135 @@
+2026-06-18T14:57:42.344232013Z [inf]  scheduling build on Metal builder "production-builderv3-us-west1-2d3g"
+2026-06-18T14:57:46.660254484Z [inf]  unpacking archive
+2026-06-18T14:57:46.906208566Z [inf]  using build driver nixpacks-v1.41.0
+2026-06-18T14:57:50.300031859Z [inf]  uploading snapshot
+2026-06-18T14:57:50.960548312Z [inf]  
+2026-06-18T14:57:50.960555875Z [inf]  ╔═══════════════════════ Nixpacks v1.41.0 ═══════════════════════╗
+2026-06-18T14:57:50.960556912Z [inf]  ║ setup      │ nodejs_22                                         ║
+2026-06-18T14:57:50.960559844Z [inf]  ║────────────────────────────────────────────────────────────────║
+2026-06-18T14:57:50.960560519Z [inf]  ║ install    │ npm install --no-audit --no-fund --prefer-offline ║
+2026-06-18T14:57:50.960561279Z [inf]  ║────────────────────────────────────────────────────────────────║
+2026-06-18T14:57:50.960561810Z [inf]  ║ build      │ npm install                                       ║
+2026-06-18T14:57:50.960562736Z [inf]  ║────────────────────────────────────────────────────────────────║
+2026-06-18T14:57:50.960563197Z [inf]  ║ start      │ npm run start                                     ║
+2026-06-18T14:57:50.960563864Z [inf]  ╚════════════════════════════════════════════════════════════════╝
+2026-06-18T14:57:50.960564315Z [inf]  
+2026-06-18T14:57:50.961074444Z [inf]  
+2026-06-18T14:57:50.961075172Z [inf]  Saved output to:
+2026-06-18T14:57:50.961075684Z [inf]    snapshot-target-unpack
+2026-06-18T14:57:51.133689603Z [inf]  [internal] load build definition from Dockerfile
+2026-06-18T14:57:51.133690455Z [inf]  [internal] load build definition from Dockerfile
+2026-06-18T14:57:51.145927934Z [inf]  [internal] load build definition from Dockerfile
+2026-06-18T14:57:51.171579541Z [inf]  [internal] load build definition from Dockerfile
+2026-06-18T14:57:51.180237792Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-18T14:58:44.930368687Z [inf]  [internal] load metadata for ghcr.io/railwayapp/nixpacks:ubuntu-1745885067
+2026-06-18T14:58:44.930776272Z [inf]  [internal] load .dockerignore
+2026-06-18T14:58:44.930783503Z [inf]  [internal] load .dockerignore
+2026-06-18T14:58:44.931831380Z [inf]  [internal] load .dockerignore
+2026-06-18T14:58:44.988227393Z [inf]  [internal] load .dockerignore
+2026-06-18T14:58:44.996745324Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "DISCORD_TOKEN") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996746061Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996746686Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_2") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996746935Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_3") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996747197Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_4") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996747654Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_5") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996887067Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_6") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996887940Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_7") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996888312Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_8") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996888652Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "GOOGLE_API_KEY_9") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996889073Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "REPLICATE_API_KEY") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.996905146Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ARG "SPOTIFY_CLIENT_SECRET") (line 11)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997756001Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "DISCORD_TOKEN") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997757061Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997757604Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_2") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997757937Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_3") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997758260Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_4") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997758586Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_5") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997758902Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_6") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997759204Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_7") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997759708Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_8") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997760177Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "GOOGLE_API_KEY_9") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997838277Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "REPLICATE_API_KEY") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997838748Z [wrn]  SecretsUsedInArgOrEnv: Do not use ARG or ENV instructions for sensitive data (ENV "SPOTIFY_CLIENT_SECRET") (line 12)(https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/)
+ details: Sensitive data should not be used in the ARG or ENV commands
+
+2026-06-18T14:58:44.997839064Z [wrn]  UndefinedVar: Usage of undefined variable '$NIXPACKS_PATH' (line 18)(https://docs.docker.com/go/dockerfile/rule/undefined-var/)
+ details: Variables should be defined before their use
+
+2026-06-18T14:58:45.000108404Z [inf]  [stage-0 10/10] COPY . /app
+2026-06-18T14:58:45.000109324Z [inf]  [stage-0  9/10] RUN printf '\nPATH=/app/node_modules/.bin:$PATH' >> /root/.profile
+2026-06-18T14:58:45.000109696Z [inf]  [stage-0  8/10] RUN --mount=type=cache,id=s/3806d292-9a58-448d-96df-1f7aad6e18d9-node_modules/cache,target=/app/node_modules/.cache npm install
+2026-06-18T14:58:45.000110618Z [inf]  [stage-0  7/10] COPY . /app/.
+2026-06-18T14:58:45.000111177Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/3806d292-9a58-448d-96df-1f7aad6e18d9-/root/npm,target=/root/.npm npm install --no-audit --no-fund --prefer-offline
+2026-06-18T14:58:45.000111789Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-06-18T14:58:45.000112509Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-23f9169c4ccce521379e602cc82ed873a1f1b52b.nix && nix-collect-garbage -d
+2026-06-18T14:58:45.000113076Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-23f9169c4ccce521379e602cc82ed873a1f1b52b.nix .nixpacks/nixpkgs-23f9169c4ccce521379e602cc82ed873a1f1b52b.nix
+2026-06-18T14:58:45.000113644Z [inf]  [internal] load build context
+2026-06-18T14:58:45.000114343Z [inf]  [stage-0  2/16] WORKDIR /app/
+2026-06-18T14:58:45.000115172Z [inf]  [stage-0  1/16] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-18T14:58:45.000115742Z [inf]  [stage-0  1/16] FROM ghcr.io/railwayapp/nixpacks:ubuntu-1745885067@sha256:d45c89d80e13d7ad0fd555b5130f22a866d9dd10e861f589932303ef2314c7de
+2026-06-18T14:58:45.000278057Z [inf]  [internal] load build context
+2026-06-18T14:58:45.034126332Z [inf]  [internal] load build context
+2026-06-18T14:58:45.219145098Z [inf]  [internal] load build context
+2026-06-18T14:58:45.242574873Z [inf]  [stage-0  2/16] WORKDIR /app/
+2026-06-18T14:58:45.242575713Z [inf]  [stage-0  3/10] COPY .nixpacks/nixpkgs-23f9169c4ccce521379e602cc82ed873a1f1b52b.nix .nixpacks/nixpkgs-23f9169c4ccce521379e602cc82ed873a1f1b52b.nix
+2026-06-18T14:58:45.242576132Z [inf]  [stage-0  4/10] RUN nix-env -if .nixpacks/nixpkgs-23f9169c4ccce521379e602cc82ed873a1f1b52b.nix && nix-collect-garbage -d
+2026-06-18T14:58:45.242616202Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-06-18T14:58:48.404182210Z [inf]  [stage-0  5/10] COPY . /app/.
+2026-06-18T14:58:48.420557617Z [inf]  [stage-0  6/10] RUN --mount=type=cache,id=s/3806d292-9a58-448d-96df-1f7aad6e18d9-/root/npm,target=/root/.npm npm install --no-audit --no-fund --prefer-offline
+2026-06-18T14:58:49.56354254Z [inf]  npm warn config production Use `--omit=dev` instead.
+
+2026-06-18T15:00:00.715908922Z [inf]  npm error Exit handler never called!
+
+2026-06-18T15:00:00.716909527Z [inf]  npm error This is an error with npm itself. Please report this error at:
+npm error   <https://github.com/npm/cli/issues>
+
+2026-06-18T15:00:00.717257275Z [inf]  npm error A complete log of this run can be found in: /root/.npm/_logs/2026-06-18T14_58_49_507Z-debug-0.log
+
+2026-06-18T15:00:00.992674286Z [err]  [stage-0  6/10] RUN --mount=type=cache,id=s/3806d292-9a58-448d-96df-1f7aad6e18d9-/root/npm,target=/root/.npm npm install --no-audit --no-fund --prefer-offline
+2026-06-18T15:00:01.055117255Z [err]  Build Failed: build daemon returned an error < failed to solve: process "/bin/bash -ol pipefail -c npm install --no-audit --no-fund --prefer-offline" did not complete successfully: exit code: 1 >
