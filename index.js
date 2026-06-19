@@ -71,6 +71,7 @@ import {
 } from "@discordjs/voice";
 import playdl from "play-dl";
 import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, removeKey, setActiveKeyIndex, resetExhaustedKeys } from "./helpers/gemini-keys.js";
+import { getRanks, addRank, removeRank, resetRanks } from "./helpers/rank-roles.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -129,12 +130,8 @@ function xpForLevel(lvl) {
   return lvl * lvl * 50;
 }
 
-// ── رتب الـ Rank تلقائياً عند الوصول للمستوى المطلوب ─────────────
-// الترتيب من الأعلى للأدنى — هيُعطى أول رتبة مستحقة بس
-const RANK_ROLES = [
-  { level: 50, id: "1511588699513557134", name: "Golden🥇", color: 0xFFD700, removeOnUpgrade: "1516027382123855922" },
-  { level: 20, id: "1516027382123855922", name: "Silver🥈", color: 0xC0C0C0, removeOnUpgrade: null },
-];
+// ── رتب الـ Rank ديناميكية — محملة من helpers/rank-roles.js ──────
+// للتعديل استخدم أمر /رتب-المستويات في الديسكورد
 
 // ─── تحويل اسم اللون أو الكود لرقم hex ────────────────────────
 const COLOR_NAMES = {
@@ -290,6 +287,10 @@ const LEGACY_COMMANDS = [
           { name: "🟡 VIP",                         value: "vip"        },
           { name: "💜 بوستر (Server Booster)",      value: "booster"    },
           { name: "🔵 موثّق (Verified)",            value: "verified"   },
+          { name: "🥇 ذهبية (Golden)",              value: "golden"     },
+          { name: "🥈 فضية (Silver)",               value: "silver"     },
+          { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
+          { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
           { name: "🟢 موسيقى / Music",              value: "music"      },
           { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
           { name: "💗 فن وتصميم / Art",             value: "art"        },
@@ -317,6 +318,10 @@ const LEGACY_COMMANDS = [
           { name: "🟡 VIP",                         value: "vip"        },
           { name: "💜 بوستر (Server Booster)",      value: "booster"    },
           { name: "🔵 موثّق (Verified)",            value: "verified"   },
+          { name: "🥇 ذهبية (Golden)",              value: "golden"     },
+          { name: "🥈 فضية (Silver)",               value: "silver"     },
+          { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
+          { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
           { name: "🟢 موسيقى / Music",              value: "music"      },
           { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
           { name: "💗 فن وتصميم / Art",             value: "art"        },
@@ -506,6 +511,36 @@ const LEGACY_COMMANDS = [
   new SlashCommandBuilder()
     .setName("قائمة-مبلوكين")
     .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
+  // ── رتب المستويات ──────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("رتب-المستويات")
+    .setDescription("إدارة رتب المستويات التلقائية [أونر فقط]")
+    .addSubcommand(sub =>
+      sub.setName("عرض").setDescription("اعرض كل الرتب المضبوطة حالياً")
+    )
+    .addSubcommand(sub =>
+      sub.setName("إضافة")
+        .setDescription("ضيف رتبة جديدة على مستوى معين")
+        .addIntegerOption(opt =>
+          opt.setName("لفل").setDescription("رقم المستوى المطلوب").setRequired(true).setMinValue(1).setMaxValue(999)
+        )
+        .addRoleOption(opt =>
+          opt.setName("رول").setDescription("الرتبة اللي هتتضاف").setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt.setName("اسم").setDescription("اسم الرتبة (اختياري — لو فاضيه هياخد اسم الرول)")
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName("حذف")
+        .setDescription("احذف الرتبة المضبوطة على مستوى معين")
+        .addIntegerOption(opt =>
+          opt.setName("لفل").setDescription("رقم المستوى المراد حذف رتبته").setRequired(true).setMinValue(1)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName("ريست").setDescription("رجّع الإعدادات الافتراضية (Silver لفل 20 / Golden لفل 50)")
+    ),
   battleCommand,
   rouletteCommand,
   mafiaCommand,
@@ -1562,21 +1597,23 @@ client.on("messageCreate", async (msg) => {
         .setTimestamp();
       msg.channel.send({ embeds: [embed] }).catch(() => {});
 
-      // ── Rank Roles تلقائي ──────────────────────────────────────
-      for (const rank of RANK_ROLES) {
+      // ── Rank Roles تلقائي (ديناميكي) ─────────────────────────
+      const currentRanks = getRanks(); // مرتبين من الأعلى للأدنى
+      for (const rank of currentRanks) {
         if (userData.level >= rank.level) {
-          // جيب أحدث نسخة من الـ member عشان الـ cache يكون محدّث
           const freshMember = await msg.guild.members.fetch(msg.author.id).catch(() => null);
           if (!freshMember) break;
-          if (!freshMember.roles.cache.has(rank.id)) {
-            await freshMember.roles.add(rank.id, `وصل للمستوى ${rank.level}`).catch(() => {});
-            // لو فيه رتبة أقل لازم تتشال عند الترقي (Silver → Golden)
-            if (rank.removeOnUpgrade && freshMember.roles.cache.has(rank.removeOnUpgrade)) {
-              await freshMember.roles.remove(rank.removeOnUpgrade, "ترقي للـ rank أعلى").catch(() => {});
+          if (!freshMember.roles.cache.has(rank.roleId)) {
+            await freshMember.roles.add(rank.roleId, `وصل للمستوى ${rank.level}`).catch(() => {});
+            // شيل كل الرتب الأقل مستوى (ترقي تلقائي)
+            for (const lower of currentRanks) {
+              if (lower.level < rank.level && freshMember.roles.cache.has(lower.roleId)) {
+                await freshMember.roles.remove(lower.roleId, "ترقي لرتبة أعلى").catch(() => {});
+              }
             }
             msg.channel.send({ embeds: [
               new EmbedBuilder()
-                .setColor(rank.color)
+                .setColor(0xFFD700)
                 .setTitle("🏆 رتبة جديدة!")
                 .setDescription(`مبروك ${msg.author}! وصلت للمستوى **${rank.level}** وكسبت رتبة **${rank.name}** 🎊`)
                 .setTimestamp()
@@ -1844,6 +1881,86 @@ client.on("interactionCreate", async (interaction) => {
           const ok = setActiveKeyIndex(num - 1);
           if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /مفاتيح-جيميني عرض عشان تشوف الأرقام`);
           return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🎯 تم تحديد المفتاح").setDescription(`✅ البوت هيستخدم المفتاح رقم **${num}** من دلوقتي.\nالمفاتيح المحروقة اتمسحت ومستعدة.`).setTimestamp()] });
+        }
+      }
+
+      // ─── رتب المستويات ────────────────────────────────────────────
+      if (cmd === "رتب-المستويات") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const sub = interaction.options.getSubcommand();
+        await interaction.deferReply({ ephemeral: true });
+
+        // ── عرض ──
+        if (sub === "عرض") {
+          const ranks = getRanks();
+          if (ranks.length === 0) {
+            return interaction.editReply({ embeds: [
+              new EmbedBuilder().setColor(0x95a5a6)
+                .setTitle("🏆 رتب المستويات")
+                .setDescription("مفيش رتب مضبوطة دلوقتي — استخدم `/رتب-المستويات إضافة` عشان تضيف.")
+                .setTimestamp()
+            ]});
+          }
+          const lines = ranks
+            .sort((a, b) => b.level - a.level)
+            .map((r, i) => `**${i + 1}.** لفل \`${r.level}\` ← **${r.name}** \`(${r.roleId})\``)
+            .join("\n");
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(0xFFD700)
+              .setTitle("🏆 رتب المستويات الحالية")
+              .setDescription(lines)
+              .addFields({ name: "📊 إجمالي الرتب", value: `\`${ranks.length}\``, inline: true })
+              .setFooter({ text: "البوت بيدي أعلى رتبة مستحقة عند ارتقاء المستوى" })
+              .setTimestamp()
+          ]});
+        }
+
+        // ── إضافة ──
+        if (sub === "إضافة") {
+          const level  = interaction.options.getInteger("لفل");
+          const role   = interaction.options.getRole("رول");
+          const name   = interaction.options.getString("اسم") || role.name;
+          const result = addRank(level, role.id, name);
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(result.added ? 0x2ecc71 : 0xf39c12)
+              .setTitle(result.added ? "✅ تمت الإضافة" : "🔄 تم التحديث")
+              .addFields(
+                { name: "📶 المستوى",   value: `\`${level}\``,          inline: true },
+                { name: "🎭 الرتبة",    value: `${role} — **${name}**`, inline: true },
+                { name: "📊 إجمالي",    value: `\`${result.total}\``,   inline: true },
+              )
+              .setFooter({ text: "💾 اتحفظ — هيفضل بعد أي restart" })
+              .setTimestamp()
+          ]});
+        }
+
+        // ── حذف ──
+        if (sub === "حذف") {
+          const level = interaction.options.getInteger("لفل");
+          const ok    = removeRank(level);
+          if (!ok) {
+            return interaction.editReply(`❌ مفيش رتبة مضبوطة على المستوى **${level}** — استخدم \`/رتب-المستويات عرض\` عشان تشوف الأرقام الصح.`);
+          }
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(0xe74c3c)
+              .setTitle("🗑️ تم الحذف")
+              .setDescription(`✅ اتحذفت الرتبة المضبوطة على المستوى **${level}** من النظام.\nإجمالي الرتب دلوقتي: **${getRanks().length}**`)
+              .setTimestamp()
+          ]});
+        }
+
+        // ── ريست ──
+        if (sub === "ريست") {
+          const defaults = resetRanks();
+          const lines = defaults.map(r => `لفل \`${r.level}\` ← **${r.name}**`).join("\n");
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(0x3498db)
+              .setTitle("🔄 تم الريست")
+              .setDescription(`✅ رجع للإعدادات الافتراضية:\n${lines}`)
+              .setTimestamp()
+          ]});
         }
       }
 

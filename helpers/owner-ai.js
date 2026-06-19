@@ -23,6 +23,10 @@ export const ROLE_PRESETS = {
   content:    { label: "منشئ محتوى",        permissions: ["SendMessages","AttachFiles","EmbedLinks","AddReactions","UseExternalEmojis","CreatePublicThreads","ManageMessages"],                           color: 0xFF6B35, hoist: false },
   bot:        { label: "بوت",               permissions: ["Administrator"],                                                                                                                               color: 0x7289DA, hoist: false },
   normal:     { label: "عضو عادي",          permissions: ["SendMessages","ReadMessageHistory","AddReactions"],                                                                                            color: 0x99aab5, hoist: false },
+  bronze:     { label: "برونزية 🥉",          permissions: ["SendMessages","ReadMessageHistory","AddReactions","AttachFiles"],                                                                              color: 0xCD7F32, hoist: true  },
+  silver:     { label: "فضية 🥈",            permissions: ["SendMessages","ReadMessageHistory","AddReactions","AttachFiles","EmbedLinks","UseExternalEmojis"],                                                color: 0xC0C0C0, hoist: true  },
+  golden:     { label: "ذهبية 🥇",           permissions: ["SendMessages","ReadMessageHistory","AddReactions","AttachFiles","EmbedLinks","UseExternalEmojis","UseExternalStickers","CreatePublicThreads"],    color: 0xFFD700, hoist: true  },
+  platinum:   { label: "بلاتينية 💎",        permissions: ["SendMessages","ReadMessageHistory","AddReactions","AttachFiles","EmbedLinks","UseExternalEmojis","UseExternalStickers","CreatePublicThreads","MentionEveryone"], color: 0xE5E4E2, hoist: true  },
   restricted: { label: "مقيّد (قراءة فقط)", permissions: ["ReadMessageHistory","ViewChannel"],                                                                                                           color: 0x747F8D, hoist: false },
   none:       { label: "بدون صلاحيات",      permissions: [],                                                                                                                                             color: 0x555555, hoist: false },
 };
