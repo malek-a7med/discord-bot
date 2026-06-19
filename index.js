@@ -25,7 +25,7 @@ import {
   handleWhitenLink,
   handleOcrUpload
 } from "./commands/quick-clean.js";
-import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
+import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 import { rouletteCommand, mafiaCommand, tttCommand, handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleGameButton } from "./commands/games.js";
@@ -202,7 +202,50 @@ const LEGACY_COMMANDS = [
     .setDescription("تعديل رسالة البوت في روم الإعلانات [أونر] / Edit bot announcement")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption((o) =>
-      o.setName("message_id").setDescription("الـ ID بتاع الرسالة اللي هتعدلها").setRequired(true)
+      o.setName("message_id").setDescription("الـ ID بتاع الرسالة (اختياري — لو فاضي هياخد الأخيرة)")
+    )
+    .addIntegerOption((o) =>
+      o.setName("موضع").setDescription("رقم الرسالة من الأخر (1=الأخيرة، 2=قبل الأخيرة...)").setMinValue(1).setMaxValue(20)
+    ),
+  new SlashCommandBuilder()
+    .setName("انشاء-رول")
+    .setDescription("إنشاء رتبة جديدة بصلاحيات ذكية [إدارة] / Create role with smart permissions")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addStringOption((o) => o.setName("الاسم").setDescription("اسم الرتبة الجديدة").setRequired(true))
+    .addStringOption((o) =>
+      o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً")
+        .addChoices(
+          { name: "🔴 إدارة (Administrator)",      value: "admin"  },
+          { name: "🟠 مشرف (Moderator)",           value: "mod"    },
+          { name: "🟡 VIP",                        value: "vip"    },
+          { name: "🟢 موسيقى / Music",             value: "music"  },
+          { name: "🟣 جيمنج / Gaming",             value: "gaming" },
+          { name: "💗 فن وتصميم / Art",            value: "art"    },
+          { name: "🔵 بوت / Bot",                  value: "bot"    },
+          { name: "⚪ عضو عادي / Normal",          value: "normal" },
+          { name: "🔘 بدون صلاحيات",              value: "none"   },
+        )
+    )
+    .addStringOption((o) => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم مثل red)"))
+    .addBooleanOption((o) => o.setName("ظهور-منفصل").setDescription("يظهر الرول منفصلاً في قائمة الأعضاء")),
+  new SlashCommandBuilder()
+    .setName("تعديل-صلاحيات-رول")
+    .setDescription("تعيين صلاحيات ذكية على رتبة موجودة [إدارة] / Set smart permissions on role")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addRoleOption((o) => o.setName("الرول").setDescription("الرتبة المراد تعديلها").setRequired(true))
+    .addStringOption((o) =>
+      o.setName("نوع").setDescription("نوع الرتبة الجديد").setRequired(true)
+        .addChoices(
+          { name: "🔴 إدارة (Administrator)",      value: "admin"  },
+          { name: "🟠 مشرف (Moderator)",           value: "mod"    },
+          { name: "🟡 VIP",                        value: "vip"    },
+          { name: "🟢 موسيقى / Music",             value: "music"  },
+          { name: "🟣 جيمنج / Gaming",             value: "gaming" },
+          { name: "💗 فن وتصميم / Art",            value: "art"    },
+          { name: "🔵 بوت / Bot",                  value: "bot"    },
+          { name: "⚪ عضو عادي / Normal",          value: "normal" },
+          { name: "🔘 مسح كل الصلاحيات",          value: "none"   },
+        )
     ),
   new SlashCommandBuilder()
     .setName("تحذير")
@@ -1134,7 +1177,8 @@ const salaamCooldowns = new Map();
 // ─── Auto-Mod Log Channel ────────────────────────────────────────
 const AUTO_MOD_LOG_CHANNEL_ID  = "1517362832063074324";
 const ANNOUNCE_CHANNEL_ID      = "1511978194465718462";
-const autoModLogs = new Map(); // logId → logData
+const autoModLogs = new Map();          // logId → logData
+const pendingAnnounceEdits = new Map(); // msgId → { content, channelId } — 10 دقايق
 
 // ─── دالة إرسال سجل التأديب ─────────────────────────────────────
 async function sendModLog(type, modUser, targetId, reason, extra = {}) {
@@ -2150,25 +2194,124 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
-      // ─── تعديل إعلان ────────────────────────────────────────────
+      // ─── تعديل إعلان (2-Step: اعرض المحتوى → زر → موداال ممليء) ──
       if (cmd === "تعديل-إعلان") {
         if (!isOwner(user.id)) {
           return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         }
-        const msgId = interaction.options.getString("message_id").trim();
-        const modal = new ModalBuilder()
-          .setCustomId(`edit_announce_modal|${msgId}`)
-          .setTitle("✏️ تعديل الإعلان");
-        const contentInput = new TextInputBuilder()
-          .setCustomId("announce_content")
-          .setLabel("المحتوى الجديد للإعلان")
-          .setStyle(TextInputStyle.Paragraph)
-          .setMinLength(1)
-          .setMaxLength(2000)
-          .setRequired(true)
-          .setPlaceholder("اكتب هنا المحتوى الجديد بتاع الإعلان...");
-        modal.addComponents(new ActionRowBuilder().addComponents(contentInput));
-        return interaction.showModal(modal);
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          const msgId   = interaction.options.getString("message_id")?.trim();
+          const pos     = interaction.options.getInteger("موضع") ?? 1;
+          const annCh   = await client.channels.fetch(ANNOUNCE_CHANNEL_ID);
+
+          let targetMsg = null;
+          if (msgId) {
+            targetMsg = await annCh.messages.fetch(msgId).catch(() => null);
+            if (!targetMsg) return interaction.editReply({ content: "❌ مش لاقي الرسالة دي! تأكد إن الـ ID صح." });
+          } else {
+            const fetched = await annCh.messages.fetch({ limit: 50 });
+            const botMsgs = [...fetched.values()].filter(m => m.author.id === client.user.id);
+            targetMsg = botMsgs[pos - 1] ?? null;
+            if (!targetMsg) return interaction.editReply({ content: `❌ مش لاقي رسالة رقم **${pos}** من الأخر للبوت في روم الإعلانات!` });
+          }
+
+          if (targetMsg.author.id !== client.user.id)
+            return interaction.editReply({ content: "❌ الرسالة دي مش بتاعت البوت!" });
+
+          const preview = (targetMsg.content || "— الرسالة فيها Embed بس —").slice(0, 800);
+          pendingAnnounceEdits.set(targetMsg.id, { content: targetMsg.content || "", channelId: ANNOUNCE_CHANNEL_ID });
+          setTimeout(() => pendingAnnounceEdits.delete(targetMsg.id), 600_000);
+
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x3498db)
+                .setTitle("✏️ تعديل الإعلان — الخطوة الأولى")
+                .setDescription(`**الرسالة الحالية:**\n\`\`\`\n${preview}\n\`\`\``)
+                .setFooter({ text: `ID: ${targetMsg.id}` })
+                .setTimestamp()
+            ],
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId(`edit_announce_btn|${targetMsg.id}`)
+                .setLabel("✏️ افتح المحرر")
+                .setStyle(ButtonStyle.Primary)
+            )]
+          });
+        } catch (err) {
+          logger.error("خطأ في تعديل-إعلان:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        }
+      }
+
+      // ─── إنشاء رول بصلاحيات ذكية ────────────────────────────────
+      if (cmd === "انشاء-رول") {
+        await interaction.deferReply({ ephemeral: true });
+        const roleName  = interaction.options.getString("الاسم");
+        const roleType  = interaction.options.getString("نوع");
+        const roleColor = interaction.options.getString("لون");
+        const roleHoist = interaction.options.getBoolean("ظهور-منفصل");
+
+        const preset  = roleType ? ROLE_PRESETS[roleType] : smartRolePerms(roleName);
+        const color   = roleColor ? parseInt(roleColor.replace("#",""), 16) : (preset?.color ?? 0x99aab5);
+        const hoist   = roleHoist !== null ? roleHoist : (preset?.hoist ?? false);
+        const perms   = preset?.permissions ?? [];
+
+        try {
+          const newRole = await guild.roles.create({ name: roleName, color, hoist, reason: `بأمر ${user.username}` });
+          if (perms.length) {
+            const valid = perms.filter(p => PermissionFlagsBits[p]);
+            if (valid.length) await newRole.setPermissions(valid.map(p => PermissionFlagsBits[p]));
+          }
+          const presetLabel = preset?.label ?? "تلقائي";
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(color)
+              .setTitle("✨ تم إنشاء الرتبة")
+              .addFields(
+                { name: "🏷️ الاسم",       value: newRole.name,                                                  inline: true },
+                { name: "🆔 الـ ID",       value: `\`${newRole.id}\``,                                          inline: true },
+                { name: "📌 النوع",        value: presetLabel,                                                   inline: true },
+                { name: "📌 ظهور منفصل",   value: hoist ? "✅" : "❌",                                          inline: true },
+                { name: "🔐 الصلاحيات",   value: perms.length ? `\`${perms.join(", ")}\`` : "لا صلاحيات",      inline: false },
+              ).setTimestamp()
+          ]});
+        } catch (err) {
+          logger.error("خطأ في إنشاء الرول:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        }
+      }
+
+      // ─── تعديل صلاحيات رول بالـ preset ──────────────────────────
+      if (cmd === "تعديل-صلاحيات-رول") {
+        await interaction.deferReply({ ephemeral: true });
+        const targetRole = interaction.options.getRole("الرول");
+        const roleType   = interaction.options.getString("نوع");
+        const preset     = ROLE_PRESETS[roleType];
+        if (!preset) return interaction.editReply({ content: "❌ نوع غير معروف!" });
+
+        try {
+          const role = guild.roles.cache.get(targetRole.id);
+          if (!role) return interaction.editReply({ content: "❌ مش لاقي الرول!" });
+          if (preset.permissions.length) {
+            const valid = preset.permissions.filter(p => PermissionFlagsBits[p]);
+            await role.setPermissions(valid.map(p => PermissionFlagsBits[p]), `بأمر ${user.username}`);
+          } else {
+            await role.setPermissions([], `بأمر ${user.username}`);
+          }
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(preset.color)
+              .setTitle("🔐 تم تعديل الصلاحيات")
+              .addFields(
+                { name: "🏷️ الرتبة",     value: role.name,                                                              inline: true  },
+                { name: "📋 النوع",       value: preset.label,                                                           inline: true  },
+                { name: "🔐 الصلاحيات",  value: preset.permissions.length ? `\`${preset.permissions.join(", ")}\`` : "لا صلاحيات", inline: false },
+              ).setTimestamp()
+          ]});
+        } catch (err) {
+          logger.error("خطأ في تعديل صلاحيات الرول:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        }
       }
 
       if (cmd === "تحذير") {
@@ -2985,6 +3128,27 @@ client.on("interactionCreate", async (interaction) => {
         return await interaction.showModal(modal);
       }
 
+      // ─── زر تعديل الإعلان ← يعرض موداال مملوء بالمحتوى الحالي ──
+      if (interaction.customId.startsWith("edit_announce_btn|")) {
+        const targetMsgId = interaction.customId.split("|")[1];
+        const stored      = pendingAnnounceEdits.get(targetMsgId);
+        const oldContent  = stored?.content ?? "";
+
+        const modal = new ModalBuilder()
+          .setCustomId(`edit_announce_modal|${targetMsgId}`)
+          .setTitle("✏️ تعديل الإعلان");
+        const input = new TextInputBuilder()
+          .setCustomId("announce_content")
+          .setLabel("المحتوى الجديد (عدّل اللي تريده مباشرةً)")
+          .setStyle(TextInputStyle.Paragraph)
+          .setMinLength(1)
+          .setMaxLength(2000)
+          .setRequired(true);
+        if (oldContent) input.setValue(oldContent.slice(0, 4000));
+        modal.addComponents(new ActionRowBuilder().addComponents(input));
+        return interaction.showModal(modal);
+      }
+
       if (interaction.customId === "wipe_cancel") {
         return interaction.update({
           embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription("✅ تم إلغاء عملية المسح")],
@@ -3121,31 +3285,27 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.deferReply({ ephemeral: true });
 
         try {
-          const announceCh = await client.channels.fetch(ANNOUNCE_CHANNEL_ID);
+          const stored     = pendingAnnounceEdits.get(targetMsgId);
+          const chId       = stored?.channelId ?? ANNOUNCE_CHANNEL_ID;
+          const announceCh = await client.channels.fetch(chId);
           const targetMsg  = await announceCh.messages.fetch(targetMsgId);
 
-          if (targetMsg.author.id !== client.user.id) {
-            return interaction.editReply({ content: "❌ الرسالة دي مش بتاعت البوت، ممكن تعدل على رسايله هو بس!" });
-          }
-
           await targetMsg.edit({ content: newContent, allowedMentions: { parse: [] } });
+          pendingAnnounceEdits.delete(targetMsgId);
 
           return interaction.editReply({
             embeds: [
               new EmbedBuilder()
                 .setColor(0x2ecc71)
                 .setTitle("✅ تم تعديل الإعلان")
-                .setDescription(`الرسالة اتعدلت بنجاح في <#${ANNOUNCE_CHANNEL_ID}>`)
+                .setDescription(`الرسالة اتعدلت بنجاح في <#${chId}>`)
                 .addFields({ name: "📋 المحتوى الجديد", value: newContent.slice(0, 1024) })
                 .setTimestamp()
             ]
           });
         } catch (err) {
           logger.error("خطأ في تعديل الإعلان:", err);
-          if (err.code === 10008) {
-            return interaction.editReply({ content: "❌ مش لاقي الرسالة دي! تأكد إن الـ ID صح وإن الرسالة موجودة في روم الإعلانات." });
-          }
-          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+          return interaction.editReply({ content: err.code === 10008 ? "❌ مش لاقي الرسالة! ربما انتهت الجلسة، شغّل الأمر من جديد." : `❌ حصل خطأ: ${err.message}` });
         }
       }
 

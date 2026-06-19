@@ -8,6 +8,32 @@ import {
   memoryGetAll, memoryToPromptText, memorySearch
 } from "./bot-memory.js";
 
+// ─── Presets الرتب الذكية ────────────────────────────────────────
+export const ROLE_PRESETS = {
+  admin:  { label: "إدارة",       permissions: ["Administrator"],                                                                                                color: 0xe74c3c, hoist: true  },
+  mod:    { label: "مشرف",        permissions: ["ManageMessages","KickMembers","ModerateMembers","ManageNicknames","ViewAuditLog","BanMembers"],                  color: 0xe67e22, hoist: true  },
+  vip:    { label: "VIP",         permissions: ["AddReactions","UseExternalEmojis","AttachFiles","EmbedLinks","SendMessages"],                                    color: 0xFFD700, hoist: true  },
+  music:  { label: "موسيقى",      permissions: ["Connect","Speak","UseVAD","SendMessages","AddReactions"],                                                       color: 0x1DB954, hoist: false },
+  gaming: { label: "جيمنج",       permissions: ["SendMessages","Connect","Speak","AddReactions"],                                                                color: 0x9B59B6, hoist: false },
+  art:    { label: "فن وتصميم",   permissions: ["SendMessages","AttachFiles","EmbedLinks","AddReactions"],                                                       color: 0xE91E8C, hoist: false },
+  bot:    { label: "بوت",         permissions: ["Administrator"],                                                                                                color: 0x7289DA, hoist: false },
+  normal: { label: "عضو عادي",    permissions: ["SendMessages","ReadMessageHistory","AddReactions"],                                                             color: 0x99aab5, hoist: false },
+  none:   { label: "بدون صلاحيات",permissions: [],                                                                                                              color: 0x555555, hoist: false },
+};
+
+export function smartRolePerms(name) {
+  const n = (name || "").toLowerCase();
+  if (/إدارة|ادارة|أدمن|ادمن|admin|owner|أونر|ملك|مدير/i.test(n))   return ROLE_PRESETS.admin;
+  if (/مشرف|مود|mod\b|ناظر|رقيب|supervisor|staff/i.test(n))          return ROLE_PRESETS.mod;
+  if (/\bvip\b|كبار|مميز|بريميوم|premium|خاص/i.test(n))              return ROLE_PRESETS.vip;
+  if (/\bbot\b|بوت/i.test(n))                                         return ROLE_PRESETS.bot;
+  if (/ميوزيك|موسيقى|music|dj\b/i.test(n))                           return ROLE_PRESETS.music;
+  if (/جيمنج|gaming|العاب|لاعب|gamer/i.test(n))                      return ROLE_PRESETS.gaming;
+  if (/آرت|فنان|فن\b|art\b|design|مصمم/i.test(n))                    return ROLE_PRESETS.art;
+  if (/عضو|normal|عادي|member/i.test(n))                              return ROLE_PRESETS.normal;
+  return null;
+}
+
 // ── قائمة انتظار ذكية لكل أونر — مش lock بيضيّع الرسايل ──────────
 const userQueues    = new Map(); // userId → [ {msg, guild, geminiModel, db, buildDashboard} ]
 const isProcessing  = new Set(); // userId → بيشتغل دلوقتي
@@ -148,11 +174,24 @@ ${memoryToPromptText()}${history ? `\nسياق المحادثة:\n${history}\n` 
 - موضوع قناة: {"action":"set_topic","channel_id":"ID أو null","topic":"نص"}
 - قفل كل السيرفر: {"action":"server_lock"}
 - فتح كل السيرفر: {"action":"server_unlock"}
+- تعديل رسالة للبوت: {"action":"edit_message","channel_id":"ID","position":1,"message_id":null,"new_content":"المحتوى الجديد","find":null,"replace":null}
+  ↳ position=1 = آخر رسالة للبوت في القناة، 2=قبل الأخيرة، إلخ
+  ↳ للتعديل الجزئي: حدد find="النص القديم" و replace="البديل" بدل new_content
+  ↳ allowedMentions تلقائياً — لن يبعت نوتيفيكيشن لأي منشن
 
 ── رتب ──
 - إعطاء رتبة: {"action":"give_role","user_id":"ID","role_id":"ID"}
 - سحب رتبة: {"action":"remove_role","user_id":"ID","role_id":"ID"}
-- إنشاء رتبة: {"action":"create_role","name":"اسم","color":"hex مثل #ff0000","hoist":false}
+- إنشاء رتبة (ذكي): {"action":"create_role","name":"اسم","color":"hex مثل #ff0000","hoist":false,"permissions":["ManageMessages","KickMembers"]}
+  ↳ مهم: لما تنشئ رتبة حدد الـ permissions المناسبة تلقائياً من اسمها:
+  ↳ مشرف/mod/staff → ManageMessages+KickMembers+ModerateMembers+BanMembers+ManageNicknames+ViewAuditLog
+  ↳ إدارة/admin/أدمن → Administrator
+  ↳ VIP/مميز → AddReactions+UseExternalEmojis+AttachFiles+EmbedLinks+SendMessages
+  ↳ موسيقى/music/dj → Connect+Speak+UseVAD+SendMessages
+  ↳ جيمنج/gaming → SendMessages+Connect+Speak+AddReactions
+  ↳ بوت/bot → Administrator
+  ↳ لو مش عارف النوع → اتركها فاضية []
+- تعيين صلاحيات ذكية لرول موجود: {"action":"set_role_smart_perms","role_id":"ID","role_name":"اسم الرول أو غرضه"}
 - حذف رتبة: {"action":"delete_role","role_id":"ID"}
 - تغيير لون رتبة: {"action":"role_color","role_id":"ID","color":"hex"}
 - تغيير اسم رتبة: {"action":"rename_role","role_id":"ID","name":"اسم"}
@@ -677,20 +716,34 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
       return send(ok(lock ? "🔒 السيرفر اتقفل" : "🔓 السيرفر اتفتح", d));
     }
 
-    // ─── إنشاء رتبة ───────────────────────────────────────────────
+    // ─── إنشاء رتبة (ذكي) ────────────────────────────────────────
     if (action === "create_role") {
-      const color = parsed.color ? parseInt(parsed.color.replace("#", ""), 16) : 0x99aab5;
+      // حدد الصلاحيات: Gemini → smartRolePerms كـ fallback
+      const preset    = (parsed.permissions?.length) ? null : smartRolePerms(parsed.name || "");
+      const perms     = parsed.permissions?.length ? parsed.permissions : (preset?.permissions ?? []);
+      const color     = parsed.color ? parseInt(parsed.color.replace("#", ""), 16) : (preset?.color ?? 0x99aab5);
+      const hoist     = parsed.hoist !== undefined ? parsed.hoist : (preset?.hoist ?? false);
+
       const newRole = await guild.roles.create({
         name: parsed.name || "رتبة جديدة",
         color,
-        hoist: parsed.hoist || false,
+        hoist,
         reason: `بأمر ${ownerName}`
       }).catch(() => null);
       if (!newRole) return send("❌ مقدرتش أعمل الرتبة!");
-      const d = `إنشاء رتبة "${newRole.name}"`;
+
+      if (perms.length) {
+        const validPerms = perms.filter(p => PermissionFlagsBits[p] !== undefined);
+        if (validPerms.length) {
+          await newRole.setPermissions(validPerms.map(p => PermissionFlagsBits[p]), `بأمر ${ownerName}`).catch(() => {});
+        }
+      }
+
+      const permsText = perms.length ? `\n🔐 الصلاحيات: \`${perms.join(", ")}\`` : "";
+      const d = `إنشاء رتبة "${newRole.name}"${permsText}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, ownerName, d);
-      return send(ok("✨ تم إنشاء الرتبة", `**${newRole.name}** — ID: \`${newRole.id}\``));
+      return send(ok("✨ تم إنشاء الرتبة", `**${newRole.name}** — ID: \`${newRole.id}\`${permsText}`));
     }
 
     // ─── حذف رتبة ─────────────────────────────────────────────────
@@ -782,6 +835,59 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
       await sendLog(guild, db, action, ownerName, d);
       return send(ok("⚙️ تم تعديل الرول", d));
+    }
+
+    // ─── تعيين صلاحيات ذكية لرول موجود ──────────────────────────
+    if (action === "set_role_smart_perms") {
+      const role = guild.roles.cache.get(parsed.role_id);
+      if (!role) return send("❌ مش لاقي الرتبة!");
+      const queryName = parsed.role_name || role.name;
+      const preset    = smartRolePerms(queryName);
+      if (!preset) {
+        return send(`🤔 مش قادر أحدد نوع الرتبة من اسمها **"${role.name}"**\nقولي هي رتبة إيه (مشرف / VIP / موسيقى / جيمنج / إلخ) وهعدلها!`);
+      }
+      const validPerms = preset.permissions.filter(p => PermissionFlagsBits[p] !== undefined);
+      await role.setPermissions(validPerms.map(p => PermissionFlagsBits[p]), `بأمر ${ownerName}`).catch(() => {});
+      const d = `تعيين صلاحيات "${role.name}" (${preset.label}): ${preset.permissions.join(", ") || "لا صلاحيات"}`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("🔐 تم تعيين الصلاحيات", d));
+    }
+
+    // ─── تعديل رسالة للبوت ───────────────────────────────────────
+    if (action === "edit_message") {
+      const ch = parsed.channel_id
+        ? guild.channels.cache.get(parsed.channel_id)
+        : (isDM ? null : msg.channel);
+      if (!ch) return send("❌ مش لاقي القناة! حدد channel_id بالظبط.");
+
+      let targetMsg = null;
+      if (parsed.message_id) {
+        targetMsg = await ch.messages.fetch(parsed.message_id).catch(() => null);
+      } else {
+        const pos     = Math.max(1, parsed.position || 1);
+        const fetched = await ch.messages.fetch({ limit: 50 }).catch(() => null);
+        if (!fetched) return send("❌ مقدرتش أجيب الرسايل!");
+        const botMsgs = [...fetched.values()].filter(m2 => m2.author.id === msg.client.user.id);
+        targetMsg = botMsgs[pos - 1] ?? null;
+      }
+
+      if (!targetMsg)              return send("❌ مش لاقي الرسالة المطلوبة!");
+      if (targetMsg.author.id !== msg.client.user.id) return send("❌ ممكن تعدل على رسايل البوت بس!");
+
+      let newContent = parsed.new_content || targetMsg.content;
+      if (parsed.find && targetMsg.content.includes(parsed.find)) {
+        newContent = targetMsg.content.replaceAll(parsed.find, parsed.replace ?? "");
+      }
+      if (!newContent?.trim()) return send("❌ المحتوى الجديد فاضي!");
+
+      await targetMsg.edit({ content: newContent, allowedMentions: { parse: [] } }).catch(() => {});
+
+      const posLabel = parsed.message_id ? `ID: ${parsed.message_id}` : `رقم ${parsed.position || 1} من الأخر`;
+      const d = `تعديل رسالة في #${ch.name} (${posLabel})`;
+      pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
+      await sendLog(guild, db, action, ownerName, d);
+      return send(ok("✏️ تم تعديل الرسالة", d));
     }
 
     // ─── كوينز: خصم / تعيين ──────────────────────────────────────
