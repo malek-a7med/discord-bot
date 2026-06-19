@@ -1837,7 +1837,126 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "userinfo") {
         const target = interaction.options.getUser("user") ?? user;
-        return interaction.reply({ content: `👤 **اسم المستخدم:** ${target.username}\n🆔 **الـ ID الخاص به:** ${target.id}` });
+        await interaction.deferReply();
+
+        // جيب المـ member عشان نوصل لبيانات السيرفر
+        const member = guild
+          ? await guild.members.fetch(target.id).catch(() => null)
+          : null;
+
+        // بيانات الداتابيس
+        const uData    = db.getUser(target.id);
+        const warnings = db.getWarnings(target.id);
+        const abilities = db.getGameAbilities(target.id);
+
+        // ── تواريخ ──
+        const createdTs = Math.floor(target.createdTimestamp / 1000);
+        const joinedTs  = member?.joinedTimestamp
+          ? Math.floor(member.joinedTimestamp / 1000)
+          : null;
+
+        // ── الرتب (بدون @everyone، أعلى 10 بس عشان ما يطولش) ──
+        const roles = member
+          ? [...member.roles.cache.values()]
+              .filter(r => r.id !== guild.id)
+              .sort((a, b) => b.position - a.position)
+          : [];
+        const topRoles   = roles.slice(0, 10).map(r => `<@&${r.id}>`).join(" ");
+        const rolesText  = roles.length
+          ? `${topRoles}${roles.length > 10 ? ` +${roles.length - 10} أكتر` : ""}`
+          : "لا توجد رتب";
+        const highestRole = roles[0] ? `<@&${roles[0].id}>` : "لا يوجد";
+
+        // ── XP والمستوى ──
+        const lvl        = uData.level || 0;
+        const xp         = uData.xp   || 0;
+        const nextLvlXp  = (lvl + 1) * (lvl + 1) * 50;
+        const progress   = nextLvlXp > 0 ? Math.min(Math.floor((xp / nextLvlXp) * 10), 10) : 0;
+        const progressBar = "█".repeat(progress) + "░".repeat(10 - progress);
+
+        // ── القدرات ──
+        const abilityNames = { shield:"🛡️ درع", skip:"⏭️ تخطي", double:"💰 ضعف", steal:"🥷 سرقة" };
+        const abilityText = Object.entries(abilities).length
+          ? Object.entries(abilities).map(([k, v]) => `${abilityNames[k] ?? k}: x${v}`).join(" • ")
+          : "لا توجد قدرات";
+
+        // ── حالة البوست ──
+        const boostSince = member?.premiumSince
+          ? `<t:${Math.floor(member.premiumSinceTimestamp / 1000)}:R>`
+          : "لا";
+
+        // ── تايم-اوت حالي ──
+        const timedOut = member?.communicationDisabledUntilTimestamp > Date.now();
+        const muteUntil = timedOut
+          ? `<t:${Math.floor(member.communicationDisabledUntilTimestamp / 1000)}:R>`
+          : "لا";
+
+        // ── badges ──
+        const flags = target.flags?.toArray() ?? [];
+        const badgeMap = {
+          Staff:                   "👮 ديسكورد ستاف",
+          Partner:                 "🤝 بارتنر",
+          Hypesquad:               "🏠 HypeSquad",
+          BugHunterLevel1:         "🐛 Bug Hunter",
+          BugHunterLevel2:         "🐛 Bug Hunter Gold",
+          HypeSquadOnlineHouse1:   "⚖️ Balance",
+          HypeSquadOnlineHouse2:   "💛 Bravery",
+          HypeSquadOnlineHouse3:   "💙 Brilliance",
+          PremiumEarlySupporter:   "🌟 Early Supporter",
+          VerifiedDeveloper:       "🔧 Verified Dev",
+          ActiveDeveloper:         "🛠️ Active Dev",
+          CertifiedModerator:      "🛡️ Moderator",
+        };
+        const badgesText = flags.length
+          ? flags.map(f => badgeMap[f] ?? f).join(" • ")
+          : "لا توجد";
+
+        const embed = new EmbedBuilder()
+          .setColor(member?.displayHexColor && member.displayHexColor !== "#000000"
+            ? member.displayHexColor : 0x5865f2)
+          .setTitle(`${target.bot ? "🤖" : "👤"} ${member?.displayName ?? target.username}`)
+          .setThumbnail(target.displayAvatarURL({ dynamic: true, size: 256 }))
+          .addFields(
+            { name: "🏷️ اسم المستخدم",    value: `\`${target.username}\``,                  inline: true },
+            { name: "🆔 الـ ID",            value: `\`${target.id}\``,                        inline: true },
+            { name: "🤖 بوت؟",             value: target.bot ? "✅ آيه" : "❌ لأ",            inline: true },
+
+            { name: "📅 تاريخ الحساب",     value: `<t:${createdTs}:D>\n<t:${createdTs}:R>`, inline: true },
+            { name: "📥 انضم للسيرفر",      value: joinedTs
+              ? `<t:${joinedTs}:D>\n<t:${joinedTs}:R>`
+              : "غير متاح",                                                                    inline: true },
+            { name: "🚀 بوستر؟",           value: boostSince,                                inline: true },
+
+            { name: "✨ المستوى والـ XP",
+              value: `**Lvl ${lvl}** — ${xp} XP\n\`${progressBar}\` → ${nextLvlXp} XP`,     inline: false },
+
+            { name: "🪙 الكوينز",          value: `**${uData.coins ?? 0}**`,                 inline: true },
+            { name: "⚠️ التحذيرات",        value: `**${warnings.length}**`,                  inline: true },
+            { name: "🔇 مسكوت لـ",         value: muteUntil,                                 inline: true },
+
+            { name: `🎭 الرتب (${roles.length})`, value: rolesText,                          inline: false },
+            { name: "⭐ أعلى رتبة",        value: highestRole,                               inline: true },
+            { name: "🎮 قدرات الألعاب",    value: abilityText,                               inline: false },
+            { name: "🏅 الشارات",          value: badgesText,                                inline: false },
+          )
+          .setFooter({ text: "زنجي Bot • معلومات تفصيلية للعضو" })
+          .setTimestamp();
+
+        // آخر مكافأة يومية
+        if (uData.lastDaily) {
+          const dailyTs = Math.floor(new Date(uData.lastDaily).getTime() / 1000);
+          embed.addFields({ name: "🎁 آخر يومي", value: `<t:${dailyTs}:R>`, inline: true });
+        }
+
+        // آخر 3 تحذيرات
+        if (warnings.length > 0) {
+          const lastWarns = warnings.slice(-3).reverse()
+            .map((w, i) => `**${i + 1}.** ${w.reason} — بواسطة \`${w.moderator}\``)
+            .join("\n");
+          embed.addFields({ name: "📋 آخر التحذيرات", value: lastWarns });
+        }
+
+        return interaction.editReply({ embeds: [embed] });
       }
 
       if (cmd === "القوانين") {
