@@ -324,18 +324,21 @@ export const memeChannelMap = new Map();
 const memeId = () => `mm${Date.now().toString(36)}${Math.random().toString(36).slice(2,3)}`;
 
 const MEME_TEMPLATES = [
-  { title: "عندما تفتح الثلاجة للمرة العاشرة وتلاقي نفس الحاجات",      prompt: "وإنت بتفتحها..." },
-  { title: "عندما الأستاذ يقول 'الامتحان هيكون سهل جداً'",              prompt: "وإنت لما بتشوف الأسئلة..." },
-  { title: "عندما تقول 'دقيقة بس' ومر ساعتين",                         prompt: "وإنت لسه..." },
-  { title: "عندما تلاقي أكلة من الأكل اللي أخبأتها في الثلاجة اتاكل",   prompt: "وجه الكارثة اللي بتعملها..." },
-  { title: "عندما البوت يرد أذكى من اللي توقعته",                       prompt: "وجهك وإنت..." },
-  { title: "عندما تنسى تحل الواجب وتيجي تعمله في المدرسة",             prompt: "وإنت..." },
-  { title: "عندما تسمع صوت غريب في البيت في نص الليل",                  prompt: "أول حاجة تعملها..." },
-  { title: "عندما تحاول توضح فكرة بس ما حدش فاهمك",                     prompt: "وإنت..." },
-  { title: "عندما تقوم من النوم وتلاقي إن الليلة جمعة",                 prompt: "إنت قايل..." },
-  { title: "عندما تبعت رسالة غلط على جروب العيلة",                      prompt: "وإنت بتحاول تمسحها..." },
-  { title: "عندما اللعبة تقفل وإنت لسه ما حفظتش",                      prompt: "وجهك بعد الكارثة..." },
-  { title: "عندما تبدأ تذاكر وبعد 10 دقايق تلاقي نفسك في يوتيوب",      prompt: "وإنت..." },
+  { title: "عندما تفتح الثلاجة للمرة العاشرة وتلاقي نفس الحاجات",      prompt: "وإنت بتفتحها...",            gif: "https://media.tenor.com/PXzKHHE6ZSUAAAAC/anime-shocked.gif" },
+  { title: "عندما الأستاذ يقول 'الامتحان هيكون سهل جداً'",              prompt: "وإنت لما بتشوف الأسئلة...",   gif: "https://media.tenor.com/3n4beqGzHasAAAAC/anime-crying.gif" },
+  { title: "عندما تقول 'دقيقة بس' ومر ساعتين",                         prompt: "وإنت لسه...",                 gif: "https://media.tenor.com/gKhOKPXGFzsAAAAC/anime-lazy.gif" },
+  { title: "عندما تلاقي أكلة من الأكل اللي أخبأتها في الثلاجة اتاكل",   prompt: "وجه الكارثة اللي بتعملها...", gif: "https://media.tenor.com/1_-JNXJiBB0AAAAC/anime-angry.gif" },
+  { title: "عندما البوت يرد أذكى من اللي توقعته",                       prompt: "وجهك وإنت...",                gif: "https://media.tenor.com/5xHNB9lVbF4AAAAC/surprised-anime.gif" },
+  { title: "عندما تنسى تحل الواجب وتيجي تعمله في المدرسة",             prompt: "وإنت...",                     gif: "https://media.tenor.com/KBOl_9FvHFUAAAAC/anime-sweat.gif" },
+  { title: "عندما تسمع صوت غريب في البيت في نص الليل",                  prompt: "أول حاجة تعملها...",          gif: "https://media.tenor.com/7MmtBCOFMhUAAAAC/scared-anime.gif" },
+  { title: "عندما تحاول توضح فكرة بس ما حدش فاهمك",                     prompt: "وإنت...",                     gif: "https://media.tenor.com/SoNubhwMq0MAAAAC/anime-exhausted.gif" },
+  { title: "عندما تقوم من النوم وتلاقي إن الليلة جمعة",                 prompt: "إنت قايل...",                 gif: "https://media.tenor.com/kPJAQzm3-sQAAAAC/anime-happy.gif" },
+  { title: "عندما تبعت رسالة غلط على جروب العيلة",                      prompt: "وإنت بتحاول تمسحها...",       gif: "https://media.tenor.com/dR3OhOLPw4QAAAAC/anime-panic.gif" },
+  { title: "عندما اللعبة تقفل وإنت لسه ما حفظتش",                      prompt: "وجهك بعد الكارثة...",         gif: "https://media.tenor.com/ys7JFIBf0HIAAAAC/anime-crying-sad.gif" },
+  { title: "عندما تبدأ تذاكر وبعد 10 دقايق تلاقي نفسك في يوتيوب",      prompt: "وإنت...",                     gif: "https://media.tenor.com/xhEHPfEXJuMAAAAC/anime-computer.gif" },
+  { title: "لما تفوز في الجيم وترجع تموت من أول أسبوع",                 prompt: "وإنت في الجيم...",            gif: "https://media.tenor.com/9nzOtGsS_WQAAAAC/gaming-win.gif" },
+  { title: "لما تحاول تاخد ايتم نادر في لعبة وبتفضل تفوت",              prompt: "ورد فعلك...",                 gif: "https://media.tenor.com/o2_QZ0aGAZAAAAAC/anime-gaming.gif" },
+  { title: "لما البوس في اللعبة يبدأ شكله بسيط وفجأة يتحول وحش",        prompt: "وإنت...",                     gif: "https://media.tenor.com/3LPq_A48PFQAAAAC/anime-scared-run.gif" },
 ];
 
 function createMemeState(channelId, creatorId) {
@@ -347,35 +350,41 @@ function createMemeState(channelId, creatorId) {
     captions: {}, // { playerId: text }
     votes: {}, // { voterId: targetPlayerId }
     timer: null,
+    swapCount: 0, // عدد مرات تغيير الموقف
   };
 }
 
 function buildMemeLobbyEmbed(state) {
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(0xf39c12).setTitle("😂 صنع الميم — انتظار اللاعبين")
     .setDescription(
       `**📖 طريقة اللعب:**\n` +
-      `┣ البوت يختار موقف مضحك\n` +
+      `┣ البوت يختار موقف مضحك مع GIF 🎞️\n` +
       `┣ كل لاعب يكتب **كابشن** مناسب للموقف\n` +
       `┣ الكل يصوت على أحلى كابشن\n` +
       `┗ الفائز يكسب **200 كوينز** 🪙\n\n` +
+      `🎭 **الموقف الحالي:**\n> ${state.template.title}\n\n` +
       `👥 **اللاعبين (${state.players.length}/10):**\n${state.players.map(id => `• <@${id}>`).join("\n")}\n\n` +
-      `⚠️ يلزم لاعبان على الأقل`
+      `⚠️ يلزم لاعبان على الأقل — ${10 - state.swapCount} تغييرات متبقية للموقف`
     )
     .setFooter({ text: "جهز نفسك للضحك! 😂" }).setTimestamp();
+  if (state.template.gif) embed.setImage(state.template.gif);
+  return embed;
 }
 
-function buildMemeLobbyRows(gameId) {
+function buildMemeLobbyRows(gameId, state) {
+  const canSwap = (state?.swapCount ?? 0) < 10;
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`meme_join_${gameId}`).setLabel("➕ انضم").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`meme_start_${gameId}`).setLabel("▶️ ابدأ").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`meme_swap_${gameId}`).setLabel("🔄 غير الموقف").setStyle(ButtonStyle.Secondary).setDisabled(!canSwap),
     new ButtonBuilder().setCustomId(`meme_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
   )];
 }
 
 function buildMemeCaptionEmbed(state) {
   const submitted = Object.keys(state.captions).length;
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(0xf39c12).setTitle("😂 صنع الميم — اكتب كابشنك!")
     .setDescription(
       `**الموقف:**\n> 🎭 ${state.template.title}\n> *(${state.template.prompt})*\n\n` +
@@ -383,6 +392,8 @@ function buildMemeCaptionEmbed(state) {
       `⏱️ عندكم **60 ثانية** — اضغط "اكتب كابشنك" الآن!`
     )
     .setFooter({ text: "أضحك وحلل! 🤣" }).setTimestamp();
+  if (state.template.gif) embed.setImage(state.template.gif);
+  return embed;
 }
 
 function buildMemeCaptionRows(gameId) {
@@ -473,7 +484,7 @@ export async function handleMemeCommand(interaction) {
   const state = createMemeState(channelId, interaction.user.id);
   memeGames.set(state.id, state);
   memeChannelMap.set(channelId, state.id);
-  const msg = await interaction.reply({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(state.id), fetchReply: true });
+  const msg = await interaction.reply({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(state.id, state), fetchReply: true });
   state.messageId = msg.id;
 }
 
@@ -498,7 +509,20 @@ export async function handleMemeButton(interaction, db) {
     if (state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت بالفعل في اللعبة!", flags: 64 });
     if (state.players.length >= 10) return interaction.reply({ content: "❌ اللعبة امتلأت!", flags: 64 });
     state.players.push(interaction.user.id);
-    return interaction.update({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(gameId) });
+    return interaction.update({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(gameId, state) });
+  }
+
+  if (action === "swap") {
+    if (state.phase !== "lobby") return interaction.reply({ content: "❌ اللعبة بدأت!", flags: 64 });
+    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يغير الموقف!", flags: 64 });
+    if (state.swapCount >= 10) return interaction.reply({ content: "❌ وصلت لأقصى عدد تغييرات (10)!", flags: 64 });
+    const current = state.template;
+    let newTemplate;
+    do { newTemplate = MEME_TEMPLATES[Math.floor(Math.random() * MEME_TEMPLATES.length)]; }
+    while (newTemplate === current && MEME_TEMPLATES.length > 1);
+    state.template = newTemplate;
+    state.swapCount++;
+    return interaction.update({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(gameId, state) });
   }
 
   if (action === "cancel") {

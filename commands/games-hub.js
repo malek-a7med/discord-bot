@@ -108,6 +108,8 @@ function buildHubRows() {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_quiz").setLabel("🧠 مسابقة").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("ghub_rps").setLabel("✂️ حجر ورقة مقص").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء اللعبة").setStyle(ButtonStyle.Danger),
     ),
   ];
 }

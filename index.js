@@ -28,10 +28,10 @@ import {
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
-import { rouletteCommand, mafiaCommand, tttCommand, handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleGameButton } from "./commands/games.js";
+import { rouletteCommand, mafiaCommand, tttCommand, rpsCommand, handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleGameButton, channelGames, rpsChannelMap, rpsGames } from "./commands/games.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
-import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal } from "./commands/party-games.js";
+import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
@@ -491,6 +491,7 @@ const LEGACY_COMMANDS = [
   rouletteCommand,
   mafiaCommand,
   tttCommand,
+  rpsCommand,
   shopCommand,
   myAbilitiesCommand,
   codenamesCommand,
@@ -499,6 +500,13 @@ const LEGACY_COMMANDS = [
   gamesHubCommand,
   latestFeaturesCommand,
   speechModeCommand,
+  new SlashCommandBuilder()
+    .setName("auto-mod")
+    .setDescription("🛡️ تشغيل أو إيقاف نظام Auto-Mod [أونر فقط]")
+    .addStringOption(o =>
+      o.setName("حالة").setDescription("تشغيل أو إيقاف").setRequired(true)
+        .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
+    ),
   pollCommand,
   new ContextMenuCommandBuilder()
     .setName("✏️ تعديل رسالة")
@@ -633,6 +641,7 @@ const client = new Client({
 const activeGames = new Collection();
 // إجراءات التأديب المعلقة — تنتظر تأكيد المشرف
 const pendingModActions = new Map(); // actionId → { type, targetId, reason, duration, modId, guildId }
+let autoModEnabled = true; // تشغيل/إيقاف Auto-Mod
 const moderation = new ModerationListener(client, db, logger);
 
 // ───────────────────────────────────────────────────────────────
@@ -1416,7 +1425,9 @@ client.on("messageCreate", async (msg) => {
     // ── رد على شتيمة الأونر قبل ما الرسالة تتحذف ─────────────
     await checkAndReplyOwnerInsult(msg).catch(() => {});
 
-    const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner, geminiModel()).catch(() => ({}));
+    const amResult = autoModEnabled
+      ? await autoModScan(msg, db, geminiImageModel(), notifyOwner, geminiModel()).catch(() => ({}))
+      : {};
     if (amResult?.triggered) {
       // ── إرسال إمبيد التقرير في قناة اللوج ──────────────────
       if (amResult.logData) {
@@ -1793,6 +1804,7 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "روليت")        return await handleRouletteCommand(interaction, db);
       if (cmd === "مافيا")        return await handleMafiaCommand(interaction, db);
       if (cmd === "اكس-اوه")     return await handleTTTCommand(interaction, db);
+      if (cmd === "حجر-ورقة-مقص") return await handleRPSCommand(interaction);
       if (cmd === "متجر-قدرات")  return await handleShopCommand(interaction, db);
       if (cmd === "قدراتي")      return await handleMyAbilitiesCommand(interaction, db);
       if (cmd === "كود-نيمز")    return await handleCodenamesCommand(interaction);
@@ -1810,6 +1822,23 @@ client.on("interactionCreate", async (interaction) => {
           embeds: [new EmbedBuilder().setColor(0xa020f0).setTitle("💬 تم تغيير أسلوب الكلام")
             .setDescription(`أسلوب البوت دلوقتي: **${modeLabel}**\n\n*التغيير فوري على كل الردود الجديدة*`)
             .setTimestamp()],
+          ephemeral: true
+        });
+      }
+
+      if (cmd === "auto-mod") {
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        const state = interaction.options.getString("حالة");
+        autoModEnabled = state === "on";
+        return interaction.reply({
+          embeds: [new EmbedBuilder()
+            .setColor(autoModEnabled ? 0x2ecc71 : 0xe74c3c)
+            .setTitle(autoModEnabled ? "✅ Auto-Mod شغال" : "❌ Auto-Mod متوقف")
+            .setDescription(
+              autoModEnabled
+                ? "نظام Auto-Mod **شغال** دلوقتي — الرسايل المخالفة هتتحذف تلقائياً."
+                : "نظام Auto-Mod **متوقف** — مفيش رسايل هتتحذف تلقائياً."
+            ).setTimestamp()],
           ephemeral: true
         });
       }
@@ -2803,6 +2832,16 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
         if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
         if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
+        if (gid === "ghub_rps")                         return await handleRPSCommand(interaction);
+        if (gid === "ghub_cancel") {
+          const cid = interaction.channel.id;
+          if (channelGames.has(cid))    { channelGames.delete(cid); }
+          if (garticChannelMap.has(cid)) { const gId = garticChannelMap.get(cid); garticGames.delete(gId); garticChannelMap.delete(cid); }
+          if (memeChannelMap.has(cid))   { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
+          if (rpsChannelMap.has(cid))    { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
+          if (quizChannelMap.has(cid))   quizChannelMap.delete(cid);
+          return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", ephemeral: true });
+        }
       }
 
       // ─── أزرار تأكيد/إلغاء أوامر التأديب ────────────────────────
@@ -2828,8 +2867,7 @@ client.on("interactionCreate", async (interaction) => {
         if (!modGuild) return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("❌ خطأ").setDescription("مش لاقي السيرفر!")], components: [] });
 
         try {
-          await modGuild.members.fetch().catch(() => {});
-          const modMember = modGuild.members.cache.get(action.targetId);
+          const modMember = await modGuild.members.fetch(action.targetId).catch(() => null);
 
           if (action.type === "warn") {
             db.addWarning(action.targetId, action.reason, interaction.user.id);

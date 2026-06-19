@@ -11,7 +11,151 @@ import {
 const rouletteGames = new Map(); // gameId → state
 const mafiaGames    = new Map(); // gameId → state
 const tttGames      = new Map(); // gameId → state
-const channelGames  = new Map(); // channelId → gameId (لمنع لعبتين في روم واحد)
+export const channelGames  = new Map(); // channelId → gameId (لمنع لعبتين في روم واحد)
+
+// ══════════════════════════════════════════════════════════════
+//  ✂️ حجر ورقة مقص
+// ══════════════════════════════════════════════════════════════
+export const rpsGames      = new Map(); // gameId → state
+export const rpsChannelMap = new Map(); // channelId → gameId
+const rpsId = () => `rps${Date.now().toString(36)}${Math.random().toString(36).slice(2,4)}`;
+
+export async function handleRPSCommand(interaction) {
+  const channelId = interaction.channel.id;
+  if (rpsChannelMap.has(channelId))
+    return interaction.reply({ content: "❌ في لعبة شغالة هنا — خلصوها الأول!", flags: 64 });
+
+  const isButton   = interaction.isButton?.();
+  const opponent   = isButton ? null : interaction.options?.getUser("خصم");
+  if (!isButton && opponent) {
+    if (opponent.id === interaction.user.id) return interaction.reply({ content: "❌ ما تعبش مع نفسك!", flags: 64 });
+    if (opponent.bot) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد بوت!", flags: 64 });
+  }
+
+  const gameId = rpsId();
+  const state  = {
+    id: gameId, channelId,
+    playerA: interaction.user.id,
+    playerB: isButton ? null : (opponent?.id ?? null),
+    choiceA: null, choiceB: null,
+    phase: "waiting", messageId: null,
+    isOpen: isButton || !opponent,
+  };
+  rpsGames.set(gameId, state);
+  rpsChannelMap.set(channelId, gameId);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x9b59b6).setTitle("✂️ حجر ورقة مقص — دعوة!")
+    .setDescription(
+      state.isOpen
+        ? `<@${interaction.user.id}> بيطلب لعبة حجر ورقة مقص!\n🟢 اضغط "قبول" عشان تلعب ضده!`
+        : `<@${interaction.user.id}> بيتحداك يا <@${opponent.id}>!\nاضغط "قبول" أو "رفض"`
+    ).setTimestamp();
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`rps_accept_${gameId}`).setLabel("✅ قبول").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`rps_decline_${gameId}`).setLabel("❌ رفض").setStyle(ButtonStyle.Danger),
+  );
+
+  const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+  state.messageId = msg.id;
+
+  setTimeout(() => {
+    if (rpsGames.has(gameId) && rpsGames.get(gameId).phase === "waiting") {
+      rpsGames.delete(gameId); rpsChannelMap.delete(channelId);
+      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("✂️ انتهت المهلة").setDescription("محدش قبل التحدي.")], components: [] }).catch(() => {});
+    }
+  }, 60_000);
+}
+
+export async function handleRPSButton(interaction) {
+  const id    = interaction.customId;
+  const parts = id.split("_");
+  const action = parts[1];
+  const gameId = parts.slice(2).join("_");
+  const state  = rpsGames.get(gameId);
+  if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
+
+  // ── قبول / رفض ──────────────────────────────────────────────
+  if (action === "accept" || action === "decline") {
+    if (state.phase !== "waiting") return interaction.reply({ content: "❌ اللعبة بدأت!", flags: 64 });
+    if (state.isOpen) {
+      if (action === "decline") {
+        if (interaction.user.id !== state.playerA) return interaction.reply({ content: "❌ مش إنت اللي بدأت!", flags: 64 });
+        rpsGames.delete(gameId); rpsChannelMap.delete(state.channelId);
+        return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("✂️ تم الإلغاء").setDescription("اللعبة اتلغت.")], components: [] });
+      }
+      if (interaction.user.id === state.playerA) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد نفسك!", flags: 64 });
+      state.playerB = interaction.user.id;
+    } else {
+      if (interaction.user.id !== state.playerB) return interaction.reply({ content: "❌ الدعوة مش إلك!", flags: 64 });
+      if (action === "decline") {
+        rpsGames.delete(gameId); rpsChannelMap.delete(state.channelId);
+        return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("✂️ رُفض التحدي").setDescription(`<@${state.playerB}> رفض اللعبة.`)], components: [] });
+      }
+    }
+    state.phase = "choosing";
+    const chooseEmbed = new EmbedBuilder()
+      .setColor(0x9b59b6).setTitle("✂️ حجر ورقة مقص — اختار حركتك!")
+      .setDescription(
+        `<@${state.playerA}> 🆚 <@${state.playerB}>\n\n` +
+        `اضغط على حركتك — **الاختيار سري** ومحدش يشوفه غيرك!\n` +
+        `⏰ عندكم **30 ثانية**`
+      ).setTimestamp();
+    const chooseRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`rps_pick_${gameId}_rock`).setLabel("🪨 حجر").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`rps_pick_${gameId}_paper`).setLabel("📄 ورقة").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`rps_pick_${gameId}_scissors`).setLabel("✂️ مقص").setStyle(ButtonStyle.Danger),
+    );
+    await interaction.update({ embeds: [chooseEmbed], components: [chooseRow] });
+
+    setTimeout(() => {
+      if (rpsGames.has(gameId) && rpsGames.get(gameId).phase === "choosing") {
+        rpsGames.delete(gameId); rpsChannelMap.delete(state.channelId);
+        interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("✂️ انتهى الوقت").setDescription("محدش اختار في الوقت!")], components: [] }).catch(() => {});
+      }
+    }, 30_000);
+    return;
+  }
+
+  // ── اختيار حركة ──────────────────────────────────────────────
+  if (action === "pick") {
+    if (state.phase !== "choosing") return interaction.reply({ content: "❌ مش وقت الاختيار!", flags: 64 });
+    const uid   = interaction.user.id;
+    const pick  = parts[parts.length - 1]; // rock/paper/scissors
+    if (uid !== state.playerA && uid !== state.playerB)
+      return interaction.reply({ content: "❌ إنت مش في اللعبة دي!", flags: 64 });
+    const isA   = uid === state.playerA;
+    if (isA && state.choiceA) return interaction.reply({ content: "✅ إنت بالفعل اخترت!", flags: 64 });
+    if (!isA && state.choiceB) return interaction.reply({ content: "✅ إنت بالفعل اخترت!", flags: 64 });
+
+    const labels = { rock: "🪨 حجر", paper: "📄 ورقة", scissors: "✂️ مقص" };
+    if (isA) state.choiceA = pick;
+    else      state.choiceB = pick;
+    await interaction.reply({ content: `✅ اخترت **${labels[pick]}** — بنستنى خصمك!`, flags: 64 });
+
+    if (state.choiceA && state.choiceB) {
+      rpsGames.delete(gameId); rpsChannelMap.delete(state.channelId);
+      const wins = { rock: "scissors", paper: "rock", scissors: "paper" };
+      let resultText;
+      if (state.choiceA === state.choiceB) {
+        resultText = "🤝 **تعادل!** الاتنين اختاروا نفس الحاجة!";
+      } else if (wins[state.choiceA] === state.choiceB) {
+        resultText = `🏆 **فاز <@${state.playerA}>!**`;
+      } else {
+        resultText = `🏆 **فاز <@${state.playerB}>!**`;
+      }
+      const finalEmbed = new EmbedBuilder()
+        .setColor(0xf1c40f).setTitle("✂️ حجر ورقة مقص — النتيجة!")
+        .setDescription(
+          `<@${state.playerA}>: **${labels[state.choiceA]}**\n` +
+          `<@${state.playerB}>: **${labels[state.choiceB]}**\n\n` +
+          resultText
+        ).setTimestamp();
+      await interaction.editReply({ embeds: [finalEmbed], components: [] }).catch(() => {});
+    }
+  }
+}
 
 const randInt  = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const randArr  = arr => arr[randInt(0, arr.length - 1)];
@@ -982,13 +1126,53 @@ export async function handleTTTButton(interaction, db) {
         db.updateUser(state.winner, { coins: (db.getUser(state.winner).coins || 0) + prize });
       }
       tttGames.delete(gameId);
+      channelGames.delete(state.channelId);
     } else {
       state.currentTurn = state.currentTurn === "X" ? "O" : "X";
     }
 
     const embed = buildTTTEmbed(state);
     const rows  = buildTTTRows(gameId, state);
+    if (state.winner) {
+      rows.push(new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`ttt_rematch_${state.playerX}_${state.playerO}`)
+          .setLabel("🔁 لعبة جديدة").setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`ttt_exit_${state.channelId}`)
+          .setLabel("🚪 خروج").setStyle(ButtonStyle.Secondary),
+      ));
+    }
     return interaction.update({ embeds: [embed], components: rows });
+  }
+
+  // ── إعادة اللعبة ──────────────────────────────────────────────
+  if (id.startsWith("ttt_rematch_")) {
+    const p = id.replace("ttt_rematch_", "").split("_");
+    const pX = p[0], pO = p[1];
+    if (interaction.user.id !== pX && interaction.user.id !== pO)
+      return interaction.reply({ content: "❌ مش في اللعبة دي!", flags: 64 });
+    if (channelGames.has(interaction.channel.id))
+      return interaction.reply({ content: "❌ في لعبة شغالة هنا!", flags: 64 });
+
+    const newId = makeId();
+    const newState = {
+      id: newId, channelId: interaction.channel.id,
+      playerX: pX, playerO: pO,
+      board: Array(9).fill(""), currentTurn: "X",
+      winner: null, phase: "playing", isOpen: false,
+    };
+    tttGames.set(newId, newState);
+    channelGames.set(interaction.channel.id, newId);
+    return interaction.update({ embeds: [buildTTTEmbed(newState)], components: buildTTTRows(newId, newState) });
+  }
+
+  // ── خروج ──────────────────────────────────────────────────────
+  if (id.startsWith("ttt_exit_")) {
+    return interaction.update({
+      embeds: [new EmbedBuilder().setColor(0x555).setTitle("❌⭕ انتهت اللعبة").setDescription("شكراً على اللعب! 👋")],
+      components: [],
+    });
   }
 }
 
@@ -1008,10 +1192,16 @@ export const tttCommand = new SlashCommandBuilder()
   .setDescription("❌⭕ تيك تاك تو — العب ضد حد!")
   .addUserOption(o => o.setName("خصم").setDescription("اختار خصمك").setRequired(true));
 
+export const rpsCommand = new SlashCommandBuilder()
+  .setName("حجر-ورقة-مقص")
+  .setDescription("✂️ تحدى حد في حجر ورقة مقص!")
+  .addUserOption(o => o.setName("خصم").setDescription("اختار خصمك (اختياري — لو فاضي تحدي مفتوح)"));
+
 // Handler موحد للأزرار
 export async function handleGameButton(interaction, db) {
   const id = interaction.customId;
   if (id.startsWith("rlt_")) return handleRouletteButton(interaction, db);
   if (id.startsWith("maf_")) return handleMafiaButton(interaction, db);
   if (id.startsWith("ttt_")) return handleTTTButton(interaction, db);
+  if (id.startsWith("rps_")) return handleRPSButton(interaction);
 }
