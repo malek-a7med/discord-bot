@@ -57,6 +57,8 @@ import {
   TextInputBuilder,
   TextInputStyle,
   AttachmentBuilder,
+  ContextMenuCommandBuilder,
+  ApplicationCommandType,
 } from "discord.js";
 import {
   joinVoiceChannel,
@@ -498,6 +500,9 @@ const LEGACY_COMMANDS = [
   latestFeaturesCommand,
   speechModeCommand,
   pollCommand,
+  new ContextMenuCommandBuilder()
+    .setName("✏️ تعديل رسالة")
+    .setType(ApplicationCommandType.Message),
 ];
 
 // Advanced Feature Commands
@@ -3291,6 +3296,37 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 
+  // ─── Context Menu: تعديل رسالة ────────────────────────────────
+  if (interaction.isMessageContextMenuCommand() && interaction.commandName === "✏️ تعديل رسالة") {
+    if (!config.isOwner(interaction.user.id)) {
+      return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: 64 });
+    }
+    const target  = interaction.targetMessage;
+    const isBotMsg = target.author.id === client.user.id;
+
+    // نجيب المحتوى الحالي — نص عادي أو أول embed description
+    const currentContent =
+      target.content ||
+      target.embeds?.[0]?.description ||
+      target.embeds?.[0]?.title ||
+      "";
+
+    const modal = new ModalBuilder()
+      .setCustomId(`editmsg_${isBotMsg ? "bot" : "user"}_${target.channel.id}_${target.id}`)
+      .setTitle(isBotMsg ? "✏️ تعديل رسالة البوت" : "✏️ إعادة إرسال رسالة المستخدم");
+
+    const input = new TextInputBuilder()
+      .setCustomId("editmsg_content")
+      .setLabel(isBotMsg ? "المحتوى الجديد" : "المحتوى بعد التعديل")
+      .setStyle(TextInputStyle.Paragraph)
+      .setValue(currentContent.slice(0, 4000))
+      .setRequired(true)
+      .setMaxLength(4000);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    return interaction.showModal(modal);
+  }
+
   if (interaction.isModalSubmit()) {
     try {
       // ─── مودال مصارعة الكلام ────────────────────────────────────
@@ -3333,6 +3369,48 @@ client.on("interactionCreate", async (interaction) => {
 
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
         return await handleAdminReplyModalSubmit(interaction);
+      }
+
+      // ─── مودال تعديل / إعادة إرسال أي رسالة ─────────────────────
+      if (interaction.customId.startsWith("editmsg_")) {
+        const parts     = interaction.customId.split("_");
+        // editmsg_{bot|user}_{channelId}_{messageId}
+        const msgType   = parts[1];
+        const channelId = parts[2];
+        const messageId = parts[3];
+        const newText   = interaction.fields.getTextInputValue("editmsg_content");
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+          const ch  = await client.channels.fetch(channelId);
+          const msg = await ch.messages.fetch(messageId);
+
+          if (msgType === "bot") {
+            // رسالة البوت — نعدل عليها مباشرة
+            if (msg.embeds.length > 0) {
+              // لو الرسالة عندها embed، نعدل الـ description بتاعه
+              const oldEmbed = msg.embeds[0];
+              const newEmbed = EmbedBuilder.from(oldEmbed).setDescription(newText);
+              await msg.edit({ embeds: [newEmbed] });
+            } else {
+              await msg.edit({ content: newText, allowedMentions: { parse: [] } });
+            }
+            return interaction.editReply({ content: "✅ تم تعديل رسالة البوت بنجاح!" });
+          } else {
+            // رسالة شخص تاني — نمسح الأصل ونعيد إرساله
+            const authorTag  = msg.author.displayName ?? msg.author.username;
+            const authorAvatar = msg.author.displayAvatarURL();
+            await msg.delete().catch(() => {});
+            await ch.send({
+              content: `> 👤 **${authorTag}** (معدّل)\n${newText}`,
+              allowedMentions: { parse: [] },
+            });
+            return interaction.editReply({ content: "✅ تم حذف الرسالة الأصلية وإعادة إرسالها بالمحتوى الجديد!" });
+          }
+        } catch (err) {
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        }
       }
 
       // ─── مودال تعديل الإعلان ──────────────────────────────────────

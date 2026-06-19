@@ -806,29 +806,44 @@ export async function handleMafiaButton(interaction, db) {
 //  ❌⭕ اكس اوه (Tic-Tac-Toe)
 // ══════════════════════════════════════════════════════════════
 export async function handleTTTCommand(interaction, db) {
-  const opponent = interaction.options.getUser("خصم");
-  if (!opponent) return interaction.reply({ content: "❌ لازم تختار خصم!", ephemeral: true });
-  if (opponent.id === interaction.user.id) return interaction.reply({ content: "❌ ما تعبش مع نفسك 😅", ephemeral: true });
-  if (opponent.bot) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد بوت!", ephemeral: true });
+  // ── تحديد الخصم: من الأمر /اكس-اوه أو تحدي مفتوح من مركز الألعاب ──
+  const isButton   = interaction.isButton?.();
+  const opponent   = isButton ? null : interaction.options?.getUser("خصم");
+
+  if (!isButton) {
+    if (!opponent) return interaction.reply({ content: "❌ لازم تختار خصم!", flags: 64 });
+    if (opponent.id === interaction.user.id) return interaction.reply({ content: "❌ ما تعبش مع نفسك 😅", flags: 64 });
+    if (opponent.bot) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد بوت!", flags: 64 });
+  }
+
+  if (channelGames.has(interaction.channel.id))
+    return interaction.reply({ content: "❌ في لعبة شغالة هنا بالفعل!", flags: 64 });
 
   const gameId = makeId();
+  const isOpen = isButton; // تحدي مفتوح — أي حد يقدر يقبل
   const state = {
     id: gameId,
     channelId: interaction.channel.id,
     playerX: interaction.user.id,
-    playerO: opponent.id,
+    playerO: isOpen ? null : opponent.id,
     board: Array(9).fill(""),
     currentTurn: "X",
     winner: null,
     phase: "waiting",
+    isOpen,
   };
 
   tttGames.set(gameId, state);
+  channelGames.set(interaction.channel.id, gameId);
 
   const embed = new EmbedBuilder()
     .setColor(0x3498db)
     .setTitle("❌⭕ اكس اوه — دعوة للعب!")
-    .setDescription(`<@${interaction.user.id}> بيتحداك يا <@${opponent.id}>!\n\nاضغط "قبول" عشان تلعب أو "رفض" عشان تتجنبه 😄`)
+    .setDescription(
+      isOpen
+        ? `<@${interaction.user.id}> بيطلب لعبة اكس-اوه!\n\n🟢 **مين عنده جرأة يقبل؟** اضغط "قبول" عشان تلعب ضده!`
+        : `<@${interaction.user.id}> بيتحداك يا <@${opponent.id}>!\n\nاضغط "قبول" عشان تلعب أو "رفض" عشان تتجنبه 😄`
+    )
     .setTimestamp();
 
   const rows = [new ActionRowBuilder().addComponents(
@@ -842,7 +857,8 @@ export async function handleTTTCommand(interaction, db) {
   setTimeout(() => {
     if (tttGames.has(gameId) && tttGames.get(gameId).phase === "waiting") {
       tttGames.delete(gameId);
-      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("❌⭕ انتهت المهلة")], components: [] }).catch(() => {});
+      channelGames.delete(interaction.channel.id);
+      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("❌⭕ انتهت المهلة").setDescription("محدش قبل التحدي 😔")], components: [] }).catch(() => {});
     }
   }, 60 * 1000);
 }
@@ -913,12 +929,26 @@ export async function handleTTTButton(interaction, db) {
   if (id.startsWith("ttt_accept_") || id.startsWith("ttt_decline_")) {
     const gameId = id.split("_").slice(2).join("_");
     const state  = tttGames.get(gameId);
-    if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", ephemeral: true });
-    if (interaction.user.id !== state.playerO) return interaction.reply({ content: "❌ الدعوة مش إلك!", ephemeral: true });
+    if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
 
-    if (id.startsWith("ttt_decline_")) {
-      tttGames.delete(gameId);
-      return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("❌⭕ رُفضت الدعوة").setDescription(`<@${state.playerO}> رفض يلعب 😢`)], components: [] });
+    // تحدي مفتوح — أي حد غير اللي بدأ يقدر يقبل
+    if (state.isOpen) {
+      if (id.startsWith("ttt_decline_")) {
+        if (interaction.user.id !== state.playerX) return interaction.reply({ content: "❌ مش إنت اللي بدأت التحدي!", flags: 64 });
+        tttGames.delete(gameId);
+        channelGames.delete(state.channelId);
+        return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("❌⭕ التحدي اتلغى").setDescription("اللي بدأ التحدي ألغاه.")], components: [] });
+      }
+      if (interaction.user.id === state.playerX) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد نفسك!", flags: 64 });
+      state.playerO = interaction.user.id;
+    } else {
+      // تحدي محدد لشخص معين
+      if (interaction.user.id !== state.playerO) return interaction.reply({ content: "❌ الدعوة مش إلك!", flags: 64 });
+      if (id.startsWith("ttt_decline_")) {
+        tttGames.delete(gameId);
+        channelGames.delete(state.channelId);
+        return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("❌⭕ رُفضت الدعوة").setDescription(`<@${state.playerO}> رفض يلعب 😢`)], components: [] });
+      }
     }
 
     state.phase = "playing";
