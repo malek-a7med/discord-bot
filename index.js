@@ -313,13 +313,13 @@ const LEGACY_COMMANDS = [
     .setName("تحذير")
     .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
+    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
     .addStringOption((o) => o.setName("السبب").setDescription("السبب").setRequired(true)),
   new SlashCommandBuilder()
     .setName("اسكات")
     .setDescription("إسكات عضو مؤقتاً [مشرف] / Timeout a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
+    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
     .addIntegerOption((o) =>
       o.setName("مدة").setDescription("المدة بالدقائق (1-1440)").setRequired(true).setMinValue(1).setMaxValue(1440)
     )
@@ -328,19 +328,19 @@ const LEGACY_COMMANDS = [
     .setName("طرد")
     .setDescription("طرد عضو [مشرف] / Kick a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
+    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
     .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
   new SlashCommandBuilder()
     .setName("تبنيد")
     .setDescription("حظر عضو نهائياً [مشرف] / Ban a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
+    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
     .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
   new SlashCommandBuilder().setName("مساعدة").setDescription("قائمة جميع الأوامر / Help"),
   new SlashCommandBuilder()
     .setName("تحذيرات")
     .setDescription("عرض تحذيرات عضو / View warnings")
-    .addUserOption((o) => o.setName("عضو").setDescription("العضو")),
+    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID (اتركه فاضي عشان تشوف تحذيراتك)")),
   new SlashCommandBuilder()
     .setName("ليدربورد")
     .setDescription("أفضل 10 أعضاء في السيرفر / Top 10 leaderboard")
@@ -587,6 +587,23 @@ function findMember(guild, nameOrId) {
       m.user.id === nameOrId
     ) || null
   );
+}
+
+async function resolveMember(guild, nameOrId) {
+  if (!guild || !nameOrId) return null;
+  nameOrId = nameOrId.replace(/[<@!>]/g, "").trim();
+  const cached = findMember(guild, nameOrId);
+  if (cached) return cached;
+  if (/^\d{17,20}$/.test(nameOrId)) {
+    return guild.members.fetch(nameOrId).catch(() => null);
+  }
+  try {
+    const results = await guild.members.search({ query: nameOrId, limit: 5 });
+    return results.find(m =>
+      m.user.username.toLowerCase().includes(nameOrId.toLowerCase()) ||
+      m.displayName.toLowerCase().includes(nameOrId.toLowerCase())
+    ) ?? results.first() ?? null;
+  } catch { return null; }
 }
 
 async function deployCommands(token, clientId) {
@@ -1233,13 +1250,15 @@ function pushUserHistory(userId, role, text) {
   h.push({ role, text: text.slice(0, 300) });
   if (h.length > MAX_USER_HIST) h.splice(0, h.length - MAX_USER_HIST);
 }
-let botSpeechMode = "normal"; // "normal" | "free"
+let botSpeechMode = "normal"; // "normal" | "free" | "toxic"
 
 function buildUserPrompt(senderName, question, userId) {
   const hist = getUserHistory(userId);
   const histText = hist.map(m => `${m.role === "user" ? senderName : "زنجي"}: ${m.text}`).join("\n");
   const modeNote = botSpeechMode === "free"
     ? "\nأسلوبك حر شوية — ممكن تكون أكتر صراحة وعفوية، بس ما تعدّيش الحدود الحمرا."
+    : botSpeechMode === "toxic"
+    ? "\nأسلوبك توكسيك — بتكلم بحدة ومباشرة، لو حد شتمك أو استفزك ترد بشتايم أكتر، مش بتهادن ومش بتخبص في كلامك. بس ما تعديش حدود الديسكورد."
     : "";
   return `أنت زنجي — بوت ديسكورد مصري ودود، بتتكلم بالعامية المصرية الطبيعية.${modeNote}
 ${histText ? `\nسياق المحادثة:\n${histText}\n` : ""}
@@ -1817,9 +1836,12 @@ client.on("interactionCreate", async (interaction) => {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         const mode = interaction.options.getString("أسلوب");
         botSpeechMode = mode;
-        const modeLabel = mode === "free" ? "😈 حر — البوت بيكلم بحرية أكتر" : "🎩 محترم — رد لطيف ومودّب";
+        const modeLabel = mode === "free" ? "😈 حر — البوت بيكلم بحرية أكتر"
+          : mode === "toxic" ? "☠️ توكسيك — البوت حاد ومباشر وبيشتم لو شتموه"
+          : "🎩 محترم — رد لطيف ومودّب";
+        const modeColor = mode === "toxic" ? 0xe74c3c : mode === "free" ? 0x9b59b6 : 0x2ecc71;
         return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(0xa020f0).setTitle("💬 تم تغيير أسلوب الكلام")
+          embeds: [new EmbedBuilder().setColor(modeColor).setTitle("💬 تم تغيير أسلوب الكلام")
             .setDescription(`أسلوب البوت دلوقتي: **${modeLabel}**\n\n*التغيير فوري على كل الردود الجديدة*`)
             .setTimestamp()],
           ephemeral: true
@@ -2391,14 +2413,16 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "تحذير") {
-        const target = interaction.options.getUser("عضو");
+        const nameOrId = interaction.options.getString("عضو");
+        const target = await resolveMember(guild, nameOrId);
+        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
         const reason = interaction.options.getString("السبب");
         const actionId = `modwarn_${Date.now()}_${user.id}`;
         pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
         setTimeout(() => pendingModActions.delete(actionId), 90_000);
         return interaction.reply({
           embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تأكيد التحذير")
-            .setDescription(`هتحذّر ${target}؟\n📋 **السبب:** ${reason}`)
+            .setDescription(`هتحذّر <@${target.id}>؟\n📋 **السبب:** ${reason}`)
             .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
           components: [new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التحذير").setStyle(ButtonStyle.Danger),
@@ -2409,7 +2433,9 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "اسكات") {
-        const target = interaction.options.getUser("عضو");
+        const nameOrId = interaction.options.getString("عضو");
+        const target = await resolveMember(guild, nameOrId);
+        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
         const dur = interaction.options.getInteger("مدة");
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
         const actionId = `modmute_${Date.now()}_${user.id}`;
@@ -2417,7 +2443,7 @@ client.on("interactionCreate", async (interaction) => {
         setTimeout(() => pendingModActions.delete(actionId), 90_000);
         return interaction.reply({
           embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تأكيد الإسكات")
-            .setDescription(`هتسكّت ${target} لمدة **${dur} دقيقة**؟\n📋 **السبب:** ${reason}`)
+            .setDescription(`هتسكّت <@${target.id}> لمدة **${dur} دقيقة**؟\n📋 **السبب:** ${reason}`)
             .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
           components: [new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الإسكات").setStyle(ButtonStyle.Danger),
@@ -2428,14 +2454,16 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "طرد") {
-        const target = interaction.options.getUser("عضو");
+        const nameOrId = interaction.options.getString("عضو");
+        const target = await resolveMember(guild, nameOrId);
+        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
         const actionId = `modkick_${Date.now()}_${user.id}`;
         pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
         setTimeout(() => pendingModActions.delete(actionId), 90_000);
         return interaction.reply({
           embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تأكيد الطرد")
-            .setDescription(`هتطرد ${target} من السيرفر؟\n📋 **السبب:** ${reason}`)
+            .setDescription(`هتطرد <@${target.id}> من السيرفر؟\n📋 **السبب:** ${reason}`)
             .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
           components: [new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الطرد").setStyle(ButtonStyle.Danger),
@@ -2446,14 +2474,16 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "تبنيد") {
-        const target = interaction.options.getUser("عضو");
+        const nameOrId = interaction.options.getString("عضو");
+        const target = await resolveMember(guild, nameOrId);
+        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
         const actionId = `modban_${Date.now()}_${user.id}`;
         pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
         setTimeout(() => pendingModActions.delete(actionId), 90_000);
         return interaction.reply({
           embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تأكيد التبنيد")
-            .setDescription(`هتبند ${target} من السيرفر نهائياً؟\n📋 **السبب:** ${reason}`)
+            .setDescription(`هتبند <@${target.id}> من السيرفر نهائياً؟\n📋 **السبب:** ${reason}`)
             .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
           components: [new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التبنيد").setStyle(ButtonStyle.Danger),
@@ -2468,10 +2498,36 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "تحذيرات") {
-        const target = interaction.options.getUser("عضو") ?? user;
-        const warns = db.getWarnings(target.id);
-        if (warns.length === 0) return interaction.reply({ content: "😇 العضو ده سجلّه أبيض وزي الفل!" });
-        return interaction.reply({ content: `⚠️ عدد تحذيراته: **${warns.length}** تحذير.` });
+        const nameOrId = interaction.options.getString("عضو");
+        let targetMember = null;
+        let targetUser = user;
+        if (nameOrId) {
+          targetMember = await resolveMember(guild, nameOrId);
+          if (!targetMember) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+          targetUser = targetMember.user;
+        }
+        const warns = db.getWarnings(targetUser.id);
+        if (warns.length === 0) {
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("😇 سجل أبيض!")
+              .setDescription(`<@${targetUser.id}> ما عندهوش أي تحذيرات 🌟`)
+              .setThumbnail(targetUser.displayAvatarURL())],
+            ephemeral: true,
+          });
+        }
+        const warnFields = warns.slice(-10).reverse().map((w, i) => ({
+          name: `⚠️ تحذير #${warns.length - i}`,
+          value: `📋 **السبب:** ${w.reason ?? "غير محدد"}\n🛡️ **المشرف:** <@${w.modId ?? "مجهول"}>\n📅 **التاريخ:** <t:${Math.floor((w.timestamp ?? Date.now()) / 1000)}:R>`,
+          inline: false,
+        }));
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("📋 سجل التحذيرات")
+            .setDescription(`<@${targetUser.id}> عنده **${warns.length}** تحذير${warns.length > 10 ? ` (بيتعرض آخر 10)` : ""}`)
+            .setThumbnail(targetUser.displayAvatarURL())
+            .addFields(...warnFields)
+            .setTimestamp()],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "ليدربورد") {
@@ -3380,6 +3436,50 @@ client.on("interactionCreate", async (interaction) => {
       // ─── مودالات ميم جيم ─────────────────────────────────────────
       if (interaction.customId.startsWith("mememodal_")) {
         return await handleMemeModal(interaction, db);
+      }
+
+      // ─── مودال حجر ورقة مقص (أي اختيار في الكون) ────────────────
+      if (interaction.customId.startsWith("rpsmodal_")) {
+        const gameId = interaction.customId.slice(9);
+        const state  = rpsGames.get(gameId);
+        if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
+        const uid = interaction.user.id;
+        if (uid !== state.playerA && uid !== state.playerB)
+          return interaction.reply({ content: "❌ إنت مش في اللعبة دي!", flags: 64 });
+        const isA = uid === state.playerA;
+        if (isA && state.choiceA) return interaction.reply({ content: "✅ إنت بالفعل اخترت! بنستنى خصمك.", flags: 64 });
+        if (!isA && state.choiceB) return interaction.reply({ content: "✅ إنت بالفعل اخترت! بنستنى خصمك.", flags: 64 });
+        const choice = (interaction.fields.getTextInputValue("choice") ?? "").trim().slice(0, 60);
+        if (!choice) return interaction.reply({ content: "❌ لازم تكتب حاجة!", flags: 64 });
+        if (isA) state.choiceA = choice;
+        else     state.choiceB = choice;
+        await interaction.reply({ content: `✅ اخترت **${choice}** — بنستنى خصمك!`, flags: 64 });
+
+        if (state.choiceA && state.choiceB) {
+          rpsGames.delete(gameId);
+          rpsChannelMap.delete(state.channelId);
+
+          const aiPrompt = `لعبة حجر ورقة مقص متقدمة. اللاعب الأول اختار "${state.choiceA}" واللاعب الثاني اختار "${state.choiceB}". من يفوز؟ فكّر في المنطق (مثلاً: الثقب الأسود يبتلع كل شيء، النار تحرق الورقة، الدرع يصد السيف...). أجب بعربي مصري مرح في سطرين: السطر الأول النتيجة (فاز اللاعب الأول/الثاني/تعادل)، السطر الثاني سبب مضحك.`;
+          let verdict = "🤔 البوت مش قادر يحكم — التعادل هو الحل!";
+          try {
+            const res = await geminiModel().generateContent(aiPrompt);
+            verdict = res.response.text().trim();
+          } catch { /* fallback above */ }
+
+          const finalEmbed = new EmbedBuilder()
+            .setColor(0xf1c40f).setTitle("✂️ حجر ورقة مقص — النتيجة!")
+            .setDescription(
+              `<@${state.playerA}> اختار: **${state.choiceA}**\n` +
+              `<@${state.playerB}> اختار: **${state.choiceB}**\n\n` +
+              `🤖 **حكم البوت:**\n${verdict}`
+            ).setTimestamp();
+
+          try {
+            const ch = await client.channels.fetch(state.channelId);
+            await ch.send({ embeds: [finalEmbed] });
+          } catch { /* ignore */ }
+        }
+        return;
       }
 
       if (interaction.customId === SUGGESTION_MODAL_ID) {

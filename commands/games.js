@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
-  ButtonBuilder, ButtonStyle,
+  ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle,
 } from "discord.js";
 
 // ─── حالة الألعاب في الذاكرة ─────────────────────────────────
@@ -99,61 +99,48 @@ export async function handleRPSButton(interaction) {
       .setColor(0x9b59b6).setTitle("✂️ حجر ورقة مقص — اختار حركتك!")
       .setDescription(
         `<@${state.playerA}> 🆚 <@${state.playerB}>\n\n` +
-        `اضغط على حركتك — **الاختيار سري** ومحدش يشوفه غيرك!\n` +
-        `⏰ عندكم **30 ثانية**`
+        `🌍 **مش لازم حجر أو ورقة أو مقص!**\n` +
+        `اختار **أي حاجة في الكون** — سيف، ثقب أسود، فرعون، طاسة شاي...\n` +
+        `الـ AI هيحكم مين يفوز ولماذا 🤖\n\n` +
+        `اضغط الزرار ده واكتب اختيارك — **سري لحد ما الاتنين يختاروا!**\n` +
+        `⏰ عندكم **2 دقيقة**`
       ).setTimestamp();
     const chooseRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`rps_pick_${gameId}_rock`).setLabel("🪨 حجر").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`rps_pick_${gameId}_paper`).setLabel("📄 ورقة").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`rps_pick_${gameId}_scissors`).setLabel("✂️ مقص").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`rps_open_${gameId}`).setLabel("✏️ اختار حركتك").setStyle(ButtonStyle.Primary),
     );
     await interaction.update({ embeds: [chooseEmbed], components: [chooseRow] });
 
     setTimeout(() => {
       if (rpsGames.has(gameId) && rpsGames.get(gameId).phase === "choosing") {
         rpsGames.delete(gameId); rpsChannelMap.delete(state.channelId);
-        interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("✂️ انتهى الوقت").setDescription("محدش اختار في الوقت!")], components: [] }).catch(() => {});
+        interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("✂️ انتهى الوقت").setDescription("محدش اختار في الوقت المحدد!")], components: [] }).catch(() => {});
       }
-    }, 30_000);
+    }, 120_000);
     return;
   }
 
-  // ── اختيار حركة ──────────────────────────────────────────────
-  if (action === "pick") {
+  // ── فتح الـ Modal لاختيار الحركة ─────────────────────────────
+  if (action === "open") {
     if (state.phase !== "choosing") return interaction.reply({ content: "❌ مش وقت الاختيار!", flags: 64 });
-    const uid   = interaction.user.id;
-    const pick  = parts[parts.length - 1]; // rock/paper/scissors
+    const uid = interaction.user.id;
     if (uid !== state.playerA && uid !== state.playerB)
       return interaction.reply({ content: "❌ إنت مش في اللعبة دي!", flags: 64 });
-    const isA   = uid === state.playerA;
-    if (isA && state.choiceA) return interaction.reply({ content: "✅ إنت بالفعل اخترت!", flags: 64 });
-    if (!isA && state.choiceB) return interaction.reply({ content: "✅ إنت بالفعل اخترت!", flags: 64 });
+    const isA = uid === state.playerA;
+    if (isA && state.choiceA) return interaction.reply({ content: "✅ إنت بالفعل اخترت — بنستنى خصمك!", flags: 64 });
+    if (!isA && state.choiceB) return interaction.reply({ content: "✅ إنت بالفعل اخترت — بنستنى خصمك!", flags: 64 });
 
-    const labels = { rock: "🪨 حجر", paper: "📄 ورقة", scissors: "✂️ مقص" };
-    if (isA) state.choiceA = pick;
-    else      state.choiceB = pick;
-    await interaction.reply({ content: `✅ اخترت **${labels[pick]}** — بنستنى خصمك!`, flags: 64 });
-
-    if (state.choiceA && state.choiceB) {
-      rpsGames.delete(gameId); rpsChannelMap.delete(state.channelId);
-      const wins = { rock: "scissors", paper: "rock", scissors: "paper" };
-      let resultText;
-      if (state.choiceA === state.choiceB) {
-        resultText = "🤝 **تعادل!** الاتنين اختاروا نفس الحاجة!";
-      } else if (wins[state.choiceA] === state.choiceB) {
-        resultText = `🏆 **فاز <@${state.playerA}>!**`;
-      } else {
-        resultText = `🏆 **فاز <@${state.playerB}>!**`;
-      }
-      const finalEmbed = new EmbedBuilder()
-        .setColor(0xf1c40f).setTitle("✂️ حجر ورقة مقص — النتيجة!")
-        .setDescription(
-          `<@${state.playerA}>: **${labels[state.choiceA]}**\n` +
-          `<@${state.playerB}>: **${labels[state.choiceB]}**\n\n` +
-          resultText
-        ).setTimestamp();
-      await interaction.editReply({ embeds: [finalEmbed], components: [] }).catch(() => {});
-    }
+    const modal = new ModalBuilder()
+      .setCustomId(`rpsmodal_${gameId}`)
+      .setTitle("✂️ اختار حركتك!");
+    const input = new TextInputBuilder()
+      .setCustomId("choice")
+      .setLabel("اكتب أي حاجة في الكون 🌍")
+      .setPlaceholder("مثلاً: ثقب أسود / سيف السامورساي / قنبلة نووية...")
+      .setStyle(TextInputStyle.Short)
+      .setRequired(true)
+      .setMaxLength(60);
+    modal.addComponents(new ActionRowBuilder().addComponents(input));
+    return interaction.showModal(modal);
   }
 }
 
