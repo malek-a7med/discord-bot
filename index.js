@@ -35,7 +35,7 @@ import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticMod
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
-import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand } from "./commands/games-hub.js";
+import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand, LATEST_FEATURES } from "./commands/games-hub.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -566,6 +566,50 @@ const LEGACY_COMMANDS = [
     .setName("✏️ تعديل رسالة")
     .setType(ApplicationCommandType.Message),
 ];
+
+// ═══════════════════════════════════════════════════════════════
+//  🚨 شرط إلزامي — أي ميزة جديدة لازم تتضاف في /احدث-المميزات
+//  القاعدة: كل أمر slash جديد لازم يكون ليه entry في LATEST_FEATURES
+//  لو مش موجود → البوت يطلع warning واضح في الـ console عند الشغل
+// ═══════════════════════════════════════════════════════════════
+function validateLatestFeatures(allCommands) {
+  const documented = LATEST_FEATURES.map(f => f.name + " " + f.value).join(" ").toLowerCase();
+  const undocumented = [];
+  for (const cmd of allCommands) {
+    const name = typeof cmd.name === "string" ? cmd.name : cmd?.data?.name;
+    if (!name) continue;
+    // الأوامر الأساسية القديمة — موجودة قبل نظام /احدث-المميزات
+    const skipList = [
+      "ping","hello","roll","serverinfo","userinfo",
+      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","✏️ تعديل رسالة",
+      "بروفايل","محفظة","متجر","شراء","إعطاء","يومي",
+      "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات",
+      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-صلاحيات-رول",
+      "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة",
+      "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف",
+      "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
+      "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
+      "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
+      "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
+      "مصارعة","روليت","مافيا","اكس-اوه",
+      "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
+      "حجر-ورقة-مقص","تحدي-يومي",
+    ];
+    if (skipList.includes(name)) continue;
+    if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
+      undocumented.push(name);
+    }
+  }
+  if (undocumented.length > 0) {
+    console.warn("═══════════════════════════════════════════════════════");
+    console.warn("⚠️  تحذير: الأوامر دي مش موثقة في /احدث-المميزات !");
+    console.warn("   أضفهم في LATEST_FEATURES داخل commands/games-hub.js");
+    console.warn("   الأوامر:", undocumented.join(", "));
+    console.warn("═══════════════════════════════════════════════════════");
+  } else {
+    console.log("✅ [LatestFeatures] كل الأوامر موثقة في /احدث-المميزات ✔");
+  }
+}
 
 // Advanced Feature Commands
 async function getAdvancedCommands() {
@@ -1214,6 +1258,7 @@ client.once("clientReady", async (c) => {
   logger.success(`تسجيل الدخول بـ: ${c.user.username}`);
   c.user.setActivity(`${LEGACY_COMMANDS.length + 14} أمر | /مساعدة`, { type: 3 });
   await deployCommands(process.env.DISCORD_TOKEN, c.user.id);
+  validateLatestFeatures(LEGACY_COMMANDS);
   await ensureSuggestionsPanel(c);
   setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
