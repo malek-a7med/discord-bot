@@ -4057,8 +4057,19 @@ process.on("SIGINT", async () => {
 });
 
 // ================= نظام الترحيب الأسطوري للفراعنة =================
-// ✅ [تعديل 6] حذف require() داخل الدالة — المكتبات محملة في الأعلى
+// deduplication: نمنع إرسال أكتر من رسالة للنفس العضو في 10 ثواني
+const _recentJoins = new Map();
+const _recentLeaves = new Map();
+function _dedupe(map, key, ttl = 10000) {
+  if (map.has(key)) return false;
+  map.set(key, true);
+  setTimeout(() => map.delete(key), ttl);
+  return true;
+}
+
 client.on('guildMemberAdd', async (member) => {
+  if (!_dedupe(_recentJoins, `${member.guild.id}-${member.id}`)) return;
+
   const WELCOME_CHANNEL_ID = "1486100560494203183";
 
   const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
@@ -4094,6 +4105,8 @@ client.on('guildMemberAdd', async (member) => {
 
 // ================= نظام الوداع للفراعنة =================
 client.on('guildMemberRemove', async (member) => {
+  if (!_dedupe(_recentLeaves, `${member.guild.id}-${member.id}`)) return;
+
   const WELCOME_CHANNEL_ID = "1486100560494203183";
 
   const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
