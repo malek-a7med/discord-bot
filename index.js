@@ -931,6 +931,33 @@ async function updateLinkedSuggestionMessages({
     embeds: [updatedAdminEmbed],
     components: [buildAdminActionRow(true), buildAdminSolvedRow(solvedAlready)],
   });
+
+  // ── إشعار تلقائي لصاحب الاقتراح عند أي تغيير في الحالة ─────────
+  if (authorUser) {
+    const dmEmbed = new EmbedBuilder()
+      .setColor(status.color)
+      .setTitle("📢 تحديث على اقتراحك في سيرفر الفراعنة")
+      .setDescription(
+        `يا **${authorUser.globalName || authorUser.username}**!\n` +
+        `الإدارة عدّلت حالة اقتراحك 👇\n\n` +
+        `**📝 اقتراحك:**\n${text.slice(0, 512)}\n\n` +
+        `**📊 الحالة الجديدة:**\n${status.text}\n\n` +
+        `*لو عندك أي استفسار، راجع لوحة الاقتراحات في السيرفر 🔱*`
+      )
+      .setFooter({ text: "سيرفر الفراعنة — نظام الاقتراحات" })
+      .setTimestamp();
+
+    try {
+      await authorUser.send({ embeds: [dmEmbed] });
+      logger.info(`📢 DM اتبعت لـ ${authorUser.tag} — حالة الاقتراح: ${status.text}`);
+    } catch (err) {
+      if (err.code === 50007) {
+        logger.warn(`⚠️ [DM] ما قدرناش نبعت إشعار لـ ${authorUser.tag} — الـ DMs مقفولة (50007)`);
+      } else {
+        logger.warn(`⚠️ [DM] خطأ غير متوقع عند إشعار ${authorUser.tag}:`, err.message);
+      }
+    }
+  }
 }
 
 async function handleAdminSuggestionAction(interaction, statusKey) {
