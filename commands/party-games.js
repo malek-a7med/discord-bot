@@ -209,8 +209,16 @@ export async function handleGarticButton(interaction) {
   }
 
   if (action === "realplay") {
-    await interaction.reply({ content: `🌐 **${interaction.user.displayName}** بيعزمكم تلعبوا الهاتف المكسور الأصلي! انضموا معاه هنا 👇\nhttps://garticphone.com/ar` });
-    return;
+    garticGames.delete(gameId); garticChannelMap.delete(state.channelId);
+    return interaction.update({
+      embeds: [new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle("🌐 روحوا العبوا الهاتف المكسور الأصلي!")
+        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n👇 **الرابط:**\nhttps://garticphone.com/ar\n\n*(اللعبة على البوت اتلغت تلقائياً)*`)
+        .setTimestamp()
+      ],
+      components: [],
+    });
   }
 
   if (action === "cancel") {
@@ -516,8 +524,16 @@ export async function handleMemeButton(interaction, db) {
   if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
 
   if (action === "realplay") {
-    await interaction.reply({ content: `🌐 **${interaction.user.displayName}** بيعزمكم تلعبوا صنع الميم الأصلي! انضموا معاه هنا 👇\nhttps://makeitmeme.com/ar/` });
-    return;
+    memeGames.delete(gameId); memeChannelMap.delete(state.channelId);
+    return interaction.update({
+      embeds: [new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle("🌐 روحوا العبوا صنع الميم الأصلي!")
+        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n👇 **الرابط:**\nhttps://makeitmeme.com/ar/\n\n*(اللعبة على البوت اتلغت تلقائياً)*`)
+        .setTimestamp()
+      ],
+      components: [],
+    });
   }
 
   if (action === "join") {

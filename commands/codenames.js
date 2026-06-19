@@ -208,8 +208,16 @@ export async function handleCodenamesButton(interaction) {
   }
 
   if (action === "realplay") {
-    await interaction.reply({ content: `🌐 **${interaction.user.displayName}** بيعزمكم تلعبوا كود نيمز الأصلي! انضموا معاه هنا 👇\nhttps://codenames.game/` });
-    return;
+    codenamesGames.delete(gameId); cdnChannelGames.delete(state.channelId);
+    return interaction.update({
+      embeds: [new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle("🌐 روحوا العبوا كود نيمز الأصلي!")
+        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n👇 **الرابط:**\nhttps://codenames.game/\n\n*(اللعبة على البوت اتلغت تلقائياً)*`)
+        .setTimestamp()
+      ],
+      components: [],
+    });
   }
 
   if (action === "cancel") {
