@@ -11,6 +11,11 @@ import {
 // ══════════════════════════════════════════════════════════════
 export const LATEST_FEATURES = [
   {
+    name: "🧠 لعبة المسابقة — جديد!",
+    value: "أسئلة ثقافية متعددة الخيارات — أول واحد يجاوب صح يكسب **100 كوينز + 30 XP**!\n→ من `/الألعاب` فقط",
+    inline: false,
+  },
+  {
     name: "📊 نظام الاستفتاءات — جديد!",
     value: "أنشئ استفتاء في أي روم بسؤال وخيارات، والنتايج تلقائياً بعد المدة\nالفائز بأكتر أصوات يتعلن تلقائياً 🏆\n→ `/استفتاء`",
     inline: false,
@@ -80,7 +85,8 @@ function buildHubEmbed() {
       `❌⭕ **اكس-اوه** — تيك تاك تو الكلاسيكي مع التحديات\n` +
       `🃏 **كود نيمز** — فريقين يخمنوا الكلمات السرية\n` +
       `📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة\n` +
-      `😂 **صنع الميم** — اكتب أحلى كابشن وفوز بالكوينز\n\n` +
+      `😂 **صنع الميم** — اكتب أحلى كابشن وفوز بالكوينز\n` +
+      `🧠 **مسابقة** — أسئلة ثقافية، أول واحد يجاوب صح يكسب الكوينز\n\n` +
       `⚔️ **/مصارعة** — تحدى أي حد بالكلام\n` +
       `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
     )
@@ -99,6 +105,9 @@ function buildHubRows() {
       new ButtonBuilder().setCustomId("ghub_cdn").setLabel("🃏 كود نيمز").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 الهاتف المكسور").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 صنع الميم").setStyle(ButtonStyle.Primary),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("ghub_quiz").setLabel("🧠 مسابقة").setStyle(ButtonStyle.Success),
     ),
   ];
 }

@@ -20,6 +20,7 @@ COPY package*.json ./
 
 # npm ci بدل npm install: أسرع وأكثر ثباتاً، بيعتمد على lockfile مقفول بالكامل
 RUN npm ci --omit=dev --no-audit --no-fund \
+    --registry=https://registry.npmjs.org/ \
     --fetch-retries=5 \
     --fetch-retry-mintimeout=20000 \
     --fetch-retry-maxtimeout=120000

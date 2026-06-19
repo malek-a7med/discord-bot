@@ -33,6 +33,7 @@ import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCo
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
 import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal } from "./commands/party-games.js";
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
+import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand } from "./commands/games-hub.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -206,7 +207,6 @@ const LEGACY_COMMANDS = [
     .setDescription("عرض بروفايلك (المستوى والكوينز) / Your profile")
     .addUserOption((o) => o.setName("عضو").setDescription("اختر عضو / Choose member")),
   new SlashCommandBuilder().setName("محفظة").setDescription("عرض رصيدك من الكوينز / Your wallet"),
-  new SlashCommandBuilder().setName("العاب").setDescription("لعبة سرعة في الشات — الفائز يكسب 150 كوينز"),
   new SlashCommandBuilder().setName("متجر").setDescription("عرض الرتب المتاحة للشراء / Shop roles"),
   new SlashCommandBuilder()
     .setName("شراء")
@@ -2119,27 +2119,6 @@ client.on("interactionCreate", async (interaction) => {
         return await handleBattleCommand(interaction, db, geminiModel());
       }
 
-      if (cmd === "العاب") {
-        if (activeGames.has(channel.id)) return interaction.reply({ content: "❌ فيه لعبة شغالة هنا بالفعل!", ephemeral: true });
-        activeGames.set(channel.id, true);
-        const randomQ = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
-        await interaction.reply({ content: `🎮 **لعبة السرعة بدأت!** أسرع إجابة تكسب 150 كوينز.\n\n🔥 **السؤال:** ${randomQ.q}` });
-
-        const filter = (m) => !m.author.bot && randomQ.a.some(ans => m.content.trim() === ans);
-        const collector = channel.createMessageCollector({ filter, time: 15000, max: 1 });
-
-        collector.on("collect", (m) => {
-          const uData = db.getUser(m.author.id);
-          db.updateUser(m.author.id, { coins: uData.coins + 150 });
-          m.reply(`🎉 إجابة صحيحة من ${m.author}! مبروك الـ **150 كوينز**! 🪙`);
-        });
-        collector.on("end", (collected) => {
-          activeGames.delete(channel.id);
-          if (collected.size === 0) channel.send(`⏰ خلص الوقت ومحدش جاوب! الإجابة هي: \`${randomQ.a[0]}\``);
-        });
-        return;
-      }
-
       if (cmd === "متجر") {
         const embed = new EmbedBuilder()
           .setColor(0xffd700)
@@ -2787,6 +2766,11 @@ client.on("interactionCreate", async (interaction) => {
         return await handlePollButton(interaction);
       }
 
+      // ─── أزرار المسابقة ───────────────────────────────────────────
+      if (interaction.customId.startsWith("quiz_")) {
+        return await handleQuizButton(interaction, db);
+      }
+
       // ─── أزرار الهاتف المكسور ─────────────────────────────────────
       if (interaction.customId.startsWith("gar_")) {
         return await handleGarticButton(interaction);
@@ -2806,6 +2790,7 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_cdn" || gid === "ftr_cdn")   return await handleCodenamesCommand(interaction);
         if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
         if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
+        if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
       }
 
       // ─── أزرار تأكيد/إلغاء أوامر التأديب ────────────────────────
@@ -3539,7 +3524,7 @@ client.on('guildMemberAdd', async (member) => {
         `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
-        `👤 **الـعـضـو الـجـديـد:** <@${member.id}>\n` +
+        `👤 **الـعـضـو الـجـديـد:** ${member.displayName}\n` +
         `🆔 **الـمـعـرّف الـخـاص:** \`${member.id}\`\n` +
         `📊 **أنـت الـفـرعـون رقـم:** \`${member.guild.memberCount}\` في مملكتنا!\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
