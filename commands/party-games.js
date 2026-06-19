@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-//  🎉 Party Games — جارتك فون + ميم جيم
-//  جارتك فون: سلسلة وصف وتخمين | ميم جيم: أفضل كابشن يفوز
+//  🎉 Party Games — الهاتف المكسور + صنع الميم
+//  الهاتف المكسور: سلسلة وصف وتخمين | صنع الميم: أفضل كابشن يفوز
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
@@ -9,7 +9,7 @@ import {
 } from "discord.js";
 
 // ══════════════════════════════════════════════════════════════
-//  📞 جارتك فون — Gartic Phone
+//  📞 الهاتف المكسور — Broken Phone
 // ══════════════════════════════════════════════════════════════
 export const garticGames      = new Map();
 export const garticChannelMap = new Map();
@@ -36,7 +36,7 @@ function createGarticState(channelId, creatorId) {
 function buildGarticLobbyEmbed(state) {
   const hint = GARTIC_STARTER_HINTS[Math.floor(Math.random() * GARTIC_STARTER_HINTS.length)];
   return new EmbedBuilder()
-    .setColor(0xe91e63).setTitle("📞 جارتك فون — انتظار اللاعبين")
+    .setColor(0xe91e63).setTitle("📞 الهاتف المكسور — انتظار اللاعبين")
     .setDescription(
       `**📖 طريقة اللعب:**\n` +
       `┣ كل لاعب يكتب جملة ويبعتها\n` +
@@ -78,7 +78,7 @@ function buildGarticRoundEmbed(state) {
   const done = state.players.length - state.pending.size;
   return new EmbedBuilder()
     .setColor(0xe91e63)
-    .setTitle(`📞 جارتك فون — الجولة ${state.round + 1}`)
+    .setTitle(`📞 الهاتف المكسور — الجولة ${state.round + 1}`)
     .setDescription(
       `**المطلوب:** ${typeLabel}\n\n` +
       `✅ بعتوا: **${done}/${state.players.length}**\n` +
@@ -98,7 +98,6 @@ function buildGarticRoundRows(gameId) {
 }
 
 async function advanceGarticRound(interaction, gameId, state) {
-  // تحقق عدد الجولات — نوقف بعد round لكل لاعب - 1 أو max 4 جولات
   const maxRounds = Math.min(state.players.length - 1, 4);
   state.round++;
   if (state.round > maxRounds) {
@@ -107,18 +106,15 @@ async function advanceGarticRound(interaction, gameId, state) {
   state.assignments = getAssignments(state.players, state.round);
   state.pending = new Set(state.players);
 
-  // بعت DM لكل لاعب عشان يعرف مهمته
   await sendGarticDMs(interaction.client, state);
 
   const embed = buildGarticRoundEmbed(state);
   const rows  = buildGarticRoundRows(gameId);
   await interaction.editReply({ embeds: [embed], components: rows });
 
-  // مؤقت 3 دقايق — لو ما بعتوش نروح للجولة الجاية
   if (state.timer) clearTimeout(state.timer);
   state.timer = setTimeout(async () => {
     if (!garticGames.has(gameId)) return;
-    // اللاعبين اللي ما بعتوش — نحط لهم placeholder
     for (const pid of state.pending) {
       const ownerChain = state.assignments[pid];
       if (!state.chains[ownerChain]) state.chains[ownerChain] = [];
@@ -140,7 +136,7 @@ async function sendGarticDMs(client, state) {
     try {
       const u = await client.users.fetch(pid);
       const embed = new EmbedBuilder()
-        .setColor(0xe91e63).setTitle(`📞 جارتك فون — مهمتك في الجولة ${state.round + 1}`)
+        .setColor(0xe91e63).setTitle(`📞 الهاتف المكسور — مهمتك في الجولة ${state.round + 1}`)
         .setDescription(`**المطلوب:** ${typeLabel}\n\n**اللي شايفه:**\n> ${latest.text}\n\n*ارجع للشات واضغط "ارسل ردي" عشان تبعت ردك*`);
       await u.send({ embeds: [embed] });
     } catch {}
@@ -152,7 +148,7 @@ async function revealGarticChains(interaction, gameId, state) {
   garticChannelMap.delete(state.channelId);
 
   const embeds = [
-    new EmbedBuilder().setColor(0xe91e63).setTitle("📞 جارتك فون — الكشف الكبير! 🎉")
+    new EmbedBuilder().setColor(0xe91e63).setTitle("📞 الهاتف المكسور — الكشف الكبير! 🎉")
       .setDescription("خلصت اللعبة! شوفوا إزاي الجمل اتغيرت من أول وجديد 😂")
   ];
 
@@ -176,7 +172,7 @@ async function revealGarticChains(interaction, gameId, state) {
 }
 
 export const garticCommand = new SlashCommandBuilder()
-  .setName("جارتك-فون").setDescription("📞 جارتك فون — سلسلة وصف وتخمين مضحكة");
+  .setName("الهاتف-المكسور").setDescription("📞 الهاتف المكسور — سلسلة وصف وتخمين مضحكة");
 
 export async function handleGarticCommand(interaction) {
   const channelId = interaction.channel.id;
@@ -190,7 +186,7 @@ export async function handleGarticCommand(interaction) {
   setTimeout(() => {
     if (garticGames.has(state.id) && garticGames.get(state.id).phase === "lobby") {
       garticGames.delete(state.id); garticChannelMap.delete(channelId);
-      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 جارتك فون — انتهت المهلة")], components: [] }).catch(() => {});
+      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 الهاتف المكسور — انتهت المهلة")], components: [] }).catch(() => {});
     }
   }, 10 * 60 * 1000);
 }
@@ -214,7 +210,7 @@ export async function handleGarticButton(interaction) {
   if (action === "cancel") {
     if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يلغيها!", flags: 64 });
     garticGames.delete(gameId); garticChannelMap.delete(state.channelId);
-    return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 تم إلغاء جارتك فون")], components: [] });
+    return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 تم إلغاء الهاتف المكسور")], components: [] });
   }
 
   if (action === "stop") {
@@ -238,7 +234,7 @@ export async function handleGarticButton(interaction) {
     for (const pid of state.players) {
       try {
         const u = await interaction.client.users.fetch(pid);
-        await u.send(new EmbedBuilder().setColor(0xe91e63).setTitle("📞 جارتك فون — الجولة 1!")
+        await u.send(new EmbedBuilder().setColor(0xe91e63).setTitle("📞 الهاتف المكسور — الجولة 1!")
           .setDescription(`**مهمتك:** اكتب جملة أو موقف مضحك / غريب / خيالي\n\n💡 **مثال للإلهام:** "${hint}"\n\n*ارجع للشات واضغط "ارسل ردي" عشان تبعت جملتك*`)
           .setFooter({ text: "اكتب أي حاجة — أكتر ما هو غريب أحسن!" }));
       } catch {}
@@ -283,7 +279,7 @@ export async function handleGarticButton(interaction) {
     const type = state.round === 0 ? "phrase" : state.round % 2 === 1 ? "description" : "guess";
     const label = type === "phrase" ? "اكتب جملتك هنا:" : type === "description" ? "وصّف ما رأيت (كأنك تشرحه):" : "خمّن الجملة الأصلية:";
 
-    const modal = new ModalBuilder().setCustomId(`garmodal_${gameId}`).setTitle("📞 جارتك فون — ردّك");
+    const modal = new ModalBuilder().setCustomId(`garmodal_${gameId}`).setTitle("📞 الهاتف المكسور — ردّك");
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId("gar_input").setLabel(label).setStyle(TextInputStyle.Paragraph)
         .setRequired(true).setMaxLength(300).setMinLength(3)
@@ -310,11 +306,9 @@ export async function handleGarticModal(interaction) {
 
   await interaction.reply({ content: "✅ تم استلام ردك!", flags: 64 });
 
-  // حدث الرسالة الرئيسية
   const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
   if (msg) await msg.edit({ embeds: [buildGarticRoundEmbed(state)], components: buildGarticRoundRows(gameId) }).catch(() => {});
 
-  // لو الكل بعت — روح للجولة الجاية
   if (state.pending.size === 0) {
     if (state.timer) clearTimeout(state.timer);
     const fakeInteraction = { editReply: (x) => msg?.edit(x), client: interaction.client, channel: interaction.channel };
@@ -323,7 +317,7 @@ export async function handleGarticModal(interaction) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  😂 ميم جيم — Make it Meme
+//  😂 صنع الميم — Make it Meme
 // ══════════════════════════════════════════════════════════════
 export const memeGames      = new Map();
 export const memeChannelMap = new Map();
@@ -358,7 +352,7 @@ function createMemeState(channelId, creatorId) {
 
 function buildMemeLobbyEmbed(state) {
   return new EmbedBuilder()
-    .setColor(0xf39c12).setTitle("😂 ميم جيم — انتظار اللاعبين")
+    .setColor(0xf39c12).setTitle("😂 صنع الميم — انتظار اللاعبين")
     .setDescription(
       `**📖 طريقة اللعب:**\n` +
       `┣ البوت يختار موقف مضحك\n` +
@@ -382,7 +376,7 @@ function buildMemeLobbyRows(gameId) {
 function buildMemeCaptionEmbed(state) {
   const submitted = Object.keys(state.captions).length;
   return new EmbedBuilder()
-    .setColor(0xf39c12).setTitle("😂 ميم جيم — اكتب كابشنك!")
+    .setColor(0xf39c12).setTitle("😂 صنع الميم — اكتب كابشنك!")
     .setDescription(
       `**الموقف:**\n> 🎭 ${state.template.title}\n> *(${state.template.prompt})*\n\n` +
       `✅ **${submitted}/${state.players.length}** بعتوا كابشناتهم\n` +
@@ -404,7 +398,7 @@ function buildMemeVoteEmbed(state) {
   ).join("\n\n");
 
   return new EmbedBuilder()
-    .setColor(0xf39c12).setTitle("😂 ميم جيم — صوّت على أحلى كابشن!")
+    .setColor(0xf39c12).setTitle("😂 صنع الميم — صوّت على أحلى كابشن!")
     .setDescription(
       `**الموقف:** 🎭 ${state.template.title}\n\n` +
       `**الكابشنات:**\n${captionsList || "لا يوجد كابشنات!"}\n\n` +
@@ -450,15 +444,12 @@ async function endMemeGame(interaction, gameId, state) {
   const winnerMention = winner ? `<@${winner.pid}>` : "لا أحد";
   const coins = 200;
 
-  // ده بحتاج db — هبعته كـ event بدل ما أحتاجه هنا
-  // الـ coins بتنضاف في index.js لما تيجي النتيجة
-
   const resultLines = sorted.map((e, i) =>
     `${i === 0 ? "🏆" : i === 1 ? "🥈" : "🥉"} ${i === 0 ? `**${winnerMention}**` : `<@${e.pid}>`}: ${e.votes} صوت\n> ${e.text}`
   ).join("\n\n");
 
   const endEmbed = new EmbedBuilder()
-    .setColor(0xf1c40f).setTitle("😂 ميم جيم — النتائج!")
+    .setColor(0xf1c40f).setTitle("😂 صنع الميم — النتائج!")
     .setDescription(
       `**الموقف:** 🎭 ${state.template.title}\n\n` +
       `${resultLines || "لا توجد كابشنات!"}\n\n` +
@@ -469,12 +460,11 @@ async function endMemeGame(interaction, gameId, state) {
   const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
   if (msg) await msg.edit({ embeds: [endEmbed], components: [] }).catch(() => {});
 
-  // إرجاع winner id والكوينز عشان index.js يضيفهم
   return { winnerId: winner?.pid, coins };
 }
 
 export const memeCommand = new SlashCommandBuilder()
-  .setName("ميم-جيم").setDescription("😂 ميم جيم — اكتب أحلى كابشن وفوز بالكوينز");
+  .setName("صنع-الميم").setDescription("😂 صنع الميم — اكتب أحلى كابشن وفوز بالكوينز");
 
 export async function handleMemeCommand(interaction) {
   const channelId = interaction.channel.id;
@@ -514,7 +504,7 @@ export async function handleMemeButton(interaction, db) {
   if (action === "cancel") {
     if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يلغيها!", flags: 64 });
     memeGames.delete(gameId); memeChannelMap.delete(state.channelId);
-    return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("😂 تم إلغاء ميم جيم")], components: [] });
+    return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("😂 تم إلغاء صنع الميم")], components: [] });
   }
 
   if (action === "start") {
@@ -531,7 +521,7 @@ export async function handleMemeButton(interaction, db) {
   if (action === "caption") {
     if (!state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت مش في اللعبة!", flags: 64 });
     if (state.captions[interaction.user.id]) return interaction.reply({ content: "✅ إنت بالفعل بعتت كابشنك!", flags: 64 });
-    const modal = new ModalBuilder().setCustomId(`mememodal_${gameId}`).setTitle("😂 ميم جيم — كابشنك");
+    const modal = new ModalBuilder().setCustomId(`mememodal_${gameId}`).setTitle("😂 صنع الميم — كابشنك");
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId("meme_caption_input")
         .setLabel(`الموقف: ${state.template.title.slice(0, 40)}...`)

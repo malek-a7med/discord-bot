@@ -6,6 +6,52 @@ import {
   ButtonBuilder, ButtonStyle,
 } from "discord.js";
 
+// ══════════════════════════════════════════════════════════════
+//  قائمة أحدث المميزات — أضف حاجة جديدة هنا وهتظهر تلقائياً
+// ══════════════════════════════════════════════════════════════
+export const LATEST_FEATURES = [
+  {
+    name: "📊 نظام الاستفتاءات — جديد!",
+    value: "أنشئ استفتاء في أي روم بسؤال وخيارات، والنتايج تلقائياً بعد المدة\nالفائز بأكتر أصوات يتعلن تلقائياً 🏆\n→ `/استفتاء`",
+    inline: false,
+  },
+  {
+    name: "🃏 كود نيمز",
+    value: "لعبة الكلمات السرية الشهيرة بالعربي!\n25 كلمة على لوحة 5×5 — فريقين — قائد سري يعطي إشارات\n→ `/كود-نيمز`",
+    inline: false,
+  },
+  {
+    name: "📞 الهاتف المكسور",
+    value: "سلسلة وصف وتخمين مضحكة!\nاكتب جملة → التاني يصفها → التالت يخمنها → ضحك مضمون\n→ `/الهاتف-المكسور`",
+    inline: false,
+  },
+  {
+    name: "😂 صنع الميم",
+    value: "البوت يختار موقف مضحك — إنت تكتب كابشن — الكل يصوت!\nالفائز يكسب **200 كوينز** 🪙\n→ `/صنع-الميم`",
+    inline: false,
+  },
+  {
+    name: "🎮 مركز الألعاب",
+    value: "كل الألعاب في مكان واحد — اضغط زرار وابدأ!\n→ `/الألعاب`",
+    inline: true,
+  },
+  {
+    name: "💬 أسلوب كلام البوت",
+    value: "للأونر: غيّر طريقة رد البوت\n→ `/تغيير-طريقة-الكلام`",
+    inline: true,
+  },
+  {
+    name: "🕌 رد على السلام عليكم",
+    value: "قول السلام عليكم في أي روم والبوت يرد عليك!",
+    inline: false,
+  },
+  {
+    name: "🛡️ Auto-Mod أذكى",
+    value: "يستخدم Gemini AI عشان يفهم السياق ويفرق بين الكلام العادي والمحتوى الفعلاً ضار",
+    inline: false,
+  },
+];
+
 // ── هب الألعاب ────────────────────────────────────────────────
 export const gamesHubCommand = new SlashCommandBuilder()
   .setName("الألعاب").setDescription("🎮 كل ألعاب زنجي في مكان واحد — اضغط وابدأ!");
@@ -33,8 +79,8 @@ function buildHubEmbed() {
       `🕵️ **مافيا** — اكشف المافيا قبل ما يقضوا على البلدة\n` +
       `❌⭕ **اكس-اوه** — تيك تاك تو الكلاسيكي مع التحديات\n` +
       `🃏 **كود نيمز** — فريقين يخمنوا الكلمات السرية\n` +
-      `📞 **جارتك فون** — سلسلة وصف وتخمين مضحكة\n` +
-      `😂 **ميم جيم** — اكتب أحلى كابشن وفوز بالكوينز\n\n` +
+      `📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة\n` +
+      `😂 **صنع الميم** — اكتب أحلى كابشن وفوز بالكوينز\n\n` +
       `⚔️ **/مصارعة** — تحدى أي حد بالكلام\n` +
       `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
     )
@@ -51,8 +97,8 @@ function buildHubRows() {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_cdn").setLabel("🃏 كود نيمز").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 جارتك فون").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 ميم جيم").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 الهاتف المكسور").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 صنع الميم").setStyle(ButtonStyle.Primary),
     ),
   ];
 }
@@ -66,43 +112,7 @@ function buildFeaturesEmbed() {
   return new EmbedBuilder()
     .setColor(0x3498db).setTitle("✨ أحدث مميزات زنجي بوت")
     .setDescription("كل ده جديد — جرّب كل حاجة! 🚀")
-    .addFields(
-      {
-        name: "🃏 كود نيمز — جديد!",
-        value: "لعبة الكلمات السرية الشهيرة بالعربي!\n25 كلمة على لوحة 5×5 — فريقين — قائد سري يعطي إشارات\n→ `/كود-نيمز`",
-        inline: false,
-      },
-      {
-        name: "📞 جارتك فون — جديد!",
-        value: "سلسلة وصف وتخمين مضحكة!\nاكتب جملة → التاني يصفها → التالت يخمنها → ضحك مضمون\n→ `/جارتك-فون`",
-        inline: false,
-      },
-      {
-        name: "😂 ميم جيم — جديد!",
-        value: "البوت يختار موقف مضحك — إنت تكتب كابشن — الكل يصوت!\nالفائز يكسب **200 كوينز** 🪙\n→ `/ميم-جيم`",
-        inline: false,
-      },
-      {
-        name: "🎮 مركز الألعاب — جديد!",
-        value: "كل الألعاب في مكان واحد — اضغط زرار وابدأ!\n→ `/الألعاب`",
-        inline: true,
-      },
-      {
-        name: "💬 أسلوب كلام البوت — جديد!",
-        value: "للأونر: غيّر طريقة رد البوت\n→ `/تغيير-طريقة-الكلام`",
-        inline: true,
-      },
-      {
-        name: "🕌 رد على السلام عليكم",
-        value: "قول السلام عليكم في أي روم والبوت يرد عليك!",
-        inline: false,
-      },
-      {
-        name: "🛡️ Auto-Mod أذكى",
-        value: "الآن يستخدم Gemini AI عشان يفهم السياق ويفرق بين الكلام العادي والمحتوى الفعلاً ضار",
-        inline: false,
-      },
-    )
+    .addFields(...LATEST_FEATURES)
     .setFooter({ text: "زنجي بوت — دايماً في تطور 🤖" })
     .setTimestamp();
 }
@@ -111,8 +121,8 @@ function buildFeaturesRows() {
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_cdn").setLabel("🃏 جرّب كود نيمز").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 جرّب جارتك").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 جرّب ميم جيم").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 جرّب الهاتف المكسور").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 جرّب صنع الميم").setStyle(ButtonStyle.Secondary),
     ),
   ];
 }

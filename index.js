@@ -32,6 +32,7 @@ import { rouletteCommand, mafiaCommand, tttCommand, handleRouletteCommand, handl
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
 import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal } from "./commands/party-games.js";
+import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand } from "./commands/games-hub.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -122,6 +123,64 @@ function calcLevel(xp) {
 
 function xpForLevel(lvl) {
   return lvl * lvl * 50;
+}
+
+// ─── تحويل اسم اللون أو الكود لرقم hex ────────────────────────
+const COLOR_NAMES = {
+  // عربي
+  "أحمر": 0xFF0000, "احمر": 0xFF0000,
+  "أزرق": 0x0000FF, "ازرق": 0x0000FF,
+  "أخضر": 0x00AA00, "اخضر": 0x00AA00,
+  "أصفر": 0xFFFF00, "اصفر": 0xFFFF00,
+  "بنفسجي": 0x9B59B6, "بنفسجى": 0x9B59B6,
+  "برتقالي": 0xFF8C00, "برتقالى": 0xFF8C00,
+  "وردي": 0xFF69B4, "وردى": 0xFF69B4,
+  "أبيض": 0xFFFFFF, "ابيض": 0xFFFFFF,
+  "أسود": 0x111111, "اسود": 0x111111,
+  "رمادي": 0x808080, "رمادى": 0x808080,
+  "ذهبي": 0xFFD700, "ذهبى": 0xFFD700,
+  "فضي": 0xC0C0C0, "فضى": 0xC0C0C0,
+  "كحلي": 0x000080, "كحلى": 0x000080,
+  "سماوي": 0x00BFFF, "سماوى": 0x00BFFF,
+  "فوشيا": 0xFF00FF, "فوشيه": 0xFF00FF,
+  "بني": 0xA0522D, "بنى": 0xA0522D,
+  "زيتي": 0x6B8E23, "زيتى": 0x6B8E23,
+  "عنابي": 0x800000, "عنابى": 0x800000,
+  "تركواز": 0x00CED1, "تركواز": 0x00CED1,
+  "نيلي": 0x4B0082, "نيلى": 0x4B0082,
+  // إنجليزي
+  "red": 0xFF0000, "blue": 0x0000FF, "green": 0x00AA00,
+  "yellow": 0xFFFF00, "purple": 0x9B59B6, "orange": 0xFF8C00,
+  "pink": 0xFF69B4, "white": 0xFFFFFF, "black": 0x111111,
+  "gray": 0x808080, "grey": 0x808080, "gold": 0xFFD700,
+  "silver": 0xC0C0C0, "navy": 0x000080, "cyan": 0x00BFFF,
+  "magenta": 0xFF00FF, "teal": 0x008080, "brown": 0xA0522D,
+  "lime": 0x00FF00, "maroon": 0x800000, "olive": 0x808000,
+  "indigo": 0x4B0082, "violet": 0x8B00FF, "coral": 0xFF7F50,
+  "salmon": 0xFA8072, "aqua": 0x00FFFF, "turquoise": 0x40E0D0,
+  "darkblue": 0x00008B, "darkgreen": 0x006400, "darkred": 0x8B0000,
+  "lightblue": 0xADD8E6, "lightgreen": 0x90EE90, "crimson": 0xDC143C,
+};
+
+function parseRoleColor(input) {
+  if (!input) return 0x99aab5;
+  const clean = input.trim();
+  // HEX: #RRGGBB أو RRGGBB
+  const hex = clean.replace(/^#/, "");
+  if (/^[0-9A-Fa-f]{6}$/.test(hex)) return parseInt(hex, 16);
+  if (/^[0-9A-Fa-f]{3}$/.test(hex)) {
+    const r = hex[0]+hex[0], g = hex[1]+hex[1], b = hex[2]+hex[2];
+    return parseInt(r+g+b, 16);
+  }
+  // اسم عربي أو إنجليزي
+  const key = clean.toLowerCase().trim();
+  if (COLOR_NAMES[clean] !== undefined) return COLOR_NAMES[clean];
+  if (COLOR_NAMES[key] !== undefined) return COLOR_NAMES[key];
+  // محاولة أخيرة — كل الأحرف lowercase
+  for (const [name, val] of Object.entries(COLOR_NAMES)) {
+    if (name.toLowerCase() === key) return val;
+  }
+  return 0x99aab5; // default
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -437,6 +496,7 @@ const LEGACY_COMMANDS = [
   gamesHubCommand,
   latestFeaturesCommand,
   speechModeCommand,
+  pollCommand,
 ];
 
 // Advanced Feature Commands
@@ -1729,8 +1789,9 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "متجر-قدرات")  return await handleShopCommand(interaction, db);
       if (cmd === "قدراتي")      return await handleMyAbilitiesCommand(interaction, db);
       if (cmd === "كود-نيمز")    return await handleCodenamesCommand(interaction);
-      if (cmd === "جارتك-فون")   return await handleGarticCommand(interaction);
-      if (cmd === "ميم-جيم")     return await handleMemeCommand(interaction);
+      if (cmd === "الهاتف-المكسور") return await handleGarticCommand(interaction);
+      if (cmd === "صنع-الميم")    return await handleMemeCommand(interaction);
+      if (cmd === "استفتاء")      return await handlePollCommand(interaction);
       if (cmd === "الألعاب")     return await handleGamesHubCommand(interaction);
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
       if (cmd === "تغيير-طريقة-الكلام") {
@@ -2254,7 +2315,7 @@ client.on("interactionCreate", async (interaction) => {
         const roleHoist = interaction.options.getBoolean("ظهور-منفصل");
 
         const preset  = roleType ? ROLE_PRESETS[roleType] : smartRolePerms(roleName);
-        const color   = roleColor ? parseInt(roleColor.replace("#",""), 16) : (preset?.color ?? 0x99aab5);
+        const color   = roleColor ? parseRoleColor(roleColor) : (preset?.color ?? 0x99aab5);
         const hoist   = roleHoist !== null ? roleHoist : (preset?.hoist ?? false);
         const perms   = preset?.permissions ?? [];
 
@@ -2721,7 +2782,12 @@ client.on("interactionCreate", async (interaction) => {
         return await handleCodenamesButton(interaction);
       }
 
-      // ─── أزرار جارتك فون ─────────────────────────────────────────
+      // ─── أزرار الاستفتاء ──────────────────────────────────────────
+      if (interaction.customId.startsWith("poll_")) {
+        return await handlePollButton(interaction);
+      }
+
+      // ─── أزرار الهاتف المكسور ─────────────────────────────────────
       if (interaction.customId.startsWith("gar_")) {
         return await handleGarticButton(interaction);
       }
