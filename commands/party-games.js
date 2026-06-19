@@ -54,7 +54,7 @@ function buildGarticLobbyRows(gameId) {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`gar_join_${gameId}`).setLabel("➕ انضم").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`gar_start_${gameId}`).setLabel("▶️ ابدأ").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`gar_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setLabel("🌐 لعب اللعبة الأصلية").setURL("https://garticphone.com/ar").setStyle(ButtonStyle.Link),
     new ButtonBuilder().setCustomId(`gar_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
   )];
 }
@@ -398,7 +398,7 @@ function buildMemeLobbyRows(gameId, state) {
       new ButtonBuilder().setCustomId(`meme_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`meme_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setLabel("🌐 لعب اللعبة الأصلية").setURL("https://makeitmeme.com/ar/").setStyle(ButtonStyle.Link),
     ),
   ];
 }

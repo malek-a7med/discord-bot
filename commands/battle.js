@@ -173,12 +173,16 @@ async function startGame(interactionOrUpdate, db, challengerId, opponentId) {
 
   let msg;
   try {
-    if (typeof interactionOrUpdate.editReply === "function") {
-      await interactionOrUpdate.editReply({ embeds: [embed], components: [choiceRow(id)] }).catch(() => {});
+    if (interactionOrUpdate.deferred || interactionOrUpdate.replied) {
+      // تم deferUpdate قبل كده — نستخدم editReply
+      await interactionOrUpdate.editReply({ embeds: [embed], components: [choiceRow(id)] });
+      msg = await interactionOrUpdate.fetchReply().catch(() => null);
+    } else if (typeof interactionOrUpdate.update === "function") {
+      // تفاعل زرار مباشر — نستخدم update
+      await interactionOrUpdate.update({ embeds: [embed], components: [choiceRow(id)] });
       msg = await interactionOrUpdate.fetchReply().catch(() => null);
     } else {
-      await interactionOrUpdate.update({ embeds: [embed], components: [choiceRow(id)] }).catch(() => {});
-      msg = await interactionOrUpdate.fetchReply().catch(() => null);
+      msg = await interactionOrUpdate.channel?.send({ embeds: [embed], components: [choiceRow(id)] }).catch(() => null);
     }
   } catch {
     msg = await interactionOrUpdate.channel?.send({ embeds: [embed], components: [choiceRow(id)] }).catch(() => null);
@@ -223,7 +227,6 @@ export async function handleBattleButton(interaction, db, geminiModel) {
     b.status = "active";
     activeBattles.delete(id);
 
-    await interaction.deferUpdate().catch(() => {});
     return startGame(interaction, db, b.challenger, b.opponent);
   }
 

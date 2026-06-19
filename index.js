@@ -29,8 +29,8 @@ import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from 
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
 import { handleBattleCommand, handleBattleButton } from "./commands/battle.js";
-import { handleBankLifeCommand, handleBankLifeButton } from "./commands/bank-life.js";
-import { handleBankLuckCommand, handleBankLuckButton } from "./commands/bank-luck.js";
+import { handleBankLifeCommand, handleBankLifeButton, lifeGames, lifeChannelMap } from "./commands/bank-life.js";
+import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap } from "./commands/bank-luck.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
 import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
@@ -3179,12 +3179,14 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_bankluck")                    return await handleBankLuckCommand(interaction);
         if (gid === "ghub_cancel") {
           const cid = interaction.channel.id;
-          if (channelGames.has(cid))    { channelGames.delete(cid); }
-          if (garticChannelMap.has(cid)) { const gId = garticChannelMap.get(cid); garticGames.delete(gId); garticChannelMap.delete(cid); }
-          if (memeChannelMap.has(cid))   { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
-          if (rpsChannelMap.has(cid))    { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
+          if (channelGames.has(cid))       { channelGames.delete(cid); }
+          if (garticChannelMap.has(cid))   { const gId = garticChannelMap.get(cid); garticGames.delete(gId); garticChannelMap.delete(cid); }
+          if (memeChannelMap.has(cid))     { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
+          if (rpsChannelMap.has(cid))      { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
           if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
-          if (quizChannelMap.has(cid))   quizChannelMap.delete(cid);
+          if (lifeChannelMap.has(cid))     { const lId = lifeChannelMap.get(cid);   lifeGames.delete(lId);   lifeChannelMap.delete(cid); }
+          if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
+          if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
           return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", ephemeral: true });
         }
       }

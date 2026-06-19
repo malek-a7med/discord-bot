@@ -124,7 +124,7 @@ function buildLobbyRows(gameId) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`cdn_start_${gameId}`).setLabel("▶️ ابدأ اللعبة").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`cdn_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`cdn_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setLabel("🌐 لعب اللعبة الأصلية").setURL("https://codenames.game/").setStyle(ButtonStyle.Link),
     ),
   ];
 }

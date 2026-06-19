@@ -15,8 +15,8 @@ const MAX_PLAYERS     = 6;
 const MIN_PLAYERS     = 2;
 const ROUNDS_TOTAL    = 10;
 
-const lifeGames      = new Map(); // gameId → state
-const lifeChannelMap = new Map(); // channelId → gameId
+export const lifeGames      = new Map(); // gameId → state
+export const lifeChannelMap = new Map(); // channelId → gameId
 
 const makeId = () => `lif${Date.now().toString(36)}${Math.random().toString(36).slice(2, 4)}`;
 

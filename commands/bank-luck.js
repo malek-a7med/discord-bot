@@ -13,8 +13,8 @@ const MAX_PLAYERS = 6;
 const MIN_PLAYERS = 2;
 const ROUNDS_EACH = 6;
 
-const luckGames      = new Map(); // gameId → state
-const luckChannelMap = new Map(); // channelId → gameId
+export const luckGames      = new Map(); // gameId → state
+export const luckChannelMap = new Map(); // channelId → gameId
 
 const makeId = () => `blk${Date.now().toString(36)}${Math.random().toString(36).slice(2, 4)}`;
 
