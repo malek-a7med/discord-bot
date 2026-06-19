@@ -3674,17 +3674,23 @@ app.get('/health', (req, res) => {
   });
 });
 
-const _server = app.listen(PORT, () => {
-  console.log(`✅ Server is ready and listening on port ${PORT}`);
-});
-_server.on("error", (err) => {
-  if (err.code === "EADDRINUSE") {
-    console.error(`❌ البورت ${PORT} مشغول — في نسخة تانية شغالة، هيتم إغلاق هذه النسخة.`);
-    process.exit(1);
-  } else {
-    throw err;
-  }
-});
+function startServer(port, retries = 10, delay = 1000) {
+  const srv = app.listen(port, () => {
+    console.log(`✅ Server is ready and listening on port ${port}`);
+  });
+  srv.on("error", (err) => {
+    if (err.code === "EADDRINUSE" && retries > 0) {
+      console.warn(`⚠️ البورت ${port} مشغول — هنحاول تاني بعد ${delay}ms (${retries} محاولات متبقية)`);
+      setTimeout(() => startServer(port, retries - 1, delay), delay);
+    } else if (err.code === "EADDRINUSE") {
+      console.error(`❌ البورت ${port} مشغول ولم يتحرر — جاري الاستمرار بدون HTTP server`);
+    } else {
+      throw err;
+    }
+  });
+  return srv;
+}
+const _server = startServer(PORT);
 
 // ═══════════════════════════════════════════════════════════════
 //  نظام Keep-Alive المتطور — 24/7 بدون تهنيج
