@@ -10,15 +10,21 @@ import {
 
 // ─── Presets الرتب الذكية ────────────────────────────────────────
 export const ROLE_PRESETS = {
-  admin:  { label: "إدارة",       permissions: ["Administrator"],                                                                                                color: 0xe74c3c, hoist: true  },
-  mod:    { label: "مشرف",        permissions: ["ManageMessages","KickMembers","ModerateMembers","ManageNicknames","ViewAuditLog","BanMembers"],                  color: 0xe67e22, hoist: true  },
-  vip:    { label: "VIP",         permissions: ["AddReactions","UseExternalEmojis","AttachFiles","EmbedLinks","SendMessages"],                                    color: 0xFFD700, hoist: true  },
-  music:  { label: "موسيقى",      permissions: ["Connect","Speak","UseVAD","SendMessages","AddReactions"],                                                       color: 0x1DB954, hoist: false },
-  gaming: { label: "جيمنج",       permissions: ["SendMessages","Connect","Speak","AddReactions"],                                                                color: 0x9B59B6, hoist: false },
-  art:    { label: "فن وتصميم",   permissions: ["SendMessages","AttachFiles","EmbedLinks","AddReactions"],                                                       color: 0xE91E8C, hoist: false },
-  bot:    { label: "بوت",         permissions: ["Administrator"],                                                                                                color: 0x7289DA, hoist: false },
-  normal: { label: "عضو عادي",    permissions: ["SendMessages","ReadMessageHistory","AddReactions"],                                                             color: 0x99aab5, hoist: false },
-  none:   { label: "بدون صلاحيات",permissions: [],                                                                                                              color: 0x555555, hoist: false },
+  admin:      { label: "إدارة",             permissions: ["Administrator"],                                                                                                                               color: 0xe74c3c, hoist: true  },
+  mod:        { label: "مشرف",              permissions: ["ManageMessages","KickMembers","ModerateMembers","ManageNicknames","ViewAuditLog","BanMembers"],                                                  color: 0xe67e22, hoist: true  },
+  helper:     { label: "مساعد مشرف",        permissions: ["ManageMessages","ModerateMembers","ViewAuditLog"],                                                                                             color: 0xF0A500, hoist: true  },
+  vip:        { label: "VIP",               permissions: ["AddReactions","UseExternalEmojis","AttachFiles","EmbedLinks","SendMessages","UseExternalStickers"],                                             color: 0xFFD700, hoist: true  },
+  booster:    { label: "بوستر",             permissions: ["AddReactions","UseExternalEmojis","AttachFiles","EmbedLinks","SendMessages","UseExternalStickers","CreatePublicThreads"],                       color: 0xF47FFF, hoist: true  },
+  verified:   { label: "موثّق",             permissions: ["SendMessages","ReadMessageHistory","AddReactions","AttachFiles","EmbedLinks"],                                                                  color: 0x5865F2, hoist: false },
+  music:      { label: "موسيقى",            permissions: ["Connect","Speak","UseVAD","SendMessages","AddReactions"],                                                                                      color: 0x1DB954, hoist: false },
+  gaming:     { label: "جيمنج",             permissions: ["SendMessages","Connect","Speak","AddReactions"],                                                                                               color: 0x9B59B6, hoist: false },
+  art:        { label: "فن وتصميم",         permissions: ["SendMessages","AttachFiles","EmbedLinks","AddReactions"],                                                                                      color: 0xE91E8C, hoist: false },
+  event:      { label: "منظّم فعاليات",     permissions: ["ManageEvents","SendMessages","MentionEveryone","EmbedLinks","AttachFiles"],                                                                    color: 0x00B0FF, hoist: false },
+  content:    { label: "منشئ محتوى",        permissions: ["SendMessages","AttachFiles","EmbedLinks","AddReactions","UseExternalEmojis","CreatePublicThreads","ManageMessages"],                           color: 0xFF6B35, hoist: false },
+  bot:        { label: "بوت",               permissions: ["Administrator"],                                                                                                                               color: 0x7289DA, hoist: false },
+  normal:     { label: "عضو عادي",          permissions: ["SendMessages","ReadMessageHistory","AddReactions"],                                                                                            color: 0x99aab5, hoist: false },
+  restricted: { label: "مقيّد (قراءة فقط)", permissions: ["ReadMessageHistory","ViewChannel"],                                                                                                           color: 0x747F8D, hoist: false },
+  none:       { label: "بدون صلاحيات",      permissions: [],                                                                                                                                             color: 0x555555, hoist: false },
 };
 
 // ─── resolveRole: بتدور على رول بـ ID أو اسم (case-insensitive) ─

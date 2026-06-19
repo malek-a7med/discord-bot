@@ -129,6 +129,13 @@ function xpForLevel(lvl) {
   return lvl * lvl * 50;
 }
 
+// ── رتب الـ Rank تلقائياً عند الوصول للمستوى المطلوب ─────────────
+// الترتيب من الأعلى للأدنى — هيُعطى أول رتبة مستحقة بس
+const RANK_ROLES = [
+  { level: 50, id: "1511588699513557134", name: "Golden🥇", color: 0xFFD700, removeOnUpgrade: "1516027382123855922" },
+  { level: 20, id: "1516027382123855922", name: "Silver🥈", color: 0xC0C0C0, removeOnUpgrade: null },
+];
+
 // ─── تحويل اسم اللون أو الكود لرقم hex ────────────────────────
 const COLOR_NAMES = {
   // عربي
@@ -277,15 +284,21 @@ const LEGACY_COMMANDS = [
     .addStringOption((o) =>
       o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً")
         .addChoices(
-          { name: "🔴 إدارة (Administrator)",      value: "admin"  },
-          { name: "🟠 مشرف (Moderator)",           value: "mod"    },
-          { name: "🟡 VIP",                        value: "vip"    },
-          { name: "🟢 موسيقى / Music",             value: "music"  },
-          { name: "🟣 جيمنج / Gaming",             value: "gaming" },
-          { name: "💗 فن وتصميم / Art",            value: "art"    },
-          { name: "🔵 بوت / Bot",                  value: "bot"    },
-          { name: "⚪ عضو عادي / Normal",          value: "normal" },
-          { name: "🔘 بدون صلاحيات",              value: "none"   },
+          { name: "🔴 إدارة (Administrator)",       value: "admin"      },
+          { name: "🟠 مشرف (Moderator)",            value: "mod"        },
+          { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
+          { name: "🟡 VIP",                         value: "vip"        },
+          { name: "💜 بوستر (Server Booster)",      value: "booster"    },
+          { name: "🔵 موثّق (Verified)",            value: "verified"   },
+          { name: "🟢 موسيقى / Music",              value: "music"      },
+          { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
+          { name: "💗 فن وتصميم / Art",             value: "art"        },
+          { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
+          { name: "🟧 منشئ محتوى / Content",        value: "content"    },
+          { name: "⚫ بوت / Bot",                   value: "bot"        },
+          { name: "⚪ عضو عادي / Normal",           value: "normal"     },
+          { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
+          { name: "🔘 بدون صلاحيات",               value: "none"       },
         )
     )
     .addStringOption((o) => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم مثل red)"))
@@ -298,15 +311,21 @@ const LEGACY_COMMANDS = [
     .addStringOption((o) =>
       o.setName("نوع").setDescription("نوع الرتبة الجديد").setRequired(true)
         .addChoices(
-          { name: "🔴 إدارة (Administrator)",      value: "admin"  },
-          { name: "🟠 مشرف (Moderator)",           value: "mod"    },
-          { name: "🟡 VIP",                        value: "vip"    },
-          { name: "🟢 موسيقى / Music",             value: "music"  },
-          { name: "🟣 جيمنج / Gaming",             value: "gaming" },
-          { name: "💗 فن وتصميم / Art",            value: "art"    },
-          { name: "🔵 بوت / Bot",                  value: "bot"    },
-          { name: "⚪ عضو عادي / Normal",          value: "normal" },
-          { name: "🔘 مسح كل الصلاحيات",          value: "none"   },
+          { name: "🔴 إدارة (Administrator)",       value: "admin"      },
+          { name: "🟠 مشرف (Moderator)",            value: "mod"        },
+          { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
+          { name: "🟡 VIP",                         value: "vip"        },
+          { name: "💜 بوستر (Server Booster)",      value: "booster"    },
+          { name: "🔵 موثّق (Verified)",            value: "verified"   },
+          { name: "🟢 موسيقى / Music",              value: "music"      },
+          { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
+          { name: "💗 فن وتصميم / Art",             value: "art"        },
+          { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
+          { name: "🟧 منشئ محتوى / Content",        value: "content"    },
+          { name: "⚫ بوت / Bot",                   value: "bot"        },
+          { name: "⚪ عضو عادي / Normal",           value: "normal"     },
+          { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
+          { name: "🔘 مسح كل الصلاحيات",           value: "none"       },
         )
     ),
   new SlashCommandBuilder()
@@ -1542,6 +1561,30 @@ client.on("messageCreate", async (msg) => {
         .setDescription(`${msg.author} وصل للمستوى **${userData.level}** 🚀`)
         .setTimestamp();
       msg.channel.send({ embeds: [embed] }).catch(() => {});
+
+      // ── Rank Roles تلقائي ──────────────────────────────────────
+      for (const rank of RANK_ROLES) {
+        if (userData.level >= rank.level) {
+          // جيب أحدث نسخة من الـ member عشان الـ cache يكون محدّث
+          const freshMember = await msg.guild.members.fetch(msg.author.id).catch(() => null);
+          if (!freshMember) break;
+          if (!freshMember.roles.cache.has(rank.id)) {
+            await freshMember.roles.add(rank.id, `وصل للمستوى ${rank.level}`).catch(() => {});
+            // لو فيه رتبة أقل لازم تتشال عند الترقي (Silver → Golden)
+            if (rank.removeOnUpgrade && freshMember.roles.cache.has(rank.removeOnUpgrade)) {
+              await freshMember.roles.remove(rank.removeOnUpgrade, "ترقي للـ rank أعلى").catch(() => {});
+            }
+            msg.channel.send({ embeds: [
+              new EmbedBuilder()
+                .setColor(rank.color)
+                .setTitle("🏆 رتبة جديدة!")
+                .setDescription(`مبروك ${msg.author}! وصلت للمستوى **${rank.level}** وكسبت رتبة **${rank.name}** 🎊`)
+                .setTimestamp()
+            ]}).catch(() => {});
+          }
+          break; // بس أعلى رتبة مستحقة
+        }
+      }
     }
   }
 
