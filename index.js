@@ -764,10 +764,11 @@ const SUGGESTION_REF_FIELD = "🔑 معرف الاقتراح";
 const SUGGESTION_PANEL_COLOR = 0xa020f0;
 
 const SUGGESTION_STATUSES = {
-  pending: { text: "⏳ قيد الدراسة والمراجعة", color: 0xa020f0 },
-  approved: { text: "✅ مقبول", color: 0x2ecc71 },
-  rejected: { text: "❌ مرفوض", color: 0xe74c3c },
-  review: { text: "🔍 قيد المراجعة", color: 0x3498db },
+  pending:  { text: "⏳ قيد الدراسة والمراجعة", color: 0xa020f0 },
+  approved: { text: "✅ مقبول",                  color: 0x2ecc71 },
+  rejected: { text: "❌ مرفوض",                  color: 0xe74c3c },
+  review:   { text: "🔍 قيد المراجعة",           color: 0x3498db },
+  solved:   { text: "🔧 تم حل المشكلة",          color: 0x1abc9c },
 };
 
 function buildSuggestionEmbed({ user, text, statusKey = "pending", moderator = null }) {
@@ -828,6 +829,16 @@ function buildAdminActionRow(disabled = false) {
       .setCustomId("admin_reply")
       .setLabel("💬 رد مخصص")
       .setStyle(ButtonStyle.Primary)
+      .setDisabled(disabled)
+  );
+}
+
+function buildAdminSolvedRow(disabled = false) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("admin_solved")
+      .setLabel("🔧 تم حل المشكلة")
+      .setStyle(ButtonStyle.Success)
       .setDisabled(disabled)
   );
 }
@@ -910,9 +921,10 @@ async function updateLinkedSuggestionMessages({
     }
   }
 
+  const solvedAlready = statusKey === "solved";
   await adminMessage.edit({
     embeds: [updatedAdminEmbed],
-    components: [buildAdminActionRow(true)],
+    components: [buildAdminActionRow(true), buildAdminSolvedRow(solvedAlready)],
   });
 }
 
@@ -1148,7 +1160,7 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
   if (adminChannel?.isTextBased()) {
     await adminChannel.send({
       embeds: [adminEmbed],
-      components: [buildAdminActionRow(false)],
+      components: [buildAdminActionRow(false), buildAdminSolvedRow(false)],
     });
   } else {
     logger.warn("⚠️ روم إدارة الاقتراحات غير متاح");
@@ -3570,6 +3582,9 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
         return await showAdminReplyModal(interaction, reference);
+      }
+      if (interaction.customId === "admin_solved") {
+        return await handleAdminSuggestionAction(interaction, "solved");
       }
     } catch (err) {
       logger.error("خطأ في معالجة الزر:", err);
