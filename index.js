@@ -1562,9 +1562,66 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
-  // ── السيرفر: البوت مش بيرد على المنشنات أو الأسماء — التحديات بس ──
-  // لو الأونر كلّمه في الـ DM، الرد موجود فوق
-  // أي منشن في السيرفر يتجاهل بصمت
+  const isMentioned  = msg.mentions.has(client.user.id);
+  const isOwner      = config.isOwner(msg.author.id);
+  const calledByName = /زنجي/i.test(msg.content) && isOwner;
+
+  if (!isMentioned && !calledByName) return;
+
+  msg.channel.sendTyping().catch(() => {});
+
+  const BOT_CHANNEL_ID = "1516591390023352370";
+
+  if (msg.guild && !isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
+    return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
+  }
+
+  const question = msg.content.replace(/<@!?\d+>/g, "").trim();
+  if (!question || !_geminiReady) return;
+
+  const now = Date.now();
+
+  if (!isOwner) {
+    const spamErr = checkSpam(msg.author.id, now);
+    if (spamErr) return msg.reply(spamErr).catch(() => {});
+  }
+
+  if (!isOwner) {
+    const lastReq = userLastRequest.get(msg.author.id) || 0;
+    const elapsed = now - lastReq;
+    if (elapsed < USER_COOLDOWN_MS) {
+      const remaining = Math.ceil((USER_COOLDOWN_MS - elapsed) / 1000);
+      return msg.reply(`⏳ استنى ${remaining} ثانية قبل ما تكلمني تاني!`).catch(() => {});
+    }
+    userLastRequest.set(msg.author.id, now);
+  }
+
+  if (isOwner) {
+    if (!db.claimAiMessage(msg.id)) return;
+    handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel);
+    return;
+  }
+
+  const svTypingInterval = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
+  msg.channel.sendTyping().catch(() => {});
+  try {
+    const senderName = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
+    const prompt     = buildUserPrompt(senderName, question, msg.author.id);
+    const result     = await geminiModel().generateContent(prompt);
+    const reply      = result.response.text().trim();
+    pushUserHistory(msg.author.id, "user", question);
+    pushUserHistory(msg.author.id, "bot",  reply);
+    await msg.reply(reply);
+  } catch (err) {
+    logger.error("خطأ في الرد على الرسالة:", err);
+    if (err.isQuotaError || err.message === "ALL_KEYS_EXHAUSTED") {
+      await msg.reply("⏳ الـ AI وصل للحد اليومي — جرب تاني بعد شوية!").catch(() => {});
+    } else {
+      await msg.reply("معلش يسطا ثواني بس").catch(() => {});
+    }
+  } finally {
+    clearInterval(svTypingInterval);
+  }
 });
 
 
