@@ -1128,6 +1128,34 @@ const salaamCooldowns = new Map();
 const AUTO_MOD_LOG_CHANNEL_ID = "1517362832063074324";
 const autoModLogs = new Map(); // logId → logData
 
+// ─── دالة إرسال سجل التأديب ─────────────────────────────────────
+async function sendModLog(type, modUser, targetId, reason, extra = {}) {
+  const colors = { warn:0xf39c12, mute:0x3498db, kick:0xe74c3c, ban:0xc0392b, clear:0x95a5a6, wipe:0x7f8c8d };
+  const icons  = { warn:"⚠️", mute:"🔇", kick:"👢", ban:"🔨", clear:"🧹", wipe:"💣" };
+  const labels = { warn:"تحذير", mute:"إسكات", kick:"طرد", ban:"تبنيد", clear:"مسح رسايل", wipe:"مسح الروم بالكامل" };
+
+  const embed = new EmbedBuilder()
+    .setColor(colors[type] ?? 0x555555)
+    .setTitle(`${icons[type] ?? "📋"} سجل التأديب | ${labels[type] ?? type}`)
+    .addFields(
+      { name: "👮 المشرف",   value: `<@${modUser.id}>\n\`${modUser.username}\``, inline: true },
+      { name: "🎯 المستهدف", value: targetId ? `<@${targetId}>` : "—",           inline: true },
+      { name: "📋 السبب",    value: reason || "غير محدد",                         inline: true },
+    )
+    .setFooter({ text: "زنجي Mod Log" })
+    .setTimestamp();
+
+  if (extra.duration) embed.addFields({ name: "⏱️ المدة",             value: `**${extra.duration}** دقيقة`,    inline: true });
+  if (extra.count)    embed.addFields({ name: "🗑️ الرسايل المحذوفة", value: `**${extra.count}** رسالة`,        inline: true });
+  if (extra.channel)  embed.addFields({ name: "📍 القناة",            value: `<#${extra.channel}>`,             inline: true });
+  if (extra.warns)    embed.addFields({ name: "⚠️ إجمالي التحذيرات", value: `**${extra.warns}**`,               inline: true });
+
+  try {
+    const logCh = await client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID);
+    await logCh.send({ embeds: [embed] });
+  } catch { /* فشل اللوج — تجاهل */ }
+}
+
 // ─── رد البوت لو حد شتم الأونر ─────────────────────────────────
 const INSULT_REGEX = /كس|نيك|زب\b|طيز|شرموط|متناك|عرص|خول|قحب|زاني|أمك|اختك|ابن.*وسخ|ابن.*شرم|fuck|bitch|bastard|asshole|يلعن|ألعن|اتناك|هنيك|انيك/gi;
 
@@ -2084,6 +2112,7 @@ client.on("interactionCreate", async (interaction) => {
           remaining -= batch;
           if (deleted.size < batch) break;
         }
+        sendModLog("clear", interaction.user, null, `مسح ${totalDeleted} رسالة`, { count: totalDeleted, channel: channel.id }).catch(() => {});
         return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
       }
 
@@ -2570,6 +2599,7 @@ client.on("interactionCreate", async (interaction) => {
           if (action.type === "warn") {
             db.addWarning(action.targetId, action.reason, interaction.user.id);
             const warns = db.getWarnings(action.targetId);
+            sendModLog("warn", interaction.user, action.targetId, action.reason, { warns: warns.length }).catch(() => {});
             return interaction.update({ embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تم التحذير").setDescription(`تم توجيه تحذير رسمي لـ <@${action.targetId}>\n📋 **السبب:** ${action.reason}\n⚠️ **إجمالي تحذيراته:** ${warns.length}`).setTimestamp()], components: [] });
           }
 
@@ -2580,16 +2610,19 @@ client.on("interactionCreate", async (interaction) => {
           if (action.type === "mute") {
             await modMember.timeout(action.duration * 60 * 1000, action.reason);
             db.addTimeout(action.targetId, action.duration * 60 * 1000, action.reason);
+            sendModLog("mute", interaction.user, action.targetId, action.reason, { duration: action.duration }).catch(() => {});
             return interaction.update({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تم الإسكات").setDescription(`تم إسكات <@${action.targetId}> لمدة **${action.duration} دقيقة**\n📋 **السبب:** ${action.reason}`).setTimestamp()], components: [] });
           }
 
           if (action.type === "kick") {
             await modMember.kick(action.reason);
+            sendModLog("kick", interaction.user, action.targetId, action.reason).catch(() => {});
             return interaction.update({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تم الطرد").setDescription(`تم طرد <@${action.targetId}> من السيرفر\n📋 **السبب:** ${action.reason}`).setTimestamp()], components: [] });
           }
 
           if (action.type === "ban") {
             await modGuild.members.ban(action.targetId, { reason: action.reason });
+            sendModLog("ban", interaction.user, action.targetId, action.reason).catch(() => {});
             return interaction.update({ embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تم التبنيد").setDescription(`تم تبنيد <@${action.targetId}> من السيرفر نهائياً\n📋 **السبب:** ${action.reason}`).setTimestamp()], components: [] });
           }
         } catch (err) {
@@ -2950,6 +2983,7 @@ client.on("interactionCreate", async (interaction) => {
               .setDescription(`🧹 تم مسح الروم بالكامل بواسطة ${interaction.user} ✅`)
               .setTimestamp()
           ]});
+          sendModLog("wipe", interaction.user, null, "مسح الروم بالكامل", { channel: targetChannelId }).catch(() => {});
         } catch (err) {
           logger.error("خطأ في wipe_confirm:", err);
         }
