@@ -6,4 +6,5 @@
 - [Polls System](polls-system.md) — activePolls Map keyed by messageId; customId: poll_vote_{pollId}_{optionIdx}; auto-ends via setTimeout; LATEST_FEATURES array in games-hub.js controls /احدث-المميزات
 - [Role Color Parsing](role-color-parsing.md) — parseRoleColor() in index.js supports HEX (#RRGGBB/RRGGBB/3-digit) + Arabic/English color names via COLOR_NAMES map
 - [Auto-Mod Smart](auto-mod-smart.md) — two-pass scan: EXTREME_REGEX instant → SUSPICIOUS_REGEX + Gemini text confirm (5s throttle); scanMessage now accepts 5th param geminiTextModel; called in index.js with geminiModel() as 5th arg
-- [Speech Mode](speech-mode.md) — botSpeechMode let variable in index.js (default "normal"); /تغيير-طريقة-الكلام owner-only; affects buildUserPrompt modeNote string; values: "normal"|"free"
+- [Speech Mode](speech-mode.md) — 3 modes: normal(no swearing)/free(mirror swear back)/toxic(swears freely); buildUserPrompt in index.js; /تغيير-طريقة-الكلام owner-only
+- [Latest Features Rule](latest-features-rule.md) — every new feature MUST be added to LATEST_FEATURES array in commands/games-hub.js (newest entry first)
