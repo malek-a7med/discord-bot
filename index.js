@@ -1124,6 +1124,46 @@ ${senderName}: ${question}
 
 const salaamCooldowns = new Map();
 
+// ─── رد البوت لو حد شتم الأونر ─────────────────────────────────
+const INSULT_REGEX = /كس|نيك|زب\b|طيز|شرموط|متناك|عرص|خول|قحب|زاني|أمك|اختك|ابن.*وسخ|ابن.*شرم|fuck|bitch|bastard|asshole|يلعن|ألعن|اتناك|هنيك|انيك/gi;
+
+async function checkAndReplyOwnerInsult(msg) {
+  if (msg.author.bot) return;
+  if (config.isOwner(msg.author.id)) return;
+  if (!msg.guild) return;
+
+  const content = msg.content;
+
+  INSULT_REGEX.lastIndex = 0;
+  if (!INSULT_REGEX.test(content)) return;
+  INSULT_REGEX.lastIndex = 0;
+
+  const ownerIds   = config.OWNER_IDS;
+  const ownerNames = Object.values(config.OWNER_NAMES);
+
+  const mentionsOwner = ownerIds.some(id => content.includes(`<@${id}>`) || content.includes(`<@!${id}>`));
+  const namesMentioned = ownerNames.some(name => content.includes(name));
+
+  if (!mentionsOwner && !namesMentioned) return;
+  if (!_geminiReady) return;
+
+  try {
+    const attackerName = msg.member?.displayName || msg.author.globalName || msg.author.username;
+    const prompt =
+      `أنت "زنجي" — بوت ديسكورد مصري وقح ومفيش حاجة بتوقفك لما حد يتجرأ على الأونر.\n` +
+      `حد اسمه "${attackerName}" بعت الرسالة دي: "${content.slice(0, 300)}"\n\n` +
+      `ردّ عليه بشتيمة واحدة ذكية وقوية بالعامية المصرية:\n` +
+      `- جملة أو جملتين بالظبط، مش أكتر\n` +
+      `- مضحكة وذكية وعلى مستوى الشتيمة اللي قالها\n` +
+      `- مش لازم تشرح ولا تعتذر — بس عاقبه بكلامك\n` +
+      `- ابدأ بـ "يا" أو بالاسم مباشرة`;
+
+    const result = await geminiModel().generateContent(prompt);
+    const reply  = result.response.text().trim();
+    if (reply) await msg.reply(reply).catch(() => {});
+  } catch { /* الـ AI فشل - تجاهل */ }
+}
+
 // ─── DM من الأونر ───────────────────────────────────────────────
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
@@ -1221,6 +1261,9 @@ client.on("messageCreate", async (msg) => {
         } catch { /* الأونر عاطل الـ DM */ }
       }
     };
+
+    // ── رد على شتيمة الأونر قبل ما الرسالة تتحذف ─────────────
+    await checkAndReplyOwnerInsult(msg).catch(() => {});
 
     const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner, geminiModel()).catch(() => ({}));
     if (amResult?.triggered) return;
