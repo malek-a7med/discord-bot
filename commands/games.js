@@ -680,15 +680,60 @@ export async function handleMafiaButton(interaction, db) {
 
     state.roles = assignRoles(state.players);
 
-    // بعت لكل لاعب دوره
+    // بعت لكل لاعب تعليمات مفصلة حسب دوره
     for (const playerId of state.players) {
-      const role = state.roles[playerId];
-      const roleEmoji = role === "mafia" ? "🔴" : role === "detective" ? "🔵" : "⚪";
-      const roleName  = role === "mafia" ? "مافيا 😈" : role === "detective" ? "محقق 🔍" : "مدني ⚪";
-      const mafiaTeam = role === "mafia" ? `\n👥 **فريقك المافيا:** ${Object.entries(state.roles).filter(([, r]) => r === "mafia").map(([id]) => `<@${id}>`).join(", ")}` : "";
-      await interaction.client.users.fetch(playerId).then(u =>
-        u.send(`${roleEmoji} **دورك في لعبة المافيا:**\nإنت **${roleName}**${mafiaTeam}\n\n**ما تقولش لحد دورك!** 🤫`).catch(() => {})
-      );
+      const role     = state.roles[playerId];
+      const mafiaIds = Object.entries(state.roles).filter(([, r]) => r === "mafia").map(([id]) => id);
+      let dmLines = [];
+
+      if (role === "mafia") {
+        const teammates = mafiaIds.filter(id => id !== playerId);
+        dmLines = [
+          `🔴 **إنت مافيا! 😈**`,
+          ``,
+          `**مهمتك في اللعبة:**`,
+          `• 🌙 **الليل:** اضغط "تصرف الليل" في الشات عشان تختار ضحيتك`,
+          `• ☀️ **النهار:** اتكلم بشكل طبيعي وحاول تقنع الكل إنك مدني — لا تنكشف!`,
+          `• 🗳️ **التصويت:** صوّت على حد عشان تشتت الأنظار بعيداً عنك`,
+          ``,
+          teammates.length > 0
+            ? `👥 **فريقك:** ${teammates.map(id => `<@${id}>`).join(", ")}\nاتفقوا معاهم في الخاص على الضحية!`
+            : `👤 إنت المافيا الوحيد — فكر بذكاء!`,
+          ``,
+          `⚠️ **مهم جداً: ما تقولش لحد دورك!** 🤫`,
+        ];
+      } else if (role === "detective") {
+        dmLines = [
+          `🔵 **إنت المحقق! 🔍**`,
+          ``,
+          `**مهمتك في اللعبة:**`,
+          `• 🌙 **الليل:** اضغط "تصرف الليل" في الشات عشان تكشف هوية شخص`,
+          `  → البوت هيبعتلك رسالة سرية: هل هو مافيا أو بريء؟`,
+          `• ☀️ **النهار:** استخدم معلوماتك لتوجيه التصويت — بحذر عشان متتكشفش`,
+          `• ⚠️ لو المافيا عرفت إنك المحقق — هتستهدفك الليلة الجاية!`,
+          ``,
+          `🎯 **هدفك:** اكشف المافيا وخلّي البلدة تطردهم قبل فوات الأوان`,
+          ``,
+          `⚠️ **مهم جداً: ما تقولش لحد دورك!** 🤫`,
+        ];
+      } else {
+        dmLines = [
+          `⚪ **إنت مدني! 👥**`,
+          ``,
+          `**مهمتك في اللعبة:**`,
+          `• ☀️ **النهار:** شارك في النقاش وحاول تكشف مين المافيا`,
+          `• 🗳️ **التصويت:** اضغط "صوّت الآن" وصوّت على اللي تشك فيه`,
+          `• 🌙 **الليل:** استنى — مفيش تصرف لك في الليل`,
+          ``,
+          `💡 **نصيحة:** راقب مين بيحاول يشتت الكلام أو ما بيشاركش بشكل طبيعي`,
+          ``,
+          `🎯 **هدفك:** ساعد في طرد كل المافيا قبل ما يقضوا عليكم جميعاً`,
+        ];
+      }
+
+      await interaction.client.users.fetch(playerId)
+        .then(u => u.send(dmLines.join("\n")).catch(() => {}))
+        .catch(() => {});
     }
 
     await startDay(interaction, gameId, state);

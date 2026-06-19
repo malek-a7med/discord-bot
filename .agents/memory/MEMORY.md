@@ -2,3 +2,6 @@
 - [Game Abilities](game-abilities.md) — stored in user.gameAbilities in server_database.json; methods on Database class; useGameAbility returns bool and auto-deletes when count reaches 0
 - [Gemini Keys Persistence](gemini-keys-persist.md) — extra keys saved to data/gemini-keys-extra.json via saveExtraKeys(); loaded at startup in collectKeys(); env keys always take priority; removeKey/setActiveKeyIndex exported
 - [Mod Confirm Flow](mod-confirm.md) — pendingModActions Map in index.js; 90s TTL; customId prefix modyes_/modno_ + actionId; only original moderator can confirm; ephemeral reply
+- [Party Games](party-games.md) — garticGames/garticChannelMap + memeGames/memeChannelMap in party-games.js; gartic gameId prefix "gar", meme prefix "mm"; modal IDs: garmodal_/mememodal_; hub buttons: ghub_*/ftr_*
+- [Auto-Mod Smart](auto-mod-smart.md) — two-pass scan: EXTREME_REGEX instant → SUSPICIOUS_REGEX + Gemini text confirm (5s throttle); scanMessage now accepts 5th param geminiTextModel; called in index.js with geminiModel() as 5th arg
+- [Speech Mode](speech-mode.md) — botSpeechMode let variable in index.js (default "normal"); /تغيير-طريقة-الكلام owner-only; affects buildUserPrompt modeNote string; values: "normal"|"free"

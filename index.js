@@ -30,6 +30,9 @@ import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleMod
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 import { rouletteCommand, mafiaCommand, tttCommand, handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleGameButton } from "./commands/games.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
+import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
+import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal } from "./commands/party-games.js";
+import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand } from "./commands/games-hub.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -378,6 +381,12 @@ const LEGACY_COMMANDS = [
   tttCommand,
   shopCommand,
   myAbilitiesCommand,
+  codenamesCommand,
+  garticCommand,
+  memeCommand,
+  gamesHubCommand,
+  latestFeaturesCommand,
+  speechModeCommand,
 ];
 
 // Advanced Feature Commands
@@ -1098,15 +1107,22 @@ function pushUserHistory(userId, role, text) {
   h.push({ role, text: text.slice(0, 300) });
   if (h.length > MAX_USER_HIST) h.splice(0, h.length - MAX_USER_HIST);
 }
+let botSpeechMode = "normal"; // "normal" | "free"
+
 function buildUserPrompt(senderName, question, userId) {
   const hist = getUserHistory(userId);
   const histText = hist.map(m => `${m.role === "user" ? senderName : "زنجي"}: ${m.text}`).join("\n");
-  return `أنت زنجي — بوت ديسكورد مصري ودود، بتتكلم بالعامية المصرية الطبيعية.
+  const modeNote = botSpeechMode === "free"
+    ? "\nأسلوبك حر شوية — ممكن تكون أكتر صراحة وعفوية، بس ما تعدّيش الحدود الحمرا."
+    : "";
+  return `أنت زنجي — بوت ديسكورد مصري ودود، بتتكلم بالعامية المصرية الطبيعية.${modeNote}
 ${histText ? `\nسياق المحادثة:\n${histText}\n` : ""}
 ${senderName}: ${question}
 
 رد بالعربي المصري بشكل مختصر وودود.`;
 }
+
+const salaamCooldowns = new Map();
 
 // ─── DM من الأونر ───────────────────────────────────────────────
 client.on("messageCreate", async (msg) => {
@@ -1206,8 +1222,22 @@ client.on("messageCreate", async (msg) => {
       }
     };
 
-    const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner).catch(() => ({}));
+    const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner, geminiModel()).catch(() => ({}));
     if (amResult?.triggered) return;
+
+    // 🕌 رد على السلام عليكم (كولداون 60 ثانية لكل قناة)
+    if (/^(السلام\s*عليكم|سلام\s*عليكم)/i.test(msg.content.trim())) {
+      const ck = `salaam_${msg.channel.id}`;
+      if (!salaamCooldowns.has(ck)) {
+        salaamCooldowns.set(ck, Date.now());
+        setTimeout(() => salaamCooldowns.delete(ck), 60_000);
+        msg.reply("وعليكم السلام ورحمة الله وبركاته 🌙").catch(() => {});
+      }
+      return;
+    }
+
+    // 🃏 إشارات قائد كود نيمز (clue parsing)
+    if (handleCodenamesMessage(msg)) return;
 
     // Autonomous Moderation Scanning (spam + links)
     if (moderation.isEnabled()) {
@@ -1519,6 +1549,23 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "اكس-اوه")     return await handleTTTCommand(interaction, db);
       if (cmd === "متجر-قدرات")  return await handleShopCommand(interaction, db);
       if (cmd === "قدراتي")      return await handleMyAbilitiesCommand(interaction, db);
+      if (cmd === "كود-نيمز")    return await handleCodenamesCommand(interaction);
+      if (cmd === "جارتك-فون")   return await handleGarticCommand(interaction);
+      if (cmd === "ميم-جيم")     return await handleMemeCommand(interaction);
+      if (cmd === "الألعاب")     return await handleGamesHubCommand(interaction);
+      if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
+      if (cmd === "تغيير-طريقة-الكلام") {
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        const mode = interaction.options.getString("أسلوب");
+        botSpeechMode = mode;
+        const modeLabel = mode === "free" ? "😈 حر — البوت بيكلم بحرية أكتر" : "🎩 محترم — رد لطيف ومودّب";
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xa020f0).setTitle("💬 تم تغيير أسلوب الكلام")
+            .setDescription(`أسلوب البوت دلوقتي: **${modeLabel}**\n\n*التغيير فوري على كل الردود الجديدة*`)
+            .setTimestamp()],
+          ephemeral: true
+        });
+      }
 
       // Quick Cleaning Tools
       if (cmd === "تنظيف_صورة") {
@@ -2172,6 +2219,32 @@ client.on("interactionCreate", async (interaction) => {
         return await handleShopButton(interaction, db);
       }
 
+      // ─── أزرار كود نيمز ──────────────────────────────────────────
+      if (interaction.customId.startsWith("cdn_")) {
+        return await handleCodenamesButton(interaction);
+      }
+
+      // ─── أزرار جارتك فون ─────────────────────────────────────────
+      if (interaction.customId.startsWith("gar_")) {
+        return await handleGarticButton(interaction);
+      }
+
+      // ─── أزرار ميم جيم ───────────────────────────────────────────
+      if (interaction.customId.startsWith("meme_")) {
+        return await handleMemeButton(interaction, db);
+      }
+
+      // ─── أزرار هب الألعاب + احدث المميزات ───────────────────────
+      if (interaction.customId.startsWith("ghub_") || interaction.customId.startsWith("ftr_")) {
+        const gid = interaction.customId;
+        if (gid === "ghub_rlt" || gid === "ftr_rlt")   return await handleRouletteCommand(interaction, db);
+        if (gid === "ghub_maf" || gid === "ftr_maf")   return await handleMafiaCommand(interaction, db);
+        if (gid === "ghub_ttt")                         return await handleTTTCommand(interaction, db);
+        if (gid === "ghub_cdn" || gid === "ftr_cdn")   return await handleCodenamesCommand(interaction);
+        if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
+        if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
+      }
+
       // ─── أزرار تأكيد/إلغاء أوامر التأديب ────────────────────────
       if (interaction.customId.startsWith("modyes_") || interaction.customId.startsWith("modno_")) {
         const isYes    = interaction.customId.startsWith("modyes_");
@@ -2508,6 +2581,16 @@ client.on("interactionCreate", async (interaction) => {
       // ─── مودال مصارعة الكلام ────────────────────────────────────
       if (interaction.customId.startsWith("btl_modal_")) {
         return await handleBattleModal(interaction, db, geminiModel());
+      }
+
+      // ─── مودالات جارتك فون ───────────────────────────────────────
+      if (interaction.customId.startsWith("garmodal_")) {
+        return await handleGarticModal(interaction);
+      }
+
+      // ─── مودالات ميم جيم ─────────────────────────────────────────
+      if (interaction.customId.startsWith("mememodal_")) {
+        return await handleMemeModal(interaction, db);
       }
 
       if (interaction.customId === SUGGESTION_MODAL_ID) {
