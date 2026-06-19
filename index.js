@@ -833,13 +833,18 @@ function buildAdminActionRow(disabled = false) {
   );
 }
 
-function buildAdminSolvedRow(disabled = false) {
+function buildAdminSolvedRow(solvedDisabled = false) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("admin_solved")
       .setLabel("🔧 تم حل المشكلة")
       .setStyle(ButtonStyle.Success)
-      .setDisabled(disabled)
+      .setDisabled(solvedDisabled),
+    new ButtonBuilder()
+      .setCustomId("admin_notify")
+      .setLabel("📢 إشعار صاحب الاقتراح")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(false)
   );
 }
 
@@ -3585,6 +3590,51 @@ client.on("interactionCreate", async (interaction) => {
       }
       if (interaction.customId === "admin_solved") {
         return await handleAdminSuggestionAction(interaction, "solved");
+      }
+      if (interaction.customId === "admin_notify") {
+        if (!isSuggestionAdmin(interaction)) {
+          return interaction.reply({ content: "❌ هذا الزر مخصص للإدارة فقط.", ephemeral: true });
+        }
+        const reference = parseSuggestionReference(interaction.message.embeds[0]);
+        if (!reference) {
+          return interaction.reply({ content: "❌ تعذر ربط هذا الاقتراح بالرسالة الأصلية.", ephemeral: true });
+        }
+        // استخرج الحالة الحالية من الإمبيد
+        const statusField = interaction.message.embeds[0]?.fields?.find(f => f.name === "📊 الحالة");
+        const currentStatus = statusField?.value || "⏳ قيد الدراسة والمراجعة";
+        const suggestionText = reference.text || "—";
+
+        let authorUser = null;
+        try { authorUser = await interaction.client.users.fetch(reference.authorUserId); } catch { /* مش لاقي اليوزر */ }
+
+        if (!authorUser) {
+          return interaction.reply({ content: "❌ ما قدرتش أجيب بيانات صاحب الاقتراح.", ephemeral: true });
+        }
+
+        const dmEmbed = new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setTitle("📢 تحديث على اقتراحك في سيرفر الفراعنة")
+          .setDescription(
+            `يا **${authorUser.globalName || authorUser.username}**! الإدارة عملت تحديث على اقتراحك 👇\n\n` +
+            `**📝 اقتراحك:**\n${suggestionText.slice(0, 512)}\n\n` +
+            `**📊 الحالة الحالية:**\n${currentStatus}\n\n` +
+            `*لو عندك أي استفسار، راجع لوحة الاقتراحات في السيرفر 🔱*`
+          )
+          .setFooter({ text: "سيرفر الفراعنة — نظام الاقتراحات" })
+          .setTimestamp();
+
+        let sent = false;
+        try {
+          await authorUser.send({ embeds: [dmEmbed] });
+          sent = true;
+        } catch { /* اليوزر مسكّر الـ DMs */ }
+
+        return interaction.reply({
+          content: sent
+            ? `✅ تم إشعار **${authorUser.globalName || authorUser.username}** بالحالة الحالية عن طريق الـ DM!`
+            : `❌ ما قدرتش أبعت DM لـ **${authorUser.globalName || authorUser.username}** — غالباً عنده الـ DMs مقفولة.`,
+          ephemeral: true,
+        });
       }
     } catch (err) {
       logger.error("خطأ في معالجة الزر:", err);
