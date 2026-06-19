@@ -13,6 +13,31 @@ import {
 // ══════════════════════════════════════════════════════════════
 export const LATEST_FEATURES = [
   {
+    name: "🏦 بنك وحياة — جديد!",
+    value: "لعبة واقعية جداً — كل لاعب يبدأ بـ 5000 جنيه وبيتعرض لأحداث حياة عشوائية (شغل، استثمار، مصروف...) لـ 5 جولات\nالفايز = أعلى رصيد في الآخر ويكسب كوينز!\n→ من `/الألعاب` بس",
+    inline: false,
+  },
+  {
+    name: "🪖 مصارعة في مركز الألعاب — جديد!",
+    value: "حجر ورقة مقص كلاسيك — تحدّى حد أو العب ضد زنجي مباشرة والفايز يكسب كوينز!\n→ من `/الألعاب` بس",
+    inline: false,
+  },
+  {
+    name: "🗳️ تغيير الصوت في الاستفتاء — جديد!",
+    value: "دلوقتي تقدر تغيّر صوتك في الاستفتاء لو غيّرت رأيك — مش مقفول على اختيارك الأول!\n→ `/استفتاء`",
+    inline: false,
+  },
+  {
+    name: "🌐 رابط اللعبة الأصلية — قابل للضغط — جديد!",
+    value: "زرار **لعب اللعبة الأصلية** بقا رابط مباشر قابل للضغط — مش مجرد نص!\n→ في لوبي الهاتف المكسور، كود نيمز، وصنع الميم",
+    inline: false,
+  },
+  {
+    name: "✏️ /تعديل-رول — محدّث! — جديد!",
+    value: "الأمر اتبسّط — دلوقتي تقدر تعدّل **الاسم + اللون + الصلاحيات** من أمر واحد!\nاللون بيتعرف تلقائياً وبيُطبَّق على الرول فوراً\n→ `/تعديل-رول`",
+    inline: false,
+  },
+  {
     name: "🪨 حجر ورقة مقص — نسختين! — جديد!",
     value: "**العادية 🪨** — كلاسيك حجر ورقة مقص، بدون AI، نتيجة فورية\n**الخارقة ✂️** — اختار **أي حاجة في الكون** (سيف، ثقب أسود، فرعون...) والـ AI يحكم مين يفوز!\n→ من `/الألعاب` بس",
     inline: false,
@@ -106,7 +131,9 @@ function buildHubEmbed() {
       `😂 **صنع الميم** — اكتب أحلى كابشن وفوز بالكوينز\n` +
       `🧠 **مسابقة** — أسئلة ثقافية، أول واحد يجاوب صح يكسب الكوينز\n` +
       `🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك، بدون AI\n` +
-      `✂️ **ح.و.م الخارقة** — اختار أي حاجة في الكون والـ AI يحكم!\n\n` +
+      `✂️ **ح.و.م الخارقة** — اختار أي حاجة في الكون والـ AI يحكم!\n` +
+      `🪖 **مصارعة** — تحدّى حد بحجر ورقة مقص وكسب كوينز!\n` +
+      `🏦 **بنك وحياة** — أدار فلوسك، اشتغل، واستثمر — أكتر رصيد يفوز!\n\n` +
       `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
     )
     .setFooter({ text: "💡 تحتاج 3+ لاعبين لمعظم الألعاب — دعوّ أصحابك!" })
@@ -119,16 +146,18 @@ function buildHubRows() {
       new ButtonBuilder().setCustomId("ghub_rlt").setLabel("🎰 روليت").setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId("ghub_maf").setLabel("🕵️ مافيا").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId("ghub_ttt").setLabel("❌ اكس-اوه").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("ghub_cdn").setLabel("🃏 كود نيمز").setStyle(ButtonStyle.Secondary),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("ghub_cdn").setLabel("🃏 كود نيمز").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 الهاتف المكسور").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 صنع الميم").setStyle(ButtonStyle.Primary),
-    ),
-    new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_quiz").setLabel("🧠 مسابقة").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId("ghub_rps_easy").setLabel("🪨 ح.و.م العادية").setStyle(ButtonStyle.Primary),
+    ),
+    new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("ghub_battle").setLabel("🪖 مصارعة").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🏦 بنك وحياة").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء").setStyle(ButtonStyle.Danger),
     ),
   ];

@@ -28,6 +28,8 @@ import {
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
+import { handleBattleCommand, handleBattleButton } from "./commands/battle.js";
+import { handleBankLifeCommand, handleBankLifeButton } from "./commands/bank-life.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
 import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
@@ -304,12 +306,12 @@ const LEGACY_COMMANDS = [
     .addStringOption((o) => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم مثل red)"))
     .addBooleanOption((o) => o.setName("ظهور-منفصل").setDescription("يظهر الرول منفصلاً في قائمة الأعضاء")),
   new SlashCommandBuilder()
-    .setName("تعديل-صلاحيات-رول")
-    .setDescription("تعيين صلاحيات ذكية على رتبة موجودة [إدارة] / Set smart permissions on role")
+    .setName("تعديل-رول")
+    .setDescription("تعديل رتبة موجودة (صلاحيات + اسم + لون) [إدارة]")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .addRoleOption((o) => o.setName("الرول").setDescription("الرتبة المراد تعديلها").setRequired(true))
     .addStringOption((o) =>
-      o.setName("نوع").setDescription("نوع الرتبة الجديد").setRequired(true)
+      o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً (اختياري)")
         .addChoices(
           { name: "🔴 إدارة (Administrator)",       value: "admin"      },
           { name: "🟠 مشرف (Moderator)",            value: "mod"        },
@@ -331,7 +333,9 @@ const LEGACY_COMMANDS = [
           { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
           { name: "🔘 مسح كل الصلاحيات",           value: "none"       },
         )
-    ),
+    )
+    .addStringOption((o) => o.setName("اسم").setDescription("الاسم الجديد للرتبة (اختياري)"))
+    .addStringOption((o) => o.setName("لون").setDescription("اللون الجديد (hex مثل #FF5733 أو اسم مثل red) (اختياري)")),
   new SlashCommandBuilder()
     .setName("تحذير")
     .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
@@ -575,14 +579,14 @@ function validateLatestFeatures(allCommands) {
       "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","✏️ تعديل رسالة",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات",
-      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-صلاحيات-رول",
+      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-رول",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة",
       "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف",
       "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
-      "مصارعة","روليت","مافيا","اكس-اوه",
+      "مصارعة","روليت","مافيا","اكس-اوه","بنك-وحياة",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
     ];
@@ -2612,34 +2616,63 @@ client.on("interactionCreate", async (interaction) => {
         }
       }
 
-      // ─── تعديل صلاحيات رول بالـ preset ──────────────────────────
-      if (cmd === "تعديل-صلاحيات-رول") {
+      // ─── تعديل رول (صلاحيات + اسم + لون) ────────────────────────
+      if (cmd === "تعديل-رول") {
         await interaction.deferReply({ ephemeral: true });
         const targetRole = interaction.options.getRole("الرول");
         const roleType   = interaction.options.getString("نوع");
-        const preset     = ROLE_PRESETS[roleType];
-        if (!preset) return interaction.editReply({ content: "❌ نوع غير معروف!" });
+        const newName    = interaction.options.getString("اسم");
+        const newColor   = interaction.options.getString("لون");
 
         try {
-          const role = guild.roles.cache.get(targetRole.id);
-          if (!role) return interaction.editReply({ content: "❌ مش لاقي الرول!" });
-          if (preset.permissions.length) {
+          let role = guild.roles.cache.get(targetRole.id);
+          if (!role) role = await guild.roles.fetch(targetRole.id).catch(() => null);
+          if (!role) return interaction.editReply({ content: "❌ مش لاقي الرول — تأكد إنه موجود!" });
+
+          const changes = [];
+          const editData = {};
+
+          // ── صلاحيات ──────────────────────────────────────────────
+          if (roleType) {
+            const preset = ROLE_PRESETS[roleType];
+            if (!preset) return interaction.editReply({ content: "❌ نوع غير معروف!" });
             const valid = preset.permissions.filter(p => PermissionFlagsBits[p]);
-            await role.setPermissions(valid.map(p => PermissionFlagsBits[p]), `بأمر ${user.username}`);
-          } else {
-            await role.setPermissions([], `بأمر ${user.username}`);
+            editData.permissions = valid.map(p => PermissionFlagsBits[p]);
+            changes.push({ name: "🔐 الصلاحيات", value: preset.permissions.length ? `\`${preset.permissions.join(", ")}\`` : "لا صلاحيات", inline: false });
+            changes.push({ name: "📋 النوع", value: preset.label, inline: true });
           }
+
+          // ── اسم ──────────────────────────────────────────────────
+          if (newName) {
+            editData.name = newName;
+            changes.push({ name: "🏷️ الاسم الجديد", value: newName, inline: true });
+          }
+
+          // ── لون ──────────────────────────────────────────────────
+          if (newColor) {
+            const parsedColor = parseRoleColor(newColor);
+            if (parsedColor === null) return interaction.editReply({ content: `❌ اللون **${newColor}** مش صح — استخدم hex مثل #FF5733 أو اسم إنجليزي مثل red` });
+            editData.color = parsedColor;
+            changes.push({ name: "🎨 اللون", value: newColor, inline: true });
+          }
+
+          if (!roleType && !newName && !newColor) {
+            return interaction.editReply({ content: "❌ لازم تحدد نوع أو اسم أو لون على الأقل!" });
+          }
+
+          await role.edit({ ...editData, reason: `بأمر ${user.username}` });
+
           return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(preset.color)
-              .setTitle("🔐 تم تعديل الصلاحيات")
+            new EmbedBuilder().setColor(editData.color ?? 0x9b59b6)
+              .setTitle("✅ تم تعديل الرتبة")
               .addFields(
-                { name: "🏷️ الرتبة",     value: role.name,                                                              inline: true  },
-                { name: "📋 النوع",       value: preset.label,                                                           inline: true  },
-                { name: "🔐 الصلاحيات",  value: preset.permissions.length ? `\`${preset.permissions.join(", ")}\`` : "لا صلاحيات", inline: false },
+                { name: "🏷️ الرتبة", value: role.name, inline: true },
+                { name: "🆔 الـ ID", value: `\`${role.id}\``, inline: true },
+                ...changes
               ).setTimestamp()
           ]});
         } catch (err) {
-          logger.error("خطأ في تعديل صلاحيات الرول:", err);
+          logger.error("خطأ في تعديل الرول:", err);
           return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
         }
       }
@@ -3110,6 +3143,16 @@ client.on("interactionCreate", async (interaction) => {
         return await handleRPSBasicButton(interaction);
       }
 
+      // ─── أزرار مصارعة ────────────────────────────────────────────
+      if (interaction.customId.startsWith("btl_")) {
+        return await handleBattleButton(interaction, db);
+      }
+
+      // ─── أزرار بنك وحياة ─────────────────────────────────────────
+      if (interaction.customId.startsWith("bnk_")) {
+        return await handleBankLifeButton(interaction, db);
+      }
+
       // ─── أزرار هب الألعاب + احدث المميزات ───────────────────────
       if (interaction.customId.startsWith("ghub_") || interaction.customId.startsWith("ftr_")) {
         const gid = interaction.customId;
@@ -3122,6 +3165,8 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
         if (gid === "ghub_rps_easy")                    return await handleRPSBasicCommand(interaction);
         if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
+        if (gid === "ghub_battle")                      return await handleBattleCommand(interaction, db);
+        if (gid === "ghub_banklife")                    return await handleBankLifeCommand(interaction);
         if (gid === "ghub_cancel") {
           const cid = interaction.channel.id;
           if (channelGames.has(cid))    { channelGames.delete(cid); }

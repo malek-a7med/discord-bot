@@ -214,10 +214,12 @@ export async function handleGarticButton(interaction) {
       embeds: [new EmbedBuilder()
         .setColor(0x3498db)
         .setTitle("🌐 روحوا العبوا الهاتف المكسور الأصلي!")
-        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n👇 **الرابط:**\nhttps://garticphone.com/ar\n\n*(اللعبة على البوت اتلغت تلقائياً)*`)
+        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n*(اللعبة على البوت اتلغت تلقائياً — اضغط الزرار الأخضر جنب ده)*`)
         .setTimestamp()
       ],
-      components: [],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setLabel("🌐 افتح الهاتف المكسور الأصلي").setURL("https://garticphone.com/ar").setStyle(ButtonStyle.Link)
+      )],
     });
   }
 
@@ -529,10 +531,12 @@ export async function handleMemeButton(interaction, db) {
       embeds: [new EmbedBuilder()
         .setColor(0x3498db)
         .setTitle("🌐 روحوا العبوا صنع الميم الأصلي!")
-        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n👇 **الرابط:**\nhttps://makeitmeme.com/ar/\n\n*(اللعبة على البوت اتلغت تلقائياً)*`)
+        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n*(اللعبة على البوت اتلغت تلقائياً — اضغط الزرار جنب ده)*`)
         .setTimestamp()
       ],
-      components: [],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setLabel("🌐 افتح صنع الميم الأصلي").setURL("https://makeitmeme.com/ar/").setStyle(ButtonStyle.Link)
+      )],
     });
   }
 

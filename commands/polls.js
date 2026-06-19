@@ -160,8 +160,13 @@ export async function handlePollButton(interaction) {
   const userId = interaction.user.id;
 
   if (state.votes[userId] !== undefined) {
-    const prev = state.options[state.votes[userId]];
-    return interaction.reply({ content: `✅ إنت بالفعل صوّت على **${OPTION_EMOJIS[state.votes[userId]]} ${prev}** — ما تقدرش تغير صوتك.`, flags: 64 });
+    const prevIdx = state.votes[userId];
+    if (prevIdx === optionIdx) {
+      const prev = state.options[prevIdx];
+      return interaction.reply({ content: `✅ إنت بالفعل صوّت على **${OPTION_EMOJIS[prevIdx]} ${prev}** — نفس الاختيار!`, flags: 64 });
+    }
+    // تغيير الصوت — شيل القديم وحط الجديد
+    state.counts[prevIdx] = Math.max(0, (state.counts[prevIdx] || 0) - 1);
   }
 
   state.votes[userId]    = optionIdx;

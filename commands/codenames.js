@@ -213,10 +213,12 @@ export async function handleCodenamesButton(interaction) {
       embeds: [new EmbedBuilder()
         .setColor(0x3498db)
         .setTitle("🌐 روحوا العبوا كود نيمز الأصلي!")
-        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n👇 **الرابط:**\nhttps://codenames.game/\n\n*(اللعبة على البوت اتلغت تلقائياً)*`)
+        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n*(اللعبة على البوت اتلغت تلقائياً — اضغط الزرار جنب ده)*`)
         .setTimestamp()
       ],
-      components: [],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setLabel("🌐 افتح كود نيمز الأصلي").setURL("https://codenames.game/").setStyle(ButtonStyle.Link)
+      )],
     });
   }
 
