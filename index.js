@@ -1124,6 +1124,10 @@ ${senderName}: ${question}
 
 const salaamCooldowns = new Map();
 
+// ─── Auto-Mod Log Channel ────────────────────────────────────────
+const AUTO_MOD_LOG_CHANNEL_ID = "1517362832063074324";
+const autoModLogs = new Map(); // logId → logData
+
 // ─── رد البوت لو حد شتم الأونر ─────────────────────────────────
 const INSULT_REGEX = /كس|نيك|زب\b|طيز|شرموط|متناك|عرص|خول|قحب|زاني|أمك|اختك|ابن.*وسخ|ابن.*شرم|fuck|bitch|bastard|asshole|يلعن|ألعن|اتناك|هنيك|انيك/gi;
 
@@ -1266,7 +1270,59 @@ client.on("messageCreate", async (msg) => {
     await checkAndReplyOwnerInsult(msg).catch(() => {});
 
     const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner, geminiModel()).catch(() => ({}));
-    if (amResult?.triggered) return;
+    if (amResult?.triggered) {
+      // ── إرسال إمبيد التقرير في قناة اللوج ──────────────────
+      if (amResult.logData) {
+        const ld     = amResult.logData;
+        const logId  = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        autoModLogs.set(logId, ld);
+        setTimeout(() => autoModLogs.delete(logId), 24 * 60 * 60 * 1000);
+
+        client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID).then(async logCh => {
+          const embed = new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setTitle("🛡️ Auto-Mod | رسالة محذوفة")
+            .setThumbnail(ld.userAvatar)
+            .addFields(
+              { name: "👤 المستخدم",      value: `<@${ld.userId}>\n\`${ld.username}\``,    inline: true },
+              { name: "📍 القناة",          value: `<#${ld.channelId}>\n\`${ld.channelName}\``, inline: true },
+              { name: "⚠️ السبب",           value: `\`${ld.reason}\``,                        inline: true },
+              { name: "🔢 التحذيرات",      value: `**${amResult.warnCount}** تحذير`,         inline: true },
+              { name: "🕐 الوقت",           value: `<t:${Math.floor(ld.timestamp / 1000)}:R>`, inline: true },
+              { name: "🆔 User ID",         value: `\`${ld.userId}\``,                        inline: true },
+              {
+                name:  "📝 محتوى الرسالة",
+                value: ld.savedContent
+                  ? `\`\`\`${ld.savedContent.slice(0, 900)}\`\`\``
+                  : "*(لا يوجد نص)*",
+              },
+            )
+            .setFooter({ text: `زنجي Auto-Mod • ${ld.guildName}` })
+            .setTimestamp();
+
+          if (ld.savedAttachments.length > 0) {
+            embed.addFields({
+              name:  "🖼️ المرفقات",
+              value: ld.savedAttachments.map((u, i) => `[مرفق ${i + 1}](${u})`).join("\n"),
+            });
+          }
+
+          const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`aml_restore_${logId}`).setLabel("↩️ رجاع الرسالة").setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`aml_confirm_${logId}`).setLabel("✅ تأكيد الحذف").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`aml_warn_${logId}`).setLabel("⚠️ تحذير فقط").setStyle(ButtonStyle.Primary),
+          );
+          const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`aml_mute_${logId}`).setLabel("🔇 إسكات").setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`aml_kick_${logId}`).setLabel("👢 طرد").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`aml_ban_${logId}`).setLabel("🔨 حظر").setStyle(ButtonStyle.Danger),
+          );
+
+          await logCh.send({ embeds: [embed], components: [row1, row2] }).catch(() => {});
+        }).catch(() => {});
+      }
+      return;
+    }
 
     // 🕌 رد على السلام عليكم (كولداون 60 ثانية لكل قناة)
     if (/^(السلام\s*عليكم|سلام\s*عليكم)/i.test(msg.content.trim())) {
@@ -1691,14 +1747,92 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "serverinfo") {
         if (!guild) return interaction.reply({ content: "❌ الأمر ده في السيرفرات بس يسطا!", ephemeral: true });
+        await interaction.deferReply();
+        await guild.members.fetch().catch(() => {});
+        await guild.emojis.fetch().catch(() => {});
+        await guild.stickers.fetch().catch(() => {});
+
+        const owner = await guild.fetchOwner().catch(() => null);
+
+        // ── الأعضاء ──
+        const allMembers = guild.members.cache;
+        const humanCount = allMembers.filter(m => !m.user.bot).size;
+        const botCount   = allMembers.filter(m => m.user.bot).size;
+
+        // ── القنوات ──
+        const chCache   = guild.channels.cache;
+        const txtCount  = chCache.filter(c => c.type === 0).size;
+        const voiceCount = chCache.filter(c => c.type === 2).size;
+        const catCount  = chCache.filter(c => c.type === 4).size;
+        const newsCount = chCache.filter(c => c.type === 5).size;
+        const stageCount = chCache.filter(c => c.type === 13).size;
+        const forumCount = chCache.filter(c => c.type === 15).size;
+        const threadCount = chCache.filter(c => [10, 11, 12].includes(c.type)).size;
+        const totalCh   = chCache.size;
+
+        // ── الرتب والإيموجي ──
+        const roleCount   = guild.roles.cache.size - 1; // بدون @everyone
+        const emojiCount  = guild.emojis.cache.size;
+        const stickerCount = guild.stickers.cache.size;
+        const animatedEmojis = guild.emojis.cache.filter(e => e.animated).size;
+
+        // ── البوست ──
+        const boostTier  = guild.premiumTier;         // 0-3
+        const boostCount = guild.premiumSubscriptionCount || 0;
+        const boostNeeded = [2, 7, 14][boostTier] ?? "—";
+
+        const verifyMap = ["❌ لا يوجد", "🟢 منخفض", "🟡 متوسط", "🟠 عالي", "🔴 عالي جداً"];
+        const mfaMap   = ["❌ لا يُشترط", "✅ مطلوب للإدارة"];
+        const nsfw     = ["✅ آمن","🟡 فعّال","🟠 صريح","🔴 عمر 18+"][guild.nsfwLevel] ?? "غير معروف";
+
+        const createdTs = Math.floor(guild.createdTimestamp / 1000);
+
         const embed = new EmbedBuilder()
-          .setColor(0x7289da)
-          .setTitle(`📊 معلومات سيرفر: ${guild.name}`)
+          .setColor(0x5865f2)
+          .setTitle(`🏛️ ${guild.name}`)
+          .setThumbnail(guild.iconURL({ dynamic: true, size: 256 }))
           .addFields(
-            { name: "🆔 ID السيرفر", value: guild.id, inline: true },
-            { name: "👥 عدد الأعضاء", value: `${guild.memberCount}`, inline: true }
-          );
-        return interaction.reply({ embeds: [embed] });
+            { name: "🆔 ID السيرفر",       value: `\`${guild.id}\``,                                                     inline: true },
+            { name: "👑 الأونر",             value: owner ? `<@${owner.id}>\n\`${owner.user.username}\`` : "غير معروف",   inline: true },
+            { name: "📅 تاريخ الإنشاء",     value: `<t:${createdTs}:D>\n<t:${createdTs}:R>`,                             inline: true },
+
+            { name: "👥 الأعضاء",
+              value: `**الكل:** ${guild.memberCount}\n👤 بشر: ${humanCount}\n🤖 بوتات: ${botCount}`,                       inline: true },
+            { name: "📡 القنوات (${totalCh})",
+              value: `💬 نصية: ${txtCount}\n🔊 صوتية: ${voiceCount}\n📁 كاتيجوري: ${catCount}\n📰 أخبار: ${newsCount}\n🎭 ستيج: ${stageCount}\n💬 فورم: ${forumCount}\n🧵 ثريدز: ${threadCount}`,
+                                                                                                                            inline: true },
+            { name: "🎭 الرتب",             value: `\`${roleCount}\` رتبة`,                                               inline: true },
+
+            { name: "😀 الإيموجي",
+              value: `**الكل:** ${emojiCount}\n🖼️ ثابت: ${emojiCount - animatedEmojis}\n✨ متحرك: ${animatedEmojis}\n🎭 ستيكرز: ${stickerCount}`,
+                                                                                                                            inline: true },
+            { name: "🚀 البوست",
+              value: `**المستوى:** ${boostTier}\n⚡ البوستات: ${boostCount}`,                                              inline: true },
+            { name: "🔒 التحقق",
+              value: `${verifyMap[guild.verificationLevel] ?? "؟"}\n🛡️ 2FA: ${mfaMap[guild.mfaLevel] ?? "؟"}\n🔞 NSFW: ${nsfw}`,
+                                                                                                                            inline: true },
+          )
+          .setFooter({ text: `زنجي Bot • معلومات تفصيلية للسيرفر` })
+          .setTimestamp();
+
+        if (guild.description) embed.setDescription(`📝 ${guild.description}`);
+        if (guild.bannerURL())  embed.setImage(guild.bannerURL({ size: 1024 }));
+
+        const featureLabels = {
+          COMMUNITY: "🏘️ كوميونيتي", VERIFIED: "✅ موثّق", PARTNERED: "🤝 بارتنر",
+          DISCOVERABLE: "🔍 قابل للاكتشاف", VANITY_URL: "🔗 URL مخصص",
+          NEWS: "📰 أخبار", ANIMATED_ICON: "🎨 أيقونة متحركة",
+          BANNER: "🖼️ بانر", INVITE_SPLASH: "✨ سبلاش",
+          ANIMATED_BANNER: "🎬 بانر متحرك", AUTO_MODERATION: "🛡️ Auto-Mod",
+          WELCOME_SCREEN_ENABLED: "👋 شاشة ترحيب", MONETIZATION_ENABLED: "💰 مونتيزيشن",
+        };
+        const featList = guild.features.map(f => featureLabels[f] ?? f.replace(/_/g, " ")).join(" • ");
+        if (featList) embed.addFields({ name: "⭐ مميزات السيرفر", value: featList.slice(0, 1024) });
+
+        const vanity = guild.vanityURLCode ? `discord.gg/${guild.vanityURLCode}` : "لا يوجد";
+        embed.addFields({ name: "🔗 رابط مخصص", value: vanity, inline: true });
+
+        return interaction.editReply({ embeds: [embed] });
       }
 
       if (cmd === "userinfo") {
@@ -2435,6 +2569,140 @@ client.on("interactionCreate", async (interaction) => {
       }
       // ─────────────────────────────────────────────────────────────
 
+      // ── أزرار Auto-Mod Log Channel ───────────────────────────────
+      if (interaction.customId.startsWith("aml_")) {
+        if (!config.isOwner(interaction.user.id) && !interaction.member?.permissions?.has(PermissionFlagsBits.ModerateMembers)) {
+          return interaction.reply({ content: "❌ الأزرار دي للمشرفين بس!", ephemeral: true });
+        }
+
+        const parts  = interaction.customId.split("_");
+        const action = parts[1]; // restore | confirm | warn | mute | kick | ban
+        const logId  = parts.slice(2).join("_");
+        const ld     = autoModLogs.get(logId);
+
+        // ↩️ رجاع الرسالة
+        if (action === "restore") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت أو منتحجتش!", ephemeral: true });
+          try {
+            const ch = await client.channels.fetch(ld.channelId).catch(() => null);
+            if (!ch) return interaction.reply({ content: "❌ مش لاقي القناة!", ephemeral: true });
+            await ch.send({
+              content: `📨 **رسالة مرجّعة من Auto-Mod** — <@${ld.userId}>:\n${ld.savedContent || "*(محتوى فارغ)*"}`,
+            });
+            await interaction.reply({ content: "✅ الرسالة اترجعت في القناة!", ephemeral: true });
+          } catch (e) {
+            await interaction.reply({ content: `❌ فشلت: ${e.message}`, ephemeral: true });
+          }
+          return;
+        }
+
+        // ✅ تأكيد الحذف
+        if (action === "confirm") {
+          await interaction.update({
+            embeds: interaction.message.embeds,
+            components: [],
+          }).catch(() => {});
+          await interaction.followUp({ content: "✅ تم تأكيد الحذف. الرسالة اتمسحت ومش هترجع.", ephemeral: true });
+          autoModLogs.delete(logId);
+          return;
+        }
+
+        // ⚠️ تحذير فقط
+        if (action === "warn") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          db.addWarning(ld.userId, ld.reason, interaction.user.username);
+          const warns = db.getWarnings(ld.userId);
+          await interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xf39c12)
+              .setTitle("⚠️ تم التحذير")
+              .setDescription(`<@${ld.userId}> أخد تحذير إضافي\nإجمالي التحذيرات: **${warns.length}**\nالسبب: ${ld.reason}`)
+              .setTimestamp()],
+            ephemeral: true,
+          });
+          return;
+        }
+
+        // 👢 طرد
+        if (action === "kick") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          try {
+            await interaction.guild.members.fetch(ld.userId);
+            const member = interaction.guild.members.cache.get(ld.userId);
+            if (!member) return interaction.reply({ content: "❌ العضو مش في السيرفر!", ephemeral: true });
+            await member.kick(`Auto-Mod Log — ${ld.reason}`);
+            await interaction.reply({
+              embeds: [new EmbedBuilder()
+                .setColor(0xe67e22)
+                .setTitle("👢 تم الطرد")
+                .setDescription(`**${ld.username}** اتطرد\nالسبب: ${ld.reason}`)
+                .setTimestamp()],
+              ephemeral: true,
+            });
+          } catch (e) {
+            await interaction.reply({ content: `❌ فشل الطرد: ${e.message}`, ephemeral: true });
+          }
+          return;
+        }
+
+        // 🔇 إسكات — بيفتح مودال
+        if (action === "mute") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          const modal = new ModalBuilder()
+            .setCustomId(`aml_mute_modal_${logId}`)
+            .setTitle("🔇 إسكات العضو");
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId("mute_duration")
+                .setLabel("المدة بالدقائق (1-10080) — اتركه فاضي لساعتين")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setPlaceholder("مثال: 60 أو 1440")
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId("mute_reason")
+                .setLabel("السبب (اختياري)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setPlaceholder(ld.reason)
+            ),
+          );
+          return interaction.showModal(modal);
+        }
+
+        // 🔨 حظر — بيفتح مودال
+        if (action === "ban") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          const modal = new ModalBuilder()
+            .setCustomId(`aml_ban_modal_${logId}`)
+            .setTitle("🔨 حظر العضو");
+          modal.addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId("ban_duration")
+                .setLabel("المدة بالأيام (اتركه فاضي = حظر دائم)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setPlaceholder("مثال: 7 أو 30 — فاضي = دائم")
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder()
+                .setCustomId("ban_reason")
+                .setLabel("السبب (اختياري)")
+                .setStyle(TextInputStyle.Short)
+                .setRequired(false)
+                .setPlaceholder(ld.reason)
+            ),
+          );
+          return interaction.showModal(modal);
+        }
+
+        return;
+      }
+      // ──────────────────────────────────────────────────────────────
+
       // ── أزرار قرار طرد Auto-Mod ───────────────────────────────────
       if (interaction.customId.startsWith("automod_kick_yes_") || interaction.customId.startsWith("automod_kick_no_")) {
         if (!config.isOwner(interaction.user.id)) {
@@ -2662,6 +2930,59 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
         return await handleAdminReplyModalSubmit(interaction);
       }
+
+      // ─── مودالات Auto-Mod Log ─────────────────────────────────────
+      if (interaction.customId.startsWith("aml_mute_modal_") || interaction.customId.startsWith("aml_ban_modal_")) {
+        const isBan = interaction.customId.startsWith("aml_ban_modal_");
+        const logId = interaction.customId.replace(isBan ? "aml_ban_modal_" : "aml_mute_modal_", "");
+        const ld    = autoModLogs.get(logId);
+        if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+          await interaction.guild.members.fetch(ld.userId).catch(() => {});
+          const member = interaction.guild.members.cache.get(ld.userId);
+
+          if (isBan) {
+            const daysRaw = interaction.fields.getTextInputValue("ban_duration").trim();
+            const reason  = interaction.fields.getTextInputValue("ban_reason").trim() || ld.reason;
+            const days    = parseInt(daysRaw) || 0;
+            const banOptions = { reason };
+            if (days > 0) banOptions.deleteMessageSeconds = days * 24 * 60 * 60;
+
+            await interaction.guild.bans.create(ld.userId, banOptions);
+            await interaction.editReply({
+              embeds: [new EmbedBuilder()
+                .setColor(0xe74c3c)
+                .setTitle("🔨 تم الحظر")
+                .setDescription(
+                  `**${ld.username}** اتحظر${days > 0 ? ` لمدة **${days} يوم**` : " **نهائياً**"}\nالسبب: ${reason}`
+                )
+                .setTimestamp()],
+            });
+          } else {
+            if (!member) return interaction.editReply({ content: "❌ العضو مش في السيرفر!" });
+            const minsRaw = interaction.fields.getTextInputValue("mute_duration").trim();
+            const reason  = interaction.fields.getTextInputValue("mute_reason").trim() || ld.reason;
+            const mins    = parseInt(minsRaw) || 120;
+            const clamped = Math.min(Math.max(mins, 1), 10080);
+
+            await member.timeout(clamped * 60 * 1000, reason);
+            await interaction.editReply({
+              embeds: [new EmbedBuilder()
+                .setColor(0x3498db)
+                .setTitle("🔇 تم الإسكات")
+                .setDescription(`**${ld.username}** اتأسكت لمدة **${clamped} دقيقة**\nالسبب: ${reason}`)
+                .setTimestamp()],
+            });
+          }
+        } catch (e) {
+          await interaction.editReply({ content: `❌ فشلت العملية: ${e.message}` });
+        }
+        return;
+      }
+      // ──────────────────────────────────────────────────────────────
 
       // ─── موودالات لوحة تحكم الأونر ────────────────────────────────
       if (["dmmod_warn","dmmod_mute","dmmod_kick","dmmod_ban","dmmod_coins"].includes(interaction.customId)) {

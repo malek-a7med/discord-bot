@@ -116,6 +116,10 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner, gemin
 
   if (!reason) return { triggered: false };
 
+  // ── حفظ محتوى الرسالة قبل الحذف ───────────────────────────
+  const savedContent     = msg.content || "";
+  const savedAttachments = [...msg.attachments.values()].map(a => a.url);
+
   // ── مسح الرسالة ────────────────────────────────────────────
   await msg.delete().catch(() => {});
 
@@ -163,5 +167,21 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner, gemin
       : "\n📌 الرسالة اتحذفت. تحذير تاني → إسكات ساعتين، وتالت → قرار الإدارة.",
   ].join("\n")).catch(() => {});
 
-  return { triggered: true, action, warnCount };
+  return {
+    triggered: true,
+    action,
+    warnCount,
+    logData: {
+      savedContent,
+      savedAttachments,
+      userId:      user.id,
+      username:    user.username,
+      userAvatar:  user.displayAvatarURL(),
+      channelId:   msg.channel.id,
+      channelName: msg.channel.name || "unknown",
+      guildName:   msg.guild.name,
+      reason,
+      timestamp:   Date.now(),
+    }
+  };
 }
