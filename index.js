@@ -30,6 +30,7 @@ import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
 import { handleBattleCommand, handleBattleButton } from "./commands/battle.js";
 import { handleBankLifeCommand, handleBankLifeButton } from "./commands/bank-life.js";
+import { handleBankLuckCommand, handleBankLuckButton } from "./commands/bank-luck.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
 import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
@@ -586,7 +587,7 @@ function validateLatestFeatures(allCommands) {
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
-      "مصارعة","روليت","مافيا","اكس-اوه","بنك-وحياة",
+      "مصارعة","روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
     ];
@@ -1765,6 +1766,9 @@ client.on("messageCreate", async (msg) => {
     handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel);
     return;
   }
+
+  // منع رد مزدوج من نسختين للبوت (نفس الآلية المستخدمة مع الأونر)
+  if (!db.claimAiMessage(msg.id)) return;
 
   const svTypingInterval = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
@@ -3148,9 +3152,14 @@ client.on("interactionCreate", async (interaction) => {
         return await handleBattleButton(interaction, db);
       }
 
-      // ─── أزرار بنك وحياة ─────────────────────────────────────────
+      // ─── أزرار الحياة ────────────────────────────────────────────
       if (interaction.customId.startsWith("bnk_")) {
         return await handleBankLifeButton(interaction, db);
+      }
+
+      // ─── أزرار بنك الحظ ──────────────────────────────────────────
+      if (interaction.customId.startsWith("blk_")) {
+        return await handleBankLuckButton(interaction, db);
       }
 
       // ─── أزرار هب الألعاب + احدث المميزات ───────────────────────
@@ -3167,6 +3176,7 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
         if (gid === "ghub_battle")                      return await handleBattleCommand(interaction, db);
         if (gid === "ghub_banklife")                    return await handleBankLifeCommand(interaction);
+        if (gid === "ghub_bankluck")                    return await handleBankLuckCommand(interaction);
         if (gid === "ghub_cancel") {
           const cid = interaction.channel.id;
           if (channelGames.has(cid))    { channelGames.delete(cid); }

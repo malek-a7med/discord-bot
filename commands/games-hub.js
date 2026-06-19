@@ -13,8 +13,13 @@ import {
 // ══════════════════════════════════════════════════════════════
 export const LATEST_FEATURES = [
   {
-    name: "🏦 بنك وحياة — جديد!",
-    value: "لعبة واقعية جداً — كل لاعب يبدأ بـ 5000 جنيه وبيتعرض لأحداث حياة عشوائية (شغل، استثمار، مصروف...) لـ 5 جولات\nالفايز = أعلى رصيد في الآخر ويكسب كوينز!\n→ من `/الألعاب` بس",
+    name: "🎰 بنك الحظ — جديد!",
+    value: "دوّر عجلة الحظ! 12 شريحة مختلفة — +200 | +500 | +1000 | +1500 | +2000 | جاكبوت +5000 | -200 | -500 | -1000 | ×2 | إفلاس | سرقة\nالفايز بأعلى رصيد يكسب كوينز!\n→ من `/الألعاب` بس",
+    inline: false,
+  },
+  {
+    name: "🌍 الحياة — محدّث بالكامل!",
+    value: "لعبة حياة واقعية كاملة! 10 جولات × 5 مراحل: 🎓 تعليم → 💼 شغل → 👨‍👩‍👧 أسرة → 📈 استثمار → 🏖️ تقاعد\nأحداث عشوائية + قرارات مصيرية (اختيارات حقيقية)! الفايز = أعلى نقاط حياة (مال + صحة + سعادة)\n→ من `/الألعاب` بس",
     inline: false,
   },
   {
@@ -133,7 +138,8 @@ function buildHubEmbed() {
       `🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك، بدون AI\n` +
       `✂️ **ح.و.م الخارقة** — اختار أي حاجة في الكون والـ AI يحكم!\n` +
       `🪖 **مصارعة** — تحدّى حد بحجر ورقة مقص وكسب كوينز!\n` +
-      `🏦 **بنك وحياة** — أدار فلوسك، اشتغل، واستثمر — أكتر رصيد يفوز!\n\n` +
+      `🌍 **الحياة** — عيش حياة كاملة (تعليم→شغل→أسرة→استثمار→تقاعد) واكسب أعلى نقاط!\n` +
+      `🎰 **بنك الحظ** — دوّر عجلة الحظ وارفع رصيدك — أكتر فلوس يفوز!\n\n` +
       `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
     )
     .setFooter({ text: "💡 تحتاج 3+ لاعبين لمعظم الألعاب — دعوّ أصحابك!" })
@@ -157,7 +163,10 @@ function buildHubRows() {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId("ghub_battle").setLabel("🪖 مصارعة").setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🏦 بنك وحياة").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🌍 الحياة").setStyle(ButtonStyle.Success),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("ghub_bankluck").setLabel("🎰 بنك الحظ").setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء").setStyle(ButtonStyle.Danger),
     ),
   ];
