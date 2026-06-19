@@ -1206,7 +1206,8 @@ const userLastRequest  = new Map(); // cooldown: آخر طلب لكل يوزر
 const USER_COOLDOWN_MS = 5_000;    // 5 ثواني بين كل طلب وتاني
 
 // ── منع تكرار الردود (لو في نسختين من البوت شغالين) ────────────
-const processedMessages = new Set();
+const processedMessages    = new Set();
+const processedInteractions = new Set();
 
 // ── نظام حماية من الـ Spam ────────────────────────────────────
 const SPAM_WINDOW_MS  = 60_000;  // نافذة 60 ثانية
@@ -1561,80 +1562,21 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
-  const isMentioned  = msg.mentions.has(client.user.id);
-  const isOwner      = config.isOwner(msg.author.id);
-  // باسمه = للأونر بس — باقي الناس لازم يعملوا منشن
-  const calledByName = /زنجي/i.test(msg.content) && isOwner;
-
-  // في السيرفر، الكل (حتى الأونر) لازم ينده باسمه أو يعمل منشن
-  if (!isMentioned && !calledByName) return;
-
-  // بعث typing فوراً عشان Discord ميعملش مقاطعة
-  msg.channel.sendTyping().catch(() => {});
-
-  const BOT_CHANNEL_ID = "1516591390023352370";
-
-  // تقييد الروم ده بس للسيرفر (مش الـ DM) وبس للناس العادية
-  if (msg.guild && !isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
-    return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
-  }
-
-  const question = msg.content.replace(/<@!?\d+>/g, "").trim();
-  if (!question || !_geminiReady) return;
-
-  const now = Date.now();
-
-  // ── حماية Spam (الأونر معفي) ─────────────────────────────────
-  if (!isOwner) {
-    const spamErr = checkSpam(msg.author.id, now);
-    if (spamErr) return msg.reply(spamErr).catch(() => {});
-  }
-
-  // ── cooldown: 15 ثانية بين كل طلب وتاني (الأونر معفي) ────────
-  if (!isOwner) {
-    const lastReq = userLastRequest.get(msg.author.id) || 0;
-    const elapsed = now - lastReq;
-    if (elapsed < USER_COOLDOWN_MS) {
-      const remaining = Math.ceil((USER_COOLDOWN_MS - elapsed) / 1000);
-      return msg.reply(`⏳ استنى ${remaining} ثانية قبل ما تكلمني تاني!`).catch(() => {});
-    }
-    userLastRequest.set(msg.author.id, now);
-  }
-
-  if (isOwner) {
-    // حماية من الرد المكرر — بتكتب في الملف مباشرة عشان تشتغل حتى مع نسختين
-    if (!db.claimAiMessage(msg.id)) return;
-    handleOwnerAI(msg, msg.guild, geminiModel(), db, buildDMControlPanel);
-    return;
-  }
-
-  const svTypingInterval = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
-  msg.channel.sendTyping().catch(() => {});
-  try {
-    // msg.member ممكن يكون null لو الرسالة جت من DM أو cache miss
-    const senderName = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
-    const prompt     = buildUserPrompt(senderName, question, msg.author.id);
-    const result     = await geminiModel().generateContent(prompt);
-    const reply      = result.response.text().trim();
-    pushUserHistory(msg.author.id, "user", question);
-    pushUserHistory(msg.author.id, "bot",  reply);
-    await msg.reply(reply);
-  } catch (err) {
-    logger.error("خطأ في الرد على الرسالة:", err);
-    if (err.isQuotaError || err.message === "ALL_KEYS_EXHAUSTED") {
-      await msg.reply("⏳ الـ AI وصل للحد اليومي — جرب تاني بعد شوية!").catch(() => {});
-    } else {
-      await msg.reply("معلش يسطا ثواني بس").catch(() => {});
-    }
-  } finally {
-    clearInterval(svTypingInterval);
-  }
+  // ── السيرفر: البوت مش بيرد على المنشنات أو الأسماء — التحديات بس ──
+  // لو الأونر كلّمه في الـ DM، الرد موجود فوق
+  // أي منشن في السيرفر يتجاهل بصمت
 });
+
 
 // ───────────────────────────────────────────────────────────────
 //  تنفيذ Slash Commands و الأزرار و المودال بالكامل
 // ───────────────────────────────────────────────────────────────
 client.on("interactionCreate", async (interaction) => {
+  // ── منع تكرار معالجة نفس الـ interaction مرتين (مثلاً لو في نسختين) ──
+  if (processedInteractions.has(interaction.id)) return;
+  processedInteractions.add(interaction.id);
+  setTimeout(() => processedInteractions.delete(interaction.id), 60_000);
+
   if (interaction.isChatInputCommand()) {
     const cmd = interaction.commandName;
     const { user, channel } = interaction;
