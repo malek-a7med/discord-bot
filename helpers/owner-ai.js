@@ -21,6 +21,22 @@ export const ROLE_PRESETS = {
   none:   { label: "بدون صلاحيات",permissions: [],                                                                                                              color: 0x555555, hoist: false },
 };
 
+// ─── resolveRole: بتدور على رول بـ ID أو اسم (case-insensitive) ─
+export function resolveRole(guild, idOrName) {
+  if (!guild || !idOrName) return null;
+  const str = String(idOrName).trim();
+  // جرب ID الأول
+  const byId = guild.roles.cache.get(str);
+  if (byId) return byId;
+  // بعدين جرب الاسم كامل أو جزء منه
+  const lower = str.toLowerCase();
+  return (
+    guild.roles.cache.find(r => r.name.toLowerCase() === lower) ||
+    guild.roles.cache.find(r => r.name.toLowerCase().includes(lower)) ||
+    null
+  );
+}
+
 export function smartRolePerms(name) {
   const n = (name || "").toLowerCase();
   if (/إدارة|ادارة|أدمن|ادمن|admin|owner|أونر|ملك|مدير/i.test(n))   return ROLE_PRESETS.admin;
@@ -113,7 +129,7 @@ function buildUnifiedPrompt(text, ownerName, guild, history) {
   const roles = guild?.roles?.cache
     ?.filter(r => r.name !== "@everyone")
     ?.map(r => `${r.name}=${r.id}`)
-    ?.slice(0, 6)?.join(", ") ?? "غير متاح";
+    ?.slice(0, 25)?.join(", ") ?? "غير متاح";
 
   return `أنت زنجي — بوت Discord مصري ذكي وودود. الأونر اسمه "${ownerName}".
 
@@ -469,9 +485,9 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     if (action === "give_role") {
       const m    = await guild.members.fetch(parsed.user_id).catch(() => null);
-      const role = guild.roles.cache.get(parsed.role_id);
+      const role = resolveRole(guild, parsed.role_id);
       if (!m)    return send("❌ مش لاقي العضو!");
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
       await m.roles.add(role);
       const d = `إعطاء رتبة ${role.name} لـ ${m.user.username}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
@@ -481,9 +497,9 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     if (action === "remove_role") {
       const m    = await guild.members.fetch(parsed.user_id).catch(() => null);
-      const role = guild.roles.cache.get(parsed.role_id);
+      const role = resolveRole(guild, parsed.role_id);
       if (!m)    return send("❌ مش لاقي العضو!");
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
       await m.roles.remove(role);
       const d = `سحب رتبة ${role.name} من ${m.user.username}`;
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", `تم: ${d}`);
@@ -748,8 +764,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     // ─── حذف رتبة ─────────────────────────────────────────────────
     if (action === "delete_role") {
-      const role = guild.roles.cache.get(parsed.role_id);
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      const role = resolveRole(guild, parsed.role_id);
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
       const rname = role.name;
       await role.delete(`بأمر ${ownerName}`).catch(() => null);
       const d = `حذف رتبة "${rname}"`;
@@ -760,8 +776,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     // ─── تغيير لون رتبة ───────────────────────────────────────────
     if (action === "role_color") {
-      const role = guild.roles.cache.get(parsed.role_id);
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      const role = resolveRole(guild, parsed.role_id);
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
       const color = parseInt(parsed.color.replace("#", ""), 16);
       await role.setColor(color).catch(() => null);
       const d = `تغيير لون رتبة "${role.name}" → ${parsed.color}`;
@@ -772,8 +788,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     // ─── تغيير اسم رتبة ───────────────────────────────────────────
     if (action === "rename_role") {
-      const role = guild.roles.cache.get(parsed.role_id);
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      const role = resolveRole(guild, parsed.role_id);
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
       const old = role.name;
       await role.setName(parsed.name).catch(() => null);
       const d = `تغيير اسم رتبة "${old}" → "${parsed.name}"`;
@@ -784,8 +800,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     // ─── تعديل صلاحيات رول ───────────────────────────────────────
     if (action === "edit_role_permissions") {
-      const role = guild.roles.cache.get(parsed.role_id);
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      const role = resolveRole(guild, parsed.role_id);
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
 
       const toAdd    = (parsed.add    || []).filter(p => PermissionFlagsBits[p] !== undefined);
       const toRemove = (parsed.remove || []).filter(p => PermissionFlagsBits[p] !== undefined);
@@ -812,8 +828,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     // ─── تعديل إعدادات رول (hoist / mentionable) ─────────────────
     if (action === "edit_role") {
-      const role = guild.roles.cache.get(parsed.role_id);
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      const role = resolveRole(guild, parsed.role_id);
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
 
       const updates = {};
       if (parsed.hoist       !== undefined) updates.hoist       = parsed.hoist;
@@ -839,8 +855,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
 
     // ─── تعيين صلاحيات ذكية لرول موجود ──────────────────────────
     if (action === "set_role_smart_perms") {
-      const role = guild.roles.cache.get(parsed.role_id);
-      if (!role) return send("❌ مش لاقي الرتبة!");
+      const role = resolveRole(guild, parsed.role_id || parsed.role_name);
+      if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id || parsed.role_name}"!`);
       const queryName = parsed.role_name || role.name;
       const preset    = smartRolePerms(queryName);
       if (!preset) {
