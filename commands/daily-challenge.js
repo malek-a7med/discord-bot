@@ -101,7 +101,7 @@ function buildChallengeEmbed(type, data, winners = [], ended = false) {
   const desc = ended
     ? `⏰ انتهى التحدي!\n\n` + (winners.length
         ? `🏆 **الفايزين:**\n${winners.map((w, i) => `${["🥇","🥈","🥉"][i]} ${w}`).join("\n")}`
-        : `😅 للأسف محدش كمّل التحدي النهارده!`)
+        : `😅 للأسف محدش كمّل التحدي الأسبوع ده!`)
     : type.description(data) +
       (winners.length
         ? `\n\n✅ **وصلوا لحد دلوقتي (${winners.length}/3):**\n${winners.map((w, i) => `${["🥇","🥈","🥉"][i]} ${w}`).join("\n")}`
@@ -109,13 +109,13 @@ function buildChallengeEmbed(type, data, winners = [], ended = false) {
 
   return new EmbedBuilder()
     .setColor(color)
-    .setTitle(ended ? `${type.label} — انتهى!` : `${type.label} — تحدي النهارده!`)
+    .setTitle(ended ? `${type.label} — انتهى!` : `${type.label} — تحدي الجمعة!`)
     .setDescription(desc)
     .addFields(
       { name: "🪙 الجايزة", value: `${type.coinReward} كوينز + ${type.xpReward} XP لكل فايز`, inline: true },
       { name: "👥 الفايزين", value: `${winners.length}/3`, inline: true },
     )
-    .setFooter({ text: "التحدي اليومي — بيتجدد كل يوم تلقائياً" })
+    .setFooter({ text: "التحدي الأسبوعي — كل جمعة بعد الصلاة 🕌" })
     .setTimestamp();
 }
 
@@ -236,26 +236,33 @@ export async function handleDailyChallengeButton(interaction) {
   });
 }
 
-// جدولة التحدي اليومي — الساعة 9 صباحاً UTC
+// جدولة التحدي الأسبوعي — كل جمعة الساعة 11 صباحاً UTC (= 1 ظهراً القاهرة UTC+2)
 export function scheduleDailyChallenge(client, db) {
-  const MS_IN_DAY = 86_400_000;
+  const MS_IN_WEEK = 7 * 86_400_000;
+  const FRIDAY     = 5;            // 0=الأحد … 5=الجمعة
+  const TARGET_UTC = 11;           // 11:00 UTC = 1:00 ظهراً بتوقيت القاهرة
 
-  function msUntilNext9am() {
-    const now = new Date();
+  function msUntilNextFriday() {
+    const now  = new Date();
     const next = new Date(now);
-    next.setUTCHours(9, 0, 0, 0);
-    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    next.setUTCHours(TARGET_UTC, 0, 0, 0);
+    const daysAway = (FRIDAY - next.getUTCDay() + 7) % 7;
+    // لو اليوم جمعة والوقت فات، أجّل لأسبوع جاي
+    if (daysAway === 0 && next <= now) {
+      next.setUTCDate(next.getUTCDate() + 7);
+    } else {
+      next.setUTCDate(next.getUTCDate() + daysAway);
+    }
     return next.getTime() - now.getTime();
   }
 
-  // أرسل فوراً لو التحدي النهارده لسه ما اتبعتش
-  postDailyChallenge(client, db).catch(console.error);
-
-  // بعدين جدول كل يوم الساعة 9 صباحاً UTC
   setTimeout(function tick() {
     postDailyChallenge(client, db).catch(console.error);
-    setTimeout(tick, MS_IN_DAY);
-  }, msUntilNext9am());
+    setTimeout(tick, MS_IN_WEEK);
+  }, msUntilNextFriday());
 
-  console.log(`✅ [DailyChallenge] جُدوِل — أول تحدي بعد ${Math.round(msUntilNext9am()/60000)} دقيقة`);
+  const mins = Math.round(msUntilNextFriday() / 60_000);
+  const hrs  = Math.floor(mins / 60);
+  const rem  = mins % 60;
+  console.log(`✅ [WeeklyChallenge] جُدوِل — التحدي القادم يوم الجمعة الساعة 1 ظهراً (بعد ${hrs} ساعة و${rem} دقيقة)`);
 }

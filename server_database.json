@@ -99,12 +99,13 @@
       "timeouts": []
     },
     "1479827771730428084": {
-      "xp": 155,
+      "xp": 160,
       "level": 1,
       "coins": 0,
       "lastDaily": null,
       "warnings": [],
-      "timeouts": []
+      "timeouts": [],
+      "_lastXpMsg": "1517538708432093235"
     },
     "1113110787792326756": {
       "xp": 15,

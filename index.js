@@ -26,9 +26,8 @@ import {
   handleOcrUpload
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
-import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
-import { rouletteCommand, mafiaCommand, tttCommand, rpsCommand, handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleGameButton, channelGames, rpsChannelMap, rpsGames } from "./commands/games.js";
+import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
 import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
@@ -541,16 +540,8 @@ const LEGACY_COMMANDS = [
     .addSubcommand(sub =>
       sub.setName("ريست").setDescription("رجّع الإعدادات الافتراضية (Silver لفل 20 / Golden لفل 50)")
     ),
-  battleCommand,
-  rouletteCommand,
-  mafiaCommand,
-  tttCommand,
-  rpsCommand,
   shopCommand,
   myAbilitiesCommand,
-  codenamesCommand,
-  garticCommand,
-  memeCommand,
   gamesHubCommand,
   latestFeaturesCommand,
   speechModeCommand,
@@ -593,7 +584,7 @@ function validateLatestFeatures(allCommands) {
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
       "مصارعة","روليت","مافيا","اكس-اوه",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
-      "حجر-ورقة-مقص","تحدي-يومي",
+      "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -2023,16 +2014,9 @@ client.on("interactionCreate", async (interaction) => {
         return await handleTranslateChapter(interaction);
       }
 
-      // ── الألعاب الكلاسيكية ────────────────────────────────────────
-      if (cmd === "روليت")        return await handleRouletteCommand(interaction, db);
-      if (cmd === "مافيا")        return await handleMafiaCommand(interaction, db);
-      if (cmd === "اكس-اوه")     return await handleTTTCommand(interaction, db);
-      if (cmd === "حجر-ورقة-مقص") return await handleRPSCommand(interaction);
+      // ── قدرات المتجر ─────────────────────────────────────────────
       if (cmd === "متجر-قدرات")  return await handleShopCommand(interaction, db);
       if (cmd === "قدراتي")      return await handleMyAbilitiesCommand(interaction, db);
-      if (cmd === "كود-نيمز")    return await handleCodenamesCommand(interaction);
-      if (cmd === "الهاتف-المكسور") return await handleGarticCommand(interaction);
-      if (cmd === "صنع-الميم")    return await handleMemeCommand(interaction);
       if (cmd === "استفتاء")      return await handlePollCommand(interaction);
       if (cmd === "الألعاب")     return await handleGamesHubCommand(interaction);
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
@@ -3035,11 +3019,6 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     try {
 
-      // ─── أزرار مصارعة الكلام ──────────────────────────────────────
-      if (interaction.customId.startsWith("btl_")) {
-        return await handleBattleButton(interaction, db, geminiModel());
-      }
-
       // ─── أزرار الألعاب الكلاسيكية ────────────────────────────────
       if (interaction.customId.startsWith("rlt_") ||
           interaction.customId.startsWith("maf_") ||
@@ -3082,6 +3061,11 @@ client.on("interactionCreate", async (interaction) => {
         return await handleMemeButton(interaction, db);
       }
 
+      // ─── أزرار حجر ورقة مقص العادية ─────────────────────────────
+      if (interaction.customId.startsWith("rpsb_")) {
+        return await handleRPSBasicButton(interaction);
+      }
+
       // ─── أزرار هب الألعاب + احدث المميزات ───────────────────────
       if (interaction.customId.startsWith("ghub_") || interaction.customId.startsWith("ftr_")) {
         const gid = interaction.customId;
@@ -3092,13 +3076,15 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
         if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
         if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
-        if (gid === "ghub_rps")                         return await handleRPSCommand(interaction);
+        if (gid === "ghub_rps_easy")                    return await handleRPSBasicCommand(interaction);
+        if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
         if (gid === "ghub_cancel") {
           const cid = interaction.channel.id;
           if (channelGames.has(cid))    { channelGames.delete(cid); }
           if (garticChannelMap.has(cid)) { const gId = garticChannelMap.get(cid); garticGames.delete(gId); garticChannelMap.delete(cid); }
           if (memeChannelMap.has(cid))   { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
           if (rpsChannelMap.has(cid))    { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
+          if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
           if (quizChannelMap.has(cid))   quizChannelMap.delete(cid);
           return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", ephemeral: true });
         }
@@ -3627,11 +3613,6 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
-      // ─── مودال مصارعة الكلام ────────────────────────────────────
-      if (interaction.customId.startsWith("btl_modal_")) {
-        return await handleBattleModal(interaction, db, geminiModel());
-      }
-
       // ─── مودالات جارتك فون ───────────────────────────────────────
       if (interaction.customId.startsWith("garmodal_")) {
         return await handleGarticModal(interaction);
@@ -3642,7 +3623,58 @@ client.on("interactionCreate", async (interaction) => {
         return await handleMemeModal(interaction, db);
       }
 
-      // ─── مودال حجر ورقة مقص (أي اختيار في الكون) ────────────────
+      // ─── مودال حجر ورقة مقص العادية ─────────────────────────────
+      if (interaction.customId.startsWith("rpsbasicmodal_")) {
+        const gameId = interaction.customId.slice(14);
+        const state  = rpsBasicGames.get(gameId);
+        if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
+        const uid = interaction.user.id;
+        if (uid !== state.playerA && uid !== state.playerB)
+          return interaction.reply({ content: "❌ إنت مش في اللعبة دي!", flags: 64 });
+        const isA = uid === state.playerA;
+        if (isA  && state.choiceA) return interaction.reply({ content: "✅ إنت بالفعل اخترت! بنستنى خصمك.", flags: 64 });
+        if (!isA && state.choiceB) return interaction.reply({ content: "✅ إنت بالفعل اخترت! بنستنى خصمك.", flags: 64 });
+
+        const raw    = (interaction.fields.getTextInputValue("choice") ?? "").trim();
+        const VALID  = { "حجر": "حجر", "ورقة": "ورقة", "ورق": "ورقة", "مقص": "مقص" };
+        const choice = VALID[raw];
+        if (!choice) return interaction.reply({ content: "❌ اكتب: **حجر** أو **ورقة** أو **مقص** بس!", flags: 64 });
+
+        if (isA) state.choiceA = choice;
+        else     state.choiceB = choice;
+        await interaction.reply({ content: `✅ اخترت ${RPS_ICON[choice]} **${choice}** — بنستنى خصمك!`, flags: 64 });
+
+        if (state.choiceA && state.choiceB) {
+          rpsBasicGames.delete(gameId);
+          rpsBasicChannelMap.delete(state.channelId);
+
+          const a = state.choiceA, b = state.choiceB;
+          let resultLine;
+          if (a === b) {
+            resultLine = `🤝 **تعادل!** الاتنين اختاروا ${RPS_ICON[a]} **${a}**`;
+          } else if (RPS_BEATS[a] === b) {
+            resultLine = `🏆 فاز <@${state.playerA}>! ${RPS_ICON[a]} **${a}** تغلب على ${RPS_ICON[b]} **${b}**`;
+          } else {
+            resultLine = `🏆 فاز <@${state.playerB}>! ${RPS_ICON[b]} **${b}** تغلب على ${RPS_ICON[a]} **${a}**`;
+          }
+
+          const finalEmbed = new EmbedBuilder()
+            .setColor(0x2ecc71).setTitle("🪨 حجر ورقة مقص — النتيجة!")
+            .setDescription(
+              `<@${state.playerA}> اختار: ${RPS_ICON[a]} **${a}**\n` +
+              `<@${state.playerB}> اختار: ${RPS_ICON[b]} **${b}**\n\n` +
+              resultLine
+            ).setTimestamp();
+
+          try {
+            const ch = await client.channels.fetch(state.channelId);
+            await ch.send({ embeds: [finalEmbed] });
+          } catch { /* ignore */ }
+        }
+        return;
+      }
+
+      // ─── مودال حجر ورقة مقص الخارقة (أي اختيار في الكون) ────────
       if (interaction.customId.startsWith("rpsmodal_")) {
         const gameId = interaction.customId.slice(9);
         const state  = rpsGames.get(gameId);

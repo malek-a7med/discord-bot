@@ -13,18 +13,28 @@ import {
 // ══════════════════════════════════════════════════════════════
 export const LATEST_FEATURES = [
   {
-    name: "🌐 لعب اللعبة الأصلية — جديد!",
-    value: "دلوقتي في لوبي الهاتف المكسور، كود نيمز، وصنع الميم — فيه زرار **لعب اللعبة الأصلية** 🎮\nاضغط عليه والبوت يبعت رابط الدعوة للروم علشان الكل يدخل!\n→ من لوبي أي لعبة من الثلاثة",
+    name: "🪨 حجر ورقة مقص — نسختين! — جديد!",
+    value: "**العادية 🪨** — كلاسيك حجر ورقة مقص، بدون AI، نتيجة فورية\n**الخارقة ✂️** — اختار **أي حاجة في الكون** (سيف، ثقب أسود، فرعون...) والـ AI يحكم مين يفوز!\n→ من `/الألعاب` بس",
     inline: false,
   },
   {
-    name: "💬 أوضاع الكلام الجديدة — جديد!",
-    value: "3 أوضاع للبوت دلوقتي:\n🎩 **محترم** — مفيش شتايم خالص\n😈 **حر** — لو حد شتمه يرد بنفس الشتيمة\n☠️ **توكسيك** — شتايم في أغلب كلامه\n→ `/تغيير-طريقة-الكلام` [أونر فقط]",
+    name: "🎮 الألعاب من /الألعاب بس — جديد!",
+    value: "كل ألعاب الهب دلوقتي بس من `/الألعاب` — مفيش أوامر مستقلة لكل لعبة\nعشان يبقى كل حاجة في مكان واحد منظم 🗂️",
     inline: false,
   },
   {
-    name: "✂️ حجر ورقة مقص متقدم",
-    value: "مش بس حجر ورقة مقص — اختار **أي حاجة في الكون** (سيف، ثقب أسود، فرعون...) والـ AI يحكم مين يفوز ولماذا 🤖\n→ `/حجر-ورقة-مقص` أو من `/الألعاب`",
+    name: "🕌 تحديات أسبوعية — جديد!",
+    value: "التحديات بقت **أسبوعية** — كل جمعة بعد الصلاة (الساعة 1 ظهراً) 🗓️\nمش كل يوم، ومش بيبعت عند ريستارت البوت\n→ بالتلقائي في الروم المخصص",
+    inline: false,
+  },
+  {
+    name: "🌐 لعب اللعبة الأصلية",
+    value: "في لوبي الهاتف المكسور، كود نيمز، وصنع الميم — فيه زرار **لعب اللعبة الأصلية** 🎮\nاضغط عليه والبوت يبعت رابط الدعوة للروم!\n→ من لوبي أي لعبة من الثلاثة",
+    inline: false,
+  },
+  {
+    name: "💬 أوضاع الكلام الجديدة",
+    value: "3 أوضاع للبوت:\n🎩 **محترم** — مفيش شتايم خالص\n😈 **حر** — لو حد شتمه يرد بنفس الشتيمة\n☠️ **توكسيك** — شتايم في أغلب كلامه\n→ `/تغيير-طريقة-الكلام` [أونر فقط]",
     inline: false,
   },
   {
@@ -95,8 +105,8 @@ function buildHubEmbed() {
       `📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة\n` +
       `😂 **صنع الميم** — اكتب أحلى كابشن وفوز بالكوينز\n` +
       `🧠 **مسابقة** — أسئلة ثقافية، أول واحد يجاوب صح يكسب الكوينز\n` +
-      `✂️ **حجر ورقة مقص** — اختار أي حاجة في الكون والـ AI يحكم!\n\n` +
-      `⚔️ **/مصارعة** — تحدى أي حد بالكلام\n` +
+      `🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك، بدون AI\n` +
+      `✂️ **ح.و.م الخارقة** — اختار أي حاجة في الكون والـ AI يحكم!\n\n` +
       `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
     )
     .setFooter({ text: "💡 تحتاج 3+ لاعبين لمعظم الألعاب — دعوّ أصحابك!" })
@@ -117,8 +127,9 @@ function buildHubRows() {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_quiz").setLabel("🧠 مسابقة").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("ghub_rps").setLabel("✂️ حجر ورقة مقص").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء اللعبة").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId("ghub_rps_easy").setLabel("🪨 ح.و.م العادية").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء").setStyle(ButtonStyle.Danger),
     ),
   ];
 }
@@ -140,9 +151,10 @@ function buildFeaturesEmbed() {
 function buildFeaturesRows() {
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("ghub_rps").setLabel("✂️ جرّب حجر ورقة مقص").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 جرّب الهاتف المكسور").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 جرّب صنع الميم").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("ghub_rps_easy").setLabel("🪨 ح.و.م العادية").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 الهاتف المكسور").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 صنع الميم").setStyle(ButtonStyle.Primary),
     ),
   ];
 }
