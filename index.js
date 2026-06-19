@@ -34,6 +34,7 @@ import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handle
 import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal } from "./commands/party-games.js";
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
+import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand } from "./commands/games-hub.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -1131,6 +1132,7 @@ client.once("clientReady", async (c) => {
   await ensureSuggestionsPanel(c);
   setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
+  scheduleDailyChallenge(c, db);
 
   // ── إعطاء البوت صلاحيات كاملة (Administrator) في كل السيرفرات ──
   for (const [, guild] of c.guilds.cache) {
@@ -2769,6 +2771,11 @@ client.on("interactionCreate", async (interaction) => {
       // ─── أزرار المسابقة ───────────────────────────────────────────
       if (interaction.customId.startsWith("quiz_")) {
         return await handleQuizButton(interaction, db);
+      }
+
+      // ─── أزرار التحدي اليومي ──────────────────────────────────────
+      if (interaction.customId.startsWith("daily_")) {
+        return await handleDailyChallengeButton(interaction);
       }
 
       // ─── أزرار الهاتف المكسور ─────────────────────────────────────
