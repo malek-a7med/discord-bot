@@ -198,6 +198,13 @@ const LEGACY_COMMANDS = [
     .setDescription("مسح كل رسايل الروم بالكامل [إدارة] / Wipe entire channel")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
+    .setName("تعديل-إعلان")
+    .setDescription("تعديل رسالة البوت في روم الإعلانات [أونر] / Edit bot announcement")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((o) =>
+      o.setName("message_id").setDescription("الـ ID بتاع الرسالة اللي هتعدلها").setRequired(true)
+    ),
+  new SlashCommandBuilder()
     .setName("تحذير")
     .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
@@ -1125,7 +1132,8 @@ ${senderName}: ${question}
 const salaamCooldowns = new Map();
 
 // ─── Auto-Mod Log Channel ────────────────────────────────────────
-const AUTO_MOD_LOG_CHANNEL_ID = "1517362832063074324";
+const AUTO_MOD_LOG_CHANNEL_ID  = "1517362832063074324";
+const ANNOUNCE_CHANNEL_ID      = "1511978194465718462";
 const autoModLogs = new Map(); // logId → logData
 
 // ─── دالة إرسال سجل التأديب ─────────────────────────────────────
@@ -2142,6 +2150,27 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
+      // ─── تعديل إعلان ────────────────────────────────────────────
+      if (cmd === "تعديل-إعلان") {
+        if (!isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const msgId = interaction.options.getString("message_id").trim();
+        const modal = new ModalBuilder()
+          .setCustomId(`edit_announce_modal|${msgId}`)
+          .setTitle("✏️ تعديل الإعلان");
+        const contentInput = new TextInputBuilder()
+          .setCustomId("announce_content")
+          .setLabel("المحتوى الجديد للإعلان")
+          .setStyle(TextInputStyle.Paragraph)
+          .setMinLength(1)
+          .setMaxLength(2000)
+          .setRequired(true)
+          .setPlaceholder("اكتب هنا المحتوى الجديد بتاع الإعلان...");
+        modal.addComponents(new ActionRowBuilder().addComponents(contentInput));
+        return interaction.showModal(modal);
+      }
+
       if (cmd === "تحذير") {
         const target = interaction.options.getUser("عضو");
         const reason = interaction.options.getString("السبب");
@@ -3082,6 +3111,42 @@ client.on("interactionCreate", async (interaction) => {
 
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
         return await handleAdminReplyModalSubmit(interaction);
+      }
+
+      // ─── مودال تعديل الإعلان ──────────────────────────────────────
+      if (interaction.customId.startsWith("edit_announce_modal|")) {
+        const targetMsgId = interaction.customId.split("|")[1];
+        const newContent  = interaction.fields.getTextInputValue("announce_content");
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+          const announceCh = await client.channels.fetch(ANNOUNCE_CHANNEL_ID);
+          const targetMsg  = await announceCh.messages.fetch(targetMsgId);
+
+          if (targetMsg.author.id !== client.user.id) {
+            return interaction.editReply({ content: "❌ الرسالة دي مش بتاعت البوت، ممكن تعدل على رسايله هو بس!" });
+          }
+
+          await targetMsg.edit({ content: newContent, allowedMentions: { parse: [] } });
+
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم تعديل الإعلان")
+                .setDescription(`الرسالة اتعدلت بنجاح في <#${ANNOUNCE_CHANNEL_ID}>`)
+                .addFields({ name: "📋 المحتوى الجديد", value: newContent.slice(0, 1024) })
+                .setTimestamp()
+            ]
+          });
+        } catch (err) {
+          logger.error("خطأ في تعديل الإعلان:", err);
+          if (err.code === 10008) {
+            return interaction.editReply({ content: "❌ مش لاقي الرسالة دي! تأكد إن الـ ID صح وإن الرسالة موجودة في روم الإعلانات." });
+          }
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        }
       }
 
       // ─── مودالات Auto-Mod Log ─────────────────────────────────────
