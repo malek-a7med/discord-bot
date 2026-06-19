@@ -1,25 +1,26 @@
 {
   "users": {
     "954816748140503090": {
-      "xp": 970,
+      "xp": 1230,
       "level": 4,
       "coins": 140,
       "lastDaily": 1780602154196,
-      "_lastXpMsg": "1517273691182989372",
+      "_lastXpMsg": "1517319281598271650",
       "_lastAiMsg": "1516940874049781920"
     },
     "1448840687763325018": {
-      "xp": 1255,
+      "xp": 1435,
       "level": 5,
       "coins": 0,
       "lastDaily": null,
-      "_lastXpMsg": "1517269691712929885"
+      "_lastXpMsg": "1517318789203759155"
     },
     "1173757411857809458": {
-      "xp": 15,
-      "level": 0,
+      "xp": 225,
+      "level": 2,
       "coins": 0,
-      "lastDaily": null
+      "lastDaily": null,
+      "_lastXpMsg": "1517319330176569545"
     },
     "844490366614110218": {
       "xp": 195,
@@ -28,10 +29,17 @@
       "lastDaily": null
     },
     "1474551986413109298": {
-      "xp": 400,
-      "level": 2,
+      "xp": 650,
+      "level": 3,
       "coins": 0,
-      "lastDaily": null
+      "lastDaily": null,
+      "_lastXpMsg": "1517320302399324191",
+      "warnings": [
+        {
+          "reason": "بناءً على طلب مالك",
+          "date": "2026-06-18T22:27:30.588Z"
+        }
+      ]
     },
     "642257294628880395": {
       "xp": 5,
@@ -42,15 +50,16 @@
       "timeouts": []
     },
     "594250288282730551": {
-      "xp": 20,
-      "level": 0,
+      "xp": 55,
+      "level": 1,
       "coins": 0,
       "lastDaily": null,
       "warnings": [],
-      "timeouts": []
+      "timeouts": [],
+      "_lastXpMsg": "1517317022671835136"
     },
     "1431030814442782770": {
-      "xp": 470,
+      "xp": 475,
       "level": 3,
       "coins": 0,
       "lastDaily": null,
@@ -61,7 +70,8 @@
           "reason": "غير محدد",
           "timestamp": 1781535377158
         }
-      ]
+      ],
+      "_lastXpMsg": "1517284005676978207"
     },
     "1223215033400430643": {
       "xp": 100,
@@ -72,12 +82,13 @@
       "timeouts": []
     },
     "1287488619111780607": {
-      "xp": 185,
-      "level": 1,
+      "xp": 210,
+      "level": 2,
       "coins": 0,
       "lastDaily": null,
       "warnings": [],
-      "timeouts": []
+      "timeouts": [],
+      "_lastXpMsg": "1517291784819052665"
     },
     "1226686919447154782": {
       "xp": 115,
@@ -137,6 +148,60 @@
       "warnings": [],
       "timeouts": [],
       "_lastXpMsg": "1516940109033898035"
+    },
+    "817342332499525644": {
+      "xp": 70,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": [],
+      "_lastXpMsg": "1517281469721219083"
+    },
+    "692031041476624435": {
+      "xp": 370,
+      "level": 2,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": [],
+      "_lastXpMsg": "1517309387792842892"
+    },
+    "1251047634710302742": {
+      "xp": 175,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": [],
+      "_lastXpMsg": "1517294458041925852"
+    },
+    "1514309934156746782": {
+      "xp": 90,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": [],
+      "_lastXpMsg": "1517292441475219576"
+    },
+    "752444300155027466": {
+      "xp": 35,
+      "level": 0,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": [],
+      "_lastXpMsg": "1517292648497680635"
+    },
+    "1260550881636782221": {
+      "xp": 55,
+      "level": 1,
+      "coins": 0,
+      "lastDaily": null,
+      "warnings": [],
+      "timeouts": [],
+      "_lastXpMsg": "1517320788351520770"
     }
   },
   "manhwa": {},
@@ -145,5 +210,8 @@
   "suggestions": {},
   "settings": {
     "backupChannelId": "1486495986263261385"
+  },
+  "aiClaims": {
+    "1517317022671835136": 1781826968589
   }
 }
