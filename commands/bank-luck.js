@@ -169,8 +169,17 @@ async function startGame(interaction, state) {
 
 async function doSpin(interaction, state) {
   const currentId = state.players[state.currentPlayerIndex];
+
+  // حماية 1: مش في اللعبة أصلاً
+  if (!state.players.includes(interaction.user.id))
+    return interaction.reply({ content: "❌ إنت مش في اللعبة دي!", flags: 64 });
+
+  // حماية 2: مش دوره
   if (interaction.user.id !== currentId)
-    return interaction.reply({ content: "❌ مش دورك دلوقتي!", flags: 64 });
+    return interaction.reply({
+      content: `❌ مش دورك! دلوقتي دور <@${currentId}> — استنّاه يدوّر!`,
+      flags: 64,
+    });
 
   const seg    = spinWheel();
   const before = state.balances[currentId] ?? START_MONEY;

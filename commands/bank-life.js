@@ -256,8 +256,17 @@ async function startGame(interaction, state) {
 
 async function doSpin(interaction, state) {
   const currentId = state.players[state.currentPlayerIndex];
+
+  // حماية 1: مش في اللعبة أصلاً
+  if (!state.players.includes(interaction.user.id))
+    return interaction.reply({ content: "❌ إنت مش في اللعبة دي!", flags: 64 });
+
+  // حماية 2: مش دوره
   if (interaction.user.id !== currentId)
-    return interaction.reply({ content: "❌ مش دورك دلوقتي!", flags: 64 });
+    return interaction.reply({
+      content: `❌ مش دورك! دلوقتي دور <@${currentId}> — استنّاه!`,
+      flags: 64,
+    });
 
   const round = (state.roundsPlayed[currentId] ?? 0) + 1;
   const event = pickEvent(round);
@@ -405,9 +414,14 @@ export async function handleBankLifeButton(interaction, db) {
   }
 
   if (second === "choiceA" || second === "choiceB") {
-    if (!state.pendingChoice) return interaction.reply({ content: "❌ ما في قرار معلّق!", flags: 64 });
+    if (!state.pendingChoice) return interaction.reply({ content: "❌ ما في قرار معلّق دلوقتي!", flags: 64 });
+    if (!state.players.includes(interaction.user.id))
+      return interaction.reply({ content: "❌ إنت مش في اللعبة دي!", flags: 64 });
     if (interaction.user.id !== state.pendingChoice.playerId)
-      return interaction.reply({ content: "❌ مش قرارك إنت!", flags: 64 });
+      return interaction.reply({
+        content: `❌ مش قرارك! ده قرار <@${state.pendingChoice.playerId}> — استنّاه يختار!`,
+        flags: 64,
+      });
 
     const chosen  = second === "choiceA" ? state.pendingChoice.event.optionA : state.pendingChoice.event.optionB;
     const eventFull = { ...state.pendingChoice.event, ...chosen, text: `${state.pendingChoice.event.text} — اخترت: **${chosen.label}**` };
