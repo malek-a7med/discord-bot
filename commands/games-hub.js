@@ -72,9 +72,9 @@ export const speechModeCommand = new SlashCommandBuilder()
   .addStringOption(opt =>
     opt.setName("أسلوب").setDescription("اختر الأسلوب المطلوب").setRequired(true)
       .addChoices(
-        { name: "🎩 محترم — رد لطيف ومودّب دايماً", value: "normal" },
-        { name: "😈 حر — مزاجه حر وبيرد بأسلوب مختلف", value: "free" },
-        { name: "☠️ توكسيك — حاد ومباشر، بيشتم لو شتموه", value: "toxic" },
+        { name: "🎩 محترم — رد لطيف ومودّب، مفيش شتايم خالص", value: "normal" },
+        { name: "😈 حر — لو حد شتم البوت، يرد بنفس الشتيمة", value: "free" },
+        { name: "☠️ توكسيك — شتايم في أغلب كلامه", value: "toxic" },
       )
   );
 

@@ -54,6 +54,7 @@ function buildGarticLobbyRows(gameId) {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`gar_join_${gameId}`).setLabel("➕ انضم").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`gar_start_${gameId}`).setLabel("▶️ ابدأ").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`gar_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`gar_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
   )];
 }
@@ -205,6 +206,11 @@ export async function handleGarticButton(interaction) {
     if (state.players.length >= 8) return interaction.reply({ content: "❌ اللعبة امتلأت!", flags: 64 });
     state.players.push(interaction.user.id);
     return interaction.update({ embeds: [buildGarticLobbyEmbed(state)], components: buildGarticLobbyRows(gameId) });
+  }
+
+  if (action === "realplay") {
+    await interaction.reply({ content: `🌐 **${interaction.user.displayName}** بيعزمكم تلعبوا الهاتف المكسور الأصلي! انضموا معاه هنا 👇\nhttps://garticphone.com/ar` });
+    return;
   }
 
   if (action === "cancel") {
@@ -374,12 +380,17 @@ function buildMemeLobbyEmbed(state) {
 
 function buildMemeLobbyRows(gameId, state) {
   const canSwap = (state?.swapCount ?? 0) < 10;
-  return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`meme_join_${gameId}`).setLabel("➕ انضم").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`meme_start_${gameId}`).setLabel("▶️ ابدأ").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`meme_swap_${gameId}`).setLabel("🔄 غير الموقف").setStyle(ButtonStyle.Secondary).setDisabled(!canSwap),
-    new ButtonBuilder().setCustomId(`meme_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
-  )];
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`meme_join_${gameId}`).setLabel("➕ انضم").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`meme_start_${gameId}`).setLabel("▶️ ابدأ").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`meme_swap_${gameId}`).setLabel("🔄 غير الموقف").setStyle(ButtonStyle.Secondary).setDisabled(!canSwap),
+      new ButtonBuilder().setCustomId(`meme_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`meme_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
+    ),
+  ];
 }
 
 function buildMemeCaptionEmbed(state) {
@@ -503,6 +514,11 @@ export async function handleMemeButton(interaction, db) {
 
   const state = memeGames.get(gameId);
   if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
+
+  if (action === "realplay") {
+    await interaction.reply({ content: `🌐 **${interaction.user.displayName}** بيعزمكم تلعبوا صنع الميم الأصلي! انضموا معاه هنا 👇\nhttps://makeitmeme.com/ar/` });
+    return;
+  }
 
   if (action === "join") {
     if (state.phase !== "lobby") return interaction.reply({ content: "❌ اللعبة بدأت!", flags: 64 });

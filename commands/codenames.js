@@ -124,6 +124,7 @@ function buildLobbyRows(gameId) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`cdn_start_${gameId}`).setLabel("▶️ ابدأ اللعبة").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`cdn_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`cdn_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
     ),
   ];
 }
@@ -204,6 +205,11 @@ export async function handleCodenamesButton(interaction) {
     state[team].spymaster = interaction.user.id;
     if (!state.allPlayers.includes(interaction.user.id)) state.allPlayers.push(interaction.user.id);
     return interaction.update({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(gameId) });
+  }
+
+  if (action === "realplay") {
+    await interaction.reply({ content: `🌐 **${interaction.user.displayName}** بيعزمكم تلعبوا كود نيمز الأصلي! انضموا معاه هنا 👇\nhttps://codenames.game/` });
+    return;
   }
 
   if (action === "cancel") {
