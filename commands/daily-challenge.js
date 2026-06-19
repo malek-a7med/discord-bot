@@ -143,6 +143,8 @@ export async function postDailyChallenge(client, db) {
   const gameId = `dc${Date.now().toString(36)}`;
 
   const msg = await channel.send({
+    content: "||@everyone||",
+    allowedMentions: { everyone: true },
     embeds: [buildChallengeEmbed(type, data)],
     components: buildChallengeButton(gameId),
   });
