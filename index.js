@@ -340,13 +340,13 @@ const LEGACY_COMMANDS = [
     .setName("تحذير")
     .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
     .addStringOption((o) => o.setName("السبب").setDescription("السبب").setRequired(true)),
   new SlashCommandBuilder()
     .setName("اسكات")
     .setDescription("إسكات عضو مؤقتاً [مشرف] / Timeout a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
     .addIntegerOption((o) =>
       o.setName("مدة").setDescription("المدة بالدقائق (1-1440)").setRequired(true).setMinValue(1).setMaxValue(1440)
     )
@@ -2696,9 +2696,10 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "تحذير") {
-        const nameOrId = interaction.options.getString("عضو");
-        const target = await resolveMember(guild, nameOrId);
-        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
         const reason = interaction.options.getString("السبب");
         const actionId = `modwarn_${Date.now()}_${user.id}`;
         pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
@@ -2716,9 +2717,10 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "اسكات") {
-        const nameOrId = interaction.options.getString("عضو");
-        const target = await resolveMember(guild, nameOrId);
-        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
         const dur = interaction.options.getInteger("مدة");
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
         const actionId = `modmute_${Date.now()}_${user.id}`;

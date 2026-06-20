@@ -6,3 +6,9 @@ id = "zsDK20M36JBpbhAMLzXLN"
 uri = "file://zangi_bot_files.tar.gz"
 type = "unspecified"
 title = "ملفات بوت زنجي"
+
+[[outputs]]
+id = "kSNVQ8pMTAd3ZBKoxMmKa"
+uri = "file://BOT_GUIDE.md"
+type = "text"
+title = "دليل بوت زنجي — توثيق شامل للـ Minimax Agent"
