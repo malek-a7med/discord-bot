@@ -1,6 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
 //  🎉 Party Games — الهاتف المكسور + صنع الميم
-//  الهاتف المكسور: سلسلة وصف وتخمين | صنع الميم: أفضل كابشن يفوز
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
@@ -15,7 +14,6 @@ export const garticGames      = new Map();
 export const garticChannelMap = new Map();
 const garticId = () => `gar${Date.now().toString(36)}${Math.random().toString(36).slice(2,3)}`;
 
-// أمثلة على جمل البداية لو اللاعب ما عندهوش أفكار
 const GARTIC_STARTER_HINTS = [
   "قطة بتقود سيارة في المطر", "فرعون بيلعب ببجي", "برج إيفل في الصحراء",
   "فيل بيحاول يدخل مترو", "شيف بيطبخ في الفضاء", "ديناصور بياكل حمص",
@@ -26,9 +24,9 @@ function createGarticState(channelId, creatorId) {
     id: garticId(), channelId, messageId: null,
     phase: "lobby", round: 0,
     players: [creatorId], creatorId,
-    chains: {}, // { ownerId: [{ type, text, authorId }] }
-    assignments: {}, // { playerId: ownerChainId } — من بيشتغل على مين
-    pending: new Set(), // اللاعبين اللي لسه ما بعتوش
+    chains: {},
+    assignments: {},
+    pending: new Set(),
     timer: null,
   };
 }
@@ -40,10 +38,10 @@ function buildGarticLobbyEmbed(state) {
     .setDescription(
       `**📖 طريقة اللعب:**\n` +
       `┣ كل لاعب يكتب جملة ويبعتها\n` +
-      `┣ التاني يشوف الجملة ويوصفها (زي ما لو بيرسمها)\n` +
+      `┣ التاني يشوف الجملة ويوصفها\n` +
       `┣ التالت يشوف الوصف ويخمن الجملة الأصلية\n` +
-      `┗ في الأخر نشوف الفرق الكوميدي بين الأول والأخر! 😂\n\n` +
-      `💡 **مثال على جملة:** "${hint}"\n\n` +
+      `┗ في الأخر نشوف الفرق الكوميدي! 😂\n\n` +
+      `💡 **مثال:** "${hint}"\n\n` +
       `👥 **اللاعبين (${state.players.length}/8):**\n${state.players.map(id => `• <@${id}>`).join("\n")}\n\n` +
       `⚠️ يلزم 3 لاعبين على الأقل`
     )
@@ -54,27 +52,24 @@ function buildGarticLobbyRows(gameId) {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`gar_join_${gameId}`).setLabel("➕ انضم").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`gar_start_${gameId}`).setLabel("▶️ ابدأ").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setLabel("🌐 لعب اللعبة الأصلية").setURL("https://garticphone.com/ar").setStyle(ButtonStyle.Link),
+    new ButtonBuilder().setCustomId(`gar_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`gar_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
   )];
 }
 
 function getAssignments(players, round) {
-  // كل لاعب يشتغل على chain اللاعب اللي قبله (circular shift)
   const assignments = {};
   const n = players.length;
   if (round === 0) {
-    players.forEach(p => { assignments[p] = p; }); // يكتبوا لأنفسهم
+    players.forEach(p => { assignments[p] = p; });
   } else {
-    players.forEach((p, i) => {
-      assignments[p] = players[(i + round) % n];
-    });
+    players.forEach((p, i) => { assignments[p] = players[(i + round) % n]; });
   }
   return assignments;
 }
 
 function buildGarticRoundEmbed(state) {
-  const types = ["اكتب جملة ابتدائية", "صف الجملة/الصورة اللي شفتها", "خمن الجملة الأصلية"];
+  const types = ["اكتب جملة ابتدائية", "صف الجملة اللي شفتها", "خمن الجملة الأصلية"];
   const typeLabel = state.round < 3 ? types[state.round] : (state.round % 2 === 1 ? types[1] : types[2]);
   const done = state.players.length - state.pending.size;
   return new EmbedBuilder()
@@ -84,7 +79,7 @@ function buildGarticRoundEmbed(state) {
       `**المطلوب:** ${typeLabel}\n\n` +
       `✅ بعتوا: **${done}/${state.players.length}**\n` +
       `⏳ لسه: ${[...state.pending].map(id => `<@${id}>`).join(", ") || "الكل بعت!"}\n\n` +
-      `*اضغط على "ارسل ردي" — هيجيلك مهمتك في رسالة خاصة*`
+      `*اضغط "ارسل ردي" — هتجيك مهمتك في رسالة خاصة*`
     )
     .setFooter({ text: "لو ما بعتش في 3 دقايق، هياخد مهلة تلقائية" })
     .setTimestamp();
@@ -106,13 +101,10 @@ async function advanceGarticRound(interaction, gameId, state) {
   }
   state.assignments = getAssignments(state.players, state.round);
   state.pending = new Set(state.players);
-
   await sendGarticDMs(interaction.client, state);
-
   const embed = buildGarticRoundEmbed(state);
   const rows  = buildGarticRoundRows(gameId);
   await interaction.editReply({ embeds: [embed], components: rows });
-
   if (state.timer) clearTimeout(state.timer);
   state.timer = setTimeout(async () => {
     if (!garticGames.has(gameId)) return;
@@ -127,8 +119,9 @@ async function advanceGarticRound(interaction, gameId, state) {
 }
 
 async function sendGarticDMs(client, state) {
-  const typeLabel = state.round % 2 === 1 ? "**وصّف** الجملة/الصورة التالية (زي ما لو بتشرحها لحد ما يراها)" : "**خمّن** الجملة/الصورة الأصلية من الوصف التالي";
-
+  const typeLabel = state.round % 2 === 1
+    ? "**وصّف** الجملة التالية (كأنك بتشرحها لحد ما يراها)"
+    : "**خمّن** الجملة الأصلية من الوصف التالي";
   for (const pid of state.players) {
     const ownerChainId = state.assignments[pid];
     const chain = state.chains[ownerChainId] || [];
@@ -137,8 +130,8 @@ async function sendGarticDMs(client, state) {
     try {
       const u = await client.users.fetch(pid);
       const embed = new EmbedBuilder()
-        .setColor(0xe91e63).setTitle(`📞 الهاتف المكسور — مهمتك في الجولة ${state.round + 1}`)
-        .setDescription(`**المطلوب:** ${typeLabel}\n\n**اللي شايفه:**\n> ${latest.text}\n\n*ارجع للشات واضغط "ارسل ردي" عشان تبعت ردك*`);
+        .setColor(0xe91e63).setTitle(`📞 الهاتف المكسور — الجولة ${state.round + 1}`)
+        .setDescription(`**المطلوب:** ${typeLabel}\n\n**اللي شايفه:**\n> ${latest.text}\n\n*ارجع للشات واضغط "ارسل ردي"*`);
       await u.send({ embeds: [embed] });
     } catch {}
   }
@@ -150,26 +143,27 @@ async function revealGarticChains(interaction, gameId, state) {
 
   const embeds = [
     new EmbedBuilder().setColor(0xe91e63).setTitle("📞 الهاتف المكسور — الكشف الكبير! 🎉")
-      .setDescription("خلصت اللعبة! شوفوا إزاي الجمل اتغيرت من أول وجديد 😂")
+      .setDescription("خلصت اللعبة! شوفوا إزاي الجمل اتغيرت 😂")
   ];
 
   for (const ownerId of state.players) {
     const chain = state.chains[ownerId] || [];
     if (chain.length === 0) continue;
-    const lines = chain.map((entry, i) => {
+    const lines = chain.map(entry => {
       const label = entry.type === "phrase" ? "📝 الجملة الأصلية" : entry.type === "description" ? "🎨 وصف" : "❓ تخمين";
       return `**${label}** (بقلم <@${entry.authorId}>):\n> ${entry.text}`;
     }).join("\n\n");
-
-    embeds.push(new EmbedBuilder()
-      .setColor(0x9b59b6)
-      .setTitle(`🔗 سلسلة <@${ownerId}>`)
-      .setDescription(lines || "لا يوجد بيانات")
-    );
+    embeds.push(new EmbedBuilder().setColor(0x9b59b6).setTitle(`🔗 سلسلة <@${ownerId}>`).setDescription(lines || "لا بيانات"));
     if (embeds.length >= 10) break;
   }
 
-  await interaction.editReply({ embeds: embeds.slice(0, 10), components: [] }).catch(() => {});
+  // مسح الرسالة الأصلية وبعت النتايج جديدة
+  try {
+    const msg = await interaction.channel?.messages?.fetch(state.messageId).catch(() => null);
+    if (msg) await msg.delete().catch(() => {});
+  } catch {}
+  await interaction.channel?.send({ embeds: embeds.slice(0, 10) }).catch(() => {});
+  await interaction.reply({ content: "📞 اللعبة خلصت! شوف النتايج فوق ☝️", flags: 64 }).catch(() => {});
 }
 
 export const garticCommand = new SlashCommandBuilder()
@@ -187,7 +181,7 @@ export async function handleGarticCommand(interaction) {
   setTimeout(() => {
     if (garticGames.has(state.id) && garticGames.get(state.id).phase === "lobby") {
       garticGames.delete(state.id); garticChannelMap.delete(channelId);
-      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 الهاتف المكسور — انتهت المهلة")], components: [] }).catch(() => {});
+      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 انتهت مهلة اللوبي")], components: [] }).catch(() => {});
     }
   }, 10 * 60 * 1000);
 }
@@ -208,25 +202,29 @@ export async function handleGarticButton(interaction) {
     return interaction.update({ embeds: [buildGarticLobbyEmbed(state)], components: buildGarticLobbyRows(gameId) });
   }
 
+  // لعب اللعبة الأصلية — فورم رابط الدعوة
   if (action === "realplay") {
-    garticGames.delete(gameId); garticChannelMap.delete(state.channelId);
-    return interaction.update({
-      embeds: [new EmbedBuilder()
-        .setColor(0x3498db)
-        .setTitle("🌐 روحوا العبوا الهاتف المكسور الأصلي!")
-        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n*(اللعبة على البوت اتلغت تلقائياً — اضغط الزرار الأخضر جنب ده)*`)
-        .setTimestamp()
-      ],
-      components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setLabel("🌐 افتح الهاتف المكسور الأصلي").setURL("https://garticphone.com/ar").setStyle(ButtonStyle.Link)
-      )],
-    });
+    const modal = new ModalBuilder()
+      .setCustomId(`garplay_${gameId}`)
+      .setTitle("🌐 لعب الهاتف المكسور الأصلي");
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("invite_link")
+        .setLabel("ابعت رابط الدعوة عشان الكل يدخل")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setPlaceholder("مثال: https://garticphone.com/ar")
+        .setMaxLength(300)
+    ));
+    return interaction.showModal(modal);
   }
 
   if (action === "cancel") {
     if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يلغيها!", flags: 64 });
+    if (state.timer) clearTimeout(state.timer);
     garticGames.delete(gameId); garticChannelMap.delete(state.channelId);
-    return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 تم إلغاء الهاتف المكسور")], components: [] });
+    await interaction.message.delete().catch(() => {});
+    return interaction.reply({ content: "📞 تم إلغاء الهاتف المكسور!", flags: 64 });
   }
 
   if (action === "stop") {
@@ -251,8 +249,8 @@ export async function handleGarticButton(interaction) {
       try {
         const u = await interaction.client.users.fetch(pid);
         await u.send(new EmbedBuilder().setColor(0xe91e63).setTitle("📞 الهاتف المكسور — الجولة 1!")
-          .setDescription(`**مهمتك:** اكتب جملة أو موقف مضحك / غريب / خيالي\n\n💡 **مثال للإلهام:** "${hint}"\n\n*ارجع للشات واضغط "ارسل ردي" عشان تبعت جملتك*`)
-          .setFooter({ text: "اكتب أي حاجة — أكتر ما هو غريب أحسن!" }));
+          .setDescription(`**مهمتك:** اكتب جملة أو موقف مضحك / غريب / خيالي\n\n💡 **مثال:** "${hint}"\n\n*ارجع للشات واضغط "ارسل ردي"*`)
+          .setFooter({ text: "أكتر ما هي غريبة أحسن!" }));
       } catch {}
     }
 
@@ -278,14 +276,14 @@ export async function handleGarticButton(interaction) {
 
     if (state.round === 0) {
       const hint = GARTIC_STARTER_HINTS[Math.floor(Math.random() * GARTIC_STARTER_HINTS.length)];
-      return interaction.reply({ flags: 64, content: `📝 **مهمتك:** اكتب جملة أو موقف مضحك/غريب!\n💡 مثال للإلهام: "${hint}"\n\nاضغط "ارسل ردي" عشان تكتب.` });
+      return interaction.reply({ flags: 64, content: `📝 **مهمتك:** اكتب جملة مضحكة/غريبة!\n💡 مثال: "${hint}"\n\nاضغط "ارسل ردي".` });
     }
     const ownerChainId = state.assignments[interaction.user.id];
     const chain = state.chains[ownerChainId] || [];
     const latest = chain[chain.length - 1];
     if (!latest) return interaction.reply({ content: "❌ مفيش مهمة لك دلوقتي!", flags: 64 });
-    const typeLabel = state.round % 2 === 1 ? "وصّف ما يلي (زي ما لو بتشرحه لحد ما يراه)" : "خمّن الجملة الأصلية من هذا الوصف";
-    return interaction.reply({ flags: 64, content: `📋 **مهمتك:** ${typeLabel}\n\n> ${latest.text}\n\nاضغط "ارسل ردي" عشان تكتب ردك.` });
+    const typeLabel = state.round % 2 === 1 ? "وصّف ما يلي" : "خمّن الجملة من الوصف";
+    return interaction.reply({ flags: 64, content: `📋 **مهمتك:** ${typeLabel}\n\n> ${latest.text}\n\nاضغط "ارسل ردي".` });
   }
 
   if (action === "submit") {
@@ -293,9 +291,9 @@ export async function handleGarticButton(interaction) {
     if (!state.pending.has(interaction.user.id)) return interaction.reply({ content: "✅ إنت بالفعل بعتت ردك!", flags: 64 });
 
     const type = state.round === 0 ? "phrase" : state.round % 2 === 1 ? "description" : "guess";
-    const label = type === "phrase" ? "اكتب جملتك هنا:" : type === "description" ? "وصّف ما رأيت (كأنك تشرحه):" : "خمّن الجملة الأصلية:";
+    const label = type === "phrase" ? "اكتب جملتك هنا:" : type === "description" ? "وصّف ما رأيت:" : "خمّن الجملة الأصلية:";
 
-    const modal = new ModalBuilder().setCustomId(`garmodal_${gameId}`).setTitle("📞 الهاتف المكسور — ردّك");
+    const modal = new ModalBuilder().setCustomId(`garmodal_${gameId}`).setTitle("📞 الهاتف المكسور");
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId("gar_input").setLabel(label).setStyle(TextInputStyle.Paragraph)
         .setRequired(true).setMaxLength(300).setMinLength(3)
@@ -332,116 +330,200 @@ export async function handleGarticModal(interaction) {
   }
 }
 
+// مودال رابط دعوة الهاتف المكسور
+export async function handleGarticInviteModal(interaction) {
+  const gameId = interaction.customId.replace("garplay_", "");
+  const state = garticGames.get(gameId);
+  if (!state) return interaction.reply({ content: "❌ اللعبة انتهت بالفعل!", flags: 64 });
+
+  const link = (interaction.fields.getTextInputValue("invite_link") || "").trim();
+  if (state.timer) clearTimeout(state.timer);
+  garticGames.delete(gameId); garticChannelMap.delete(state.channelId);
+
+  await interaction.message.delete().catch(() => {});
+  return interaction.reply({
+    embeds: [new EmbedBuilder()
+      .setColor(0xe91e63)
+      .setTitle("🌐 روحوا العبوا الهاتف المكسور الأصلي!")
+      .setDescription(`**${interaction.user.displayName}** بعت رابط الدعوة! 🎮\n*(اللعبة على البوت اتلغت)*\n\n🔗 **رابط الدعوة:** ${link}`)
+      .setTimestamp()],
+  });
+}
+
+
 // ══════════════════════════════════════════════════════════════
 //  😂 صنع الميم — Make it Meme
+//  البوت يبعت GIF في الخاص — اللاعب يتنقل ويختار — يكتب كابشن
 // ══════════════════════════════════════════════════════════════
 export const memeGames      = new Map();
 export const memeChannelMap = new Map();
 const memeId = () => `mm${Date.now().toString(36)}${Math.random().toString(36).slice(2,3)}`;
 
+// قايمة GIFs أنيمي وجيمنج وكرتون
 const MEME_TEMPLATES = [
-  { title: "عندما تفتح الثلاجة للمرة العاشرة وتلاقي نفس الحاجات",      prompt: "وإنت بتفتحها...",            gif: "https://media.tenor.com/PXzKHHE6ZSUAAAAC/anime-shocked.gif" },
-  { title: "عندما الأستاذ يقول 'الامتحان هيكون سهل جداً'",              prompt: "وإنت لما بتشوف الأسئلة...",   gif: "https://media.tenor.com/3n4beqGzHasAAAAC/anime-crying.gif" },
-  { title: "عندما تقول 'دقيقة بس' ومر ساعتين",                         prompt: "وإنت لسه...",                 gif: "https://media.tenor.com/gKhOKPXGFzsAAAAC/anime-lazy.gif" },
-  { title: "عندما تلاقي أكلة من الأكل اللي أخبأتها في الثلاجة اتاكل",   prompt: "وجه الكارثة اللي بتعملها...", gif: "https://media.tenor.com/1_-JNXJiBB0AAAAC/anime-angry.gif" },
-  { title: "عندما البوت يرد أذكى من اللي توقعته",                       prompt: "وجهك وإنت...",                gif: "https://media.tenor.com/5xHNB9lVbF4AAAAC/surprised-anime.gif" },
-  { title: "عندما تنسى تحل الواجب وتيجي تعمله في المدرسة",             prompt: "وإنت...",                     gif: "https://media.tenor.com/KBOl_9FvHFUAAAAC/anime-sweat.gif" },
-  { title: "عندما تسمع صوت غريب في البيت في نص الليل",                  prompt: "أول حاجة تعملها...",          gif: "https://media.tenor.com/7MmtBCOFMhUAAAAC/scared-anime.gif" },
-  { title: "عندما تحاول توضح فكرة بس ما حدش فاهمك",                     prompt: "وإنت...",                     gif: "https://media.tenor.com/SoNubhwMq0MAAAAC/anime-exhausted.gif" },
-  { title: "عندما تقوم من النوم وتلاقي إن الليلة جمعة",                 prompt: "إنت قايل...",                 gif: "https://media.tenor.com/kPJAQzm3-sQAAAAC/anime-happy.gif" },
-  { title: "عندما تبعت رسالة غلط على جروب العيلة",                      prompt: "وإنت بتحاول تمسحها...",       gif: "https://media.tenor.com/dR3OhOLPw4QAAAAC/anime-panic.gif" },
-  { title: "عندما اللعبة تقفل وإنت لسه ما حفظتش",                      prompt: "وجهك بعد الكارثة...",         gif: "https://media.tenor.com/ys7JFIBf0HIAAAAC/anime-crying-sad.gif" },
-  { title: "عندما تبدأ تذاكر وبعد 10 دقايق تلاقي نفسك في يوتيوب",      prompt: "وإنت...",                     gif: "https://media.tenor.com/xhEHPfEXJuMAAAAC/anime-computer.gif" },
-  { title: "لما تفوز في الجيم وترجع تموت من أول أسبوع",                 prompt: "وإنت في الجيم...",            gif: "https://media.tenor.com/9nzOtGsS_WQAAAAC/gaming-win.gif" },
-  { title: "لما تحاول تاخد ايتم نادر في لعبة وبتفضل تفوت",              prompt: "ورد فعلك...",                 gif: "https://media.tenor.com/o2_QZ0aGAZAAAAAC/anime-gaming.gif" },
-  { title: "لما البوس في اللعبة يبدأ شكله بسيط وفجأة يتحول وحش",        prompt: "وإنت...",                     gif: "https://media.tenor.com/3LPq_A48PFQAAAAC/anime-scared-run.gif" },
+  { title: "عندما تفتح الثلاجة للمرة العاشرة وتلاقي نفس الحاجات",          gif: "https://media.tenor.com/PXzKHHE6ZSUAAAAC/anime-shocked.gif" },
+  { title: "عندما الأستاذ يقول 'الامتحان هيكون سهل جداً'",                  gif: "https://media.tenor.com/3n4beqGzHasAAAAC/anime-crying.gif" },
+  { title: "عندما تقول 'دقيقة بس' ومر ساعتين",                             gif: "https://media.tenor.com/gKhOKPXGFzsAAAAC/anime-lazy.gif" },
+  { title: "عندما تلاقي أكلة من الأكل اللي أخبأتها في الثلاجة اتاكلت",      gif: "https://media.tenor.com/1_-JNXJiBB0AAAAC/anime-angry.gif" },
+  { title: "عندما البوت يرد أذكى من اللي توقعته",                           gif: "https://media.tenor.com/5xHNB9lVbF4AAAAC/surprised-anime.gif" },
+  { title: "عندما تنسى تحل الواجب وتيجي تعمله في المدرسة",                 gif: "https://media.tenor.com/KBOl_9FvHFUAAAAC/anime-sweat.gif" },
+  { title: "عندما تسمع صوت غريب في البيت في نص الليل",                      gif: "https://media.tenor.com/7MmtBCOFMhUAAAAC/scared-anime.gif" },
+  { title: "عندما تحاول توضح فكرة بس ما حدش فاهمك",                         gif: "https://media.tenor.com/SoNubhwMq0MAAAAC/anime-exhausted.gif" },
+  { title: "عندما تقوم من النوم وتلاقي إن الليلة جمعة",                     gif: "https://media.tenor.com/kPJAQzm3-sQAAAAC/anime-happy.gif" },
+  { title: "عندما تبعت رسالة غلط على جروب العيلة",                          gif: "https://media.tenor.com/dR3OhOLPw4QAAAAC/anime-panic.gif" },
+  { title: "عندما اللعبة تقفل وإنت لسه ما حفظتش",                          gif: "https://media.tenor.com/ys7JFIBf0HIAAAAC/anime-crying-sad.gif" },
+  { title: "عندما تبدأ تذاكر وبعد 10 دقايق تلاقي نفسك في يوتيوب",          gif: "https://media.tenor.com/xhEHPfEXJuMAAAAC/anime-computer.gif" },
+  { title: "لما تفوز في الجيم وترجع تموت من أول أسبوع",                     gif: "https://media.tenor.com/9nzOtGsS_WQAAAAC/gaming-win.gif" },
+  { title: "لما تحاول تاخد آيتم نادر في لعبة وبتفضل تفوت",                  gif: "https://media.tenor.com/o2_QZ0aGAZAAAAAC/anime-gaming.gif" },
+  { title: "لما البوس في اللعبة يتحول وحش فجأة",                            gif: "https://media.tenor.com/3LPq_A48PFQAAAAC/anime-scared-run.gif" },
+  { title: "لما تكسب في اللعبة بعد ألف محاولة",                             gif: "https://media.tenor.com/vgMYRBHPpSsAAAAC/anime-victory.gif" },
+  { title: "لما حد يقولك 'إنت أحسن من ده'",                                 gif: "https://media.tenor.com/8TJDaJpHJlEAAAAC/anime-blush.gif" },
+  { title: "لما الإنترنت يبطأ وإنت في أحمس لحظة في اللعبة",                 gif: "https://media.tenor.com/lKxYQl-VkMIAAAAC/anime-rage.gif" },
+  { title: "وجهك لما تصحى الساعة 6 الصبح ليوم مدرسة",                       gif: "https://media.tenor.com/kn1RkbNxkOAAAAAC/anime-sleepy.gif" },
+  { title: "لما تلاقي 20 جنيه في جيبك ما كنتش عارف بيهم",                  gif: "https://media.tenor.com/9r3y3CQAAKIAAAAC/anime-money.gif" },
+  { title: "لما تحاول تنام بدري وجسمك يرفض",                               gif: "https://media.tenor.com/2LZ-ot4E1EUAAAAC/cant-sleep-anime.gif" },
+  { title: "لما تكتب إيميل رسمي وتبعته غلط",                               gif: "https://media.tenor.com/IlvXLrqvT_MAAAAC/anime-oops.gif" },
+  { title: "لما يسألوك 'إيه اللي بتعمله في حياتك؟'",                        gif: "https://media.tenor.com/Q5bVUPaFRrsAAAAC/anime-thinking.gif" },
+  { title: "لما الاكل يجيلك ويبص أحلى مما كنت متوقع",                      gif: "https://media.tenor.com/FNGlQFNdCxYAAAAC/anime-food.gif" },
+  { title: "لما صاحبك يبعتلك ميم الساعة 3 الصبح",                           gif: "https://media.tenor.com/Ef_OhBrkAF0AAAAC/anime-surprised-meme.gif" },
 ];
 
 function createMemeState(channelId, creatorId) {
-  const template = MEME_TEMPLATES[Math.floor(Math.random() * MEME_TEMPLATES.length)];
   return {
     id: memeId(), channelId, messageId: null,
-    phase: "lobby", template,
+    phase: "lobby",
     players: [creatorId], creatorId,
-    captions: {}, // { playerId: text }
-    votes: {}, // { voterId: targetPlayerId }
+    captions: {},
+    votes: {},
     timer: null,
-    swapCount: 0, // عدد مرات تغيير الموقف
+    // تتبع GIF كل لاعب في DM
+    playerTemplateIdx: {},  // { playerId: currentIdx }
+    playerHistory: {},      // { playerId: [idx, idx, ...] }
+    playerDmMsgId: {},      // { playerId: messageId in DM }
+    playerDmChannelId: {},  // { playerId: DM channel ID }
   };
 }
 
+// اختار GIF عشوائي مختلف عن الحالي
+function nextTemplate(currentIdx) {
+  const next = Math.floor(Math.random() * MEME_TEMPLATES.length);
+  if (MEME_TEMPLATES.length <= 1) return 0;
+  return next === currentIdx ? (next + 1) % MEME_TEMPLATES.length : next;
+}
+
 function buildMemeLobbyEmbed(state) {
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setColor(0xf39c12).setTitle("😂 صنع الميم — انتظار اللاعبين")
     .setDescription(
       `**📖 طريقة اللعب:**\n` +
-      `┣ البوت يختار موقف مضحك مع GIF 🎞️\n` +
-      `┣ كل لاعب يكتب **كابشن** مناسب للموقف\n` +
+      `┣ لما اللعبة تبدأ البوت يبعتلك GIF أنيمي/جيمنج في الخاص\n` +
+      `┣ تقدر تغير الـ GIF أو ترجع للقديم\n` +
+      `┣ لما تختار الـ GIF اللي عاجبك اكتب كابشن مضحك عليه\n` +
       `┣ الكل يصوت على أحلى كابشن\n` +
       `┗ الفائز يكسب **200 كوينز** 🪙\n\n` +
-      `🎭 **الموقف الحالي:**\n> ${state.template.title}\n\n` +
       `👥 **اللاعبين (${state.players.length}/10):**\n${state.players.map(id => `• <@${id}>`).join("\n")}\n\n` +
-      `⚠️ يلزم لاعبان على الأقل — ${10 - state.swapCount} تغييرات متبقية للموقف`
+      `⚠️ يلزم لاعبان على الأقل`
     )
     .setFooter({ text: "جهز نفسك للضحك! 😂" }).setTimestamp();
-  if (state.template.gif) embed.setImage(state.template.gif);
-  return embed;
 }
 
-function buildMemeLobbyRows(gameId, state) {
-  const canSwap = (state?.swapCount ?? 0) < 10;
+function buildMemeLobbyRows(gameId) {
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`meme_join_${gameId}`).setLabel("➕ انضم").setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`meme_start_${gameId}`).setLabel("▶️ ابدأ").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`meme_swap_${gameId}`).setLabel("🔄 غير الموقف").setStyle(ButtonStyle.Secondary).setDisabled(!canSwap),
+      new ButtonBuilder().setCustomId(`meme_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`meme_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
-    ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setLabel("🌐 لعب اللعبة الأصلية").setURL("https://makeitmeme.com/ar/").setStyle(ButtonStyle.Link),
     ),
   ];
 }
 
-function buildMemeCaptionEmbed(state) {
-  const submitted = Object.keys(state.captions).length;
-  const embed = new EmbedBuilder()
-    .setColor(0xf39c12).setTitle("😂 صنع الميم — اكتب كابشنك!")
+// بناء embed الـ DM للاعب
+function buildPlayerDmEmbed(state, playerId) {
+  const idx = state.playerTemplateIdx[playerId] ?? 0;
+  const template = MEME_TEMPLATES[idx];
+  const histLen  = (state.playerHistory[playerId] || []).length;
+  return new EmbedBuilder()
+    .setColor(0xf39c12)
+    .setTitle("😂 صنع الميم — اختار الـ GIF اللي عاجبك!")
     .setDescription(
-      `**الموقف:**\n> 🎭 ${state.template.title}\n> *(${state.template.prompt})*\n\n` +
-      `✅ **${submitted}/${state.players.length}** بعتوا كابشناتهم\n` +
-      `⏱️ عندكم **60 ثانية** — اضغط "اكتب كابشنك" الآن!`
+      `**الموقف:** ${template.title}\n\n` +
+      `*تقدر تغير الـ GIF أو ترجع للقديم — لما تختار اضغط "✍️ اكتب كابشن"*\n\n` +
+      `📊 عندك ${histLen} GIF في السجل للرجوع ليه`
     )
-    .setFooter({ text: "أضحك وحلل! 🤣" }).setTimestamp();
-  if (state.template.gif) embed.setImage(state.template.gif);
-  return embed;
+    .setImage(template.gif)
+    .setFooter({ text: `GIF رقم ${idx + 1} من ${MEME_TEMPLATES.length}` })
+    .setTimestamp();
 }
 
-function buildMemeCaptionRows(gameId) {
+function buildPlayerDmRows(gameId, playerId) {
   return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`meme_caption_${gameId}`).setLabel("✏️ اكتب كابشنك").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`meme_dm_back_${gameId}_${playerId}`)
+      .setLabel("◀️ رجوع")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`meme_dm_change_${gameId}_${playerId}`)
+      .setLabel("🔄 غير الـ GIF")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`meme_dm_caption_${gameId}_${playerId}`)
+      .setLabel("✍️ اكتب كابشن وابعت")
+      .setStyle(ButtonStyle.Success),
   )];
 }
 
+// إرسال DM لكل لاعب مع أول GIF
+async function sendMemeDMs(client, state) {
+  for (const pid of state.players) {
+    const startIdx = Math.floor(Math.random() * MEME_TEMPLATES.length);
+    state.playerTemplateIdx[pid] = startIdx;
+    state.playerHistory[pid]     = [];
+    try {
+      const u = await client.users.fetch(pid);
+      const dmMsg = await u.send({
+        embeds: [buildPlayerDmEmbed(state, pid)],
+        components: buildPlayerDmRows(state.id, pid),
+      });
+      state.playerDmMsgId[pid] = dmMsg.id;
+      state.playerDmChannelId[pid] = dmMsg.channel.id;
+    } catch {
+      // لو ما قدرش يبعت DM، يضيف كابشن فارغ عشان ميوقفش اللعبة
+      state.captions[pid] = "⚠️ ما قدرش يبعت DM";
+    }
+  }
+}
+
+function buildMemeCaptionEmbed(state) {
+  const submitted = Object.keys(state.captions).length;
+  return new EmbedBuilder()
+    .setColor(0xf39c12).setTitle("😂 صنع الميم — اكتب كابشنك!")
+    .setDescription(
+      `**البوت بعتلك GIF في الخاص — روح اختار واكتب كابشنك!**\n\n` +
+      `✅ **${submitted}/${state.players.length}** بعتوا كابشناتهم\n` +
+      `⏱️ عندكم **90 ثانية**`
+    )
+    .setFooter({ text: "روح الـ DM — اختار GIF واكتب كابشن 📬" }).setTimestamp();
+}
+
 function buildMemeVoteEmbed(state) {
-  const captionEntries = Object.entries(state.captions);
-  const captionsList = captionEntries.map(([pid, text], i) =>
-    `**${i + 1}.** ${text}`
-  ).join("\n\n");
+  const entries = Object.entries(state.captions);
+  const list = entries.map(([pid, data], i) => {
+    const tmpl = MEME_TEMPLATES[data.templateIdx ?? 0];
+    return `**${i + 1}.** <@${pid}>\n> ${data.text}\n*(${tmpl?.title?.slice(0,40)}...)*`;
+  }).join("\n\n");
 
   return new EmbedBuilder()
     .setColor(0xf39c12).setTitle("😂 صنع الميم — صوّت على أحلى كابشن!")
     .setDescription(
-      `**الموقف:** 🎭 ${state.template.title}\n\n` +
-      `**الكابشنات:**\n${captionsList || "لا يوجد كابشنات!"}\n\n` +
-      `⏱️ التصويت ينتهي بعد 30 ثانية`
+      `**الكابشنات:**\n${list || "لا يوجد!"}\n\n⏱️ التصويت ينتهي بعد 30 ثانية`
     )
-    .setFooter({ text: "اضغط على رقم الكابشن اللي أضحكك أكتر!" }).setTimestamp();
+    .setFooter({ text: "اضغط رقم الكابشن اللي أضحكك!" }).setTimestamp();
 }
 
 function buildMemeVoteRows(gameId, state) {
-  const captionEntries = Object.entries(state.captions);
-  const btns = captionEntries.slice(0, 5).map(([pid], i) =>
+  const entries = Object.entries(state.captions);
+  const btns = entries.slice(0, 5).map(([pid], i) =>
     new ButtonBuilder().setCustomId(`meme_vote_${gameId}_${pid}`).setLabel(`${i + 1}`).setStyle(ButtonStyle.Secondary)
   );
   if (btns.length === 0) return [];
@@ -454,7 +536,6 @@ async function startMemeVoting(interaction, gameId, state) {
   const rows  = buildMemeVoteRows(gameId, state);
   const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
   if (msg) await msg.edit({ embeds: [embed], components: rows }).catch(() => {});
-
   if (state.timer) clearTimeout(state.timer);
   state.timer = setTimeout(() => endMemeGame(interaction, gameId, state), 30 * 1000);
 }
@@ -467,30 +548,43 @@ async function endMemeGame(interaction, gameId, state) {
     voteCounts[targetId] = (voteCounts[targetId] || 0) + 1;
   }
 
-  const captionEntries = Object.entries(state.captions);
-  const sorted = captionEntries
-    .map(([pid, text]) => ({ pid, text, votes: voteCounts[pid] || 0 }))
+  const entries = Object.entries(state.captions);
+  const sorted = entries
+    .map(([pid, data]) => ({ pid, data, votes: voteCounts[pid] || 0 }))
     .sort((a, b) => b.votes - a.votes);
 
   const winner = sorted[0];
-  const winnerMention = winner ? `<@${winner.pid}>` : "لا أحد";
-  const coins = 200;
+  const coins  = 200;
 
-  const resultLines = sorted.map((e, i) =>
-    `${i === 0 ? "🏆" : i === 1 ? "🥈" : "🥉"} ${i === 0 ? `**${winnerMention}**` : `<@${e.pid}>`}: ${e.votes} صوت\n> ${e.text}`
-  ).join("\n\n");
+  const resultLines = sorted.map((e, i) => {
+    const tmpl = MEME_TEMPLATES[e.data.templateIdx ?? 0];
+    return `${i === 0 ? "🏆" : i === 1 ? "🥈" : "🥉"} ${i === 0 ? `**<@${e.pid}>**` : `<@${e.pid}>`}: **${e.votes} صوت**\n> ${e.data.text}\n*(${tmpl?.title?.slice(0,50)}...)*`;
+  }).join("\n\n");
+
+  const winnerTemplate = winner ? MEME_TEMPLATES[winner.data.templateIdx ?? 0] : null;
 
   const endEmbed = new EmbedBuilder()
     .setColor(0xf1c40f).setTitle("😂 صنع الميم — النتائج!")
     .setDescription(
-      `**الموقف:** 🎭 ${state.template.title}\n\n` +
-      `${resultLines || "لا توجد كابشنات!"}\n\n` +
-      `${winner ? `🎉 ${winnerMention} فاز بـ **${coins} كوينز**! 🪙` : ""}`
+      `${resultLines || "لا كابشنات!"}\n\n` +
+      `${winner ? `🎉 <@${winner.pid}> فاز بـ **${coins} كوينز**! 🪙` : ""}`
     )
     .setTimestamp();
 
+  // أضف صورة الفايز وزرار التنزيل
+  const components = [];
+  if (winnerTemplate) {
+    endEmbed.setImage(winnerTemplate.gif);
+    components.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel("⬇️ تنزيل الميم الفايز")
+        .setURL(winnerTemplate.gif)
+        .setStyle(ButtonStyle.Link)
+    ));
+  }
+
   const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
-  if (msg) await msg.edit({ embeds: [endEmbed], components: [] }).catch(() => {});
+  if (msg) await msg.edit({ embeds: [endEmbed], components }).catch(() => {});
 
   return { winnerId: winner?.pid, coins };
 }
@@ -505,7 +599,7 @@ export async function handleMemeCommand(interaction) {
   const state = createMemeState(channelId, interaction.user.id);
   memeGames.set(state.id, state);
   memeChannelMap.set(channelId, state.id);
-  const msg = await interaction.reply({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(state.id, state), fetchReply: true });
+  const msg = await interaction.reply({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(state.id), fetchReply: true });
   state.messageId = msg.id;
 }
 
@@ -513,11 +607,20 @@ export async function handleMemeButton(interaction, db) {
   const id = interaction.customId;
   const parts = id.split("_");
   const action = parts[1];
-  let gameId, targetId;
+  let gameId, targetId, playerId;
 
   if (action === "vote") {
     gameId = parts.slice(2, parts.length - 1).join("_");
     targetId = parts[parts.length - 1];
+  } else if (action === "dm") {
+    // meme_dm_{subaction}_{gameId}_{playerId}
+    const subaction = parts[2];
+    // gameId and playerId: need to handle compound IDs
+    // format: meme_dm_change_{gameId}_{playerId}
+    // playerId is the last segment, gameId is everything between subaction and playerId
+    playerId = parts[parts.length - 1];
+    gameId = parts.slice(3, parts.length - 1).join("_");
+    return handleMemeDmButton(interaction, subaction, gameId, playerId, db);
   } else {
     gameId = parts.slice(2).join("_");
   }
@@ -525,19 +628,21 @@ export async function handleMemeButton(interaction, db) {
   const state = memeGames.get(gameId);
   if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
 
+  // لعب اللعبة الأصلية — فورم رابط الدعوة
   if (action === "realplay") {
-    memeGames.delete(gameId); memeChannelMap.delete(state.channelId);
-    return interaction.update({
-      embeds: [new EmbedBuilder()
-        .setColor(0x3498db)
-        .setTitle("🌐 روحوا العبوا صنع الميم الأصلي!")
-        .setDescription(`**${interaction.user.displayName}** قرر يلعبوا اللعبة الأصلية!\n\n*(اللعبة على البوت اتلغت تلقائياً — اضغط الزرار جنب ده)*`)
-        .setTimestamp()
-      ],
-      components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setLabel("🌐 افتح صنع الميم الأصلي").setURL("https://makeitmeme.com/ar/").setStyle(ButtonStyle.Link)
-      )],
-    });
+    const modal = new ModalBuilder()
+      .setCustomId(`memeplay_${gameId}`)
+      .setTitle("🌐 لعب صنع الميم الأصلي");
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("invite_link")
+        .setLabel("ابعت رابط الدعوة عشان الكل يدخل")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setPlaceholder("مثال: https://makeitmeme.com")
+        .setMaxLength(300)
+    ));
+    return interaction.showModal(modal);
   }
 
   if (action === "join") {
@@ -545,50 +650,34 @@ export async function handleMemeButton(interaction, db) {
     if (state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت بالفعل في اللعبة!", flags: 64 });
     if (state.players.length >= 10) return interaction.reply({ content: "❌ اللعبة امتلأت!", flags: 64 });
     state.players.push(interaction.user.id);
-    return interaction.update({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(gameId, state) });
-  }
-
-  if (action === "swap") {
-    if (state.phase !== "lobby") return interaction.reply({ content: "❌ اللعبة بدأت!", flags: 64 });
-    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يغير الموقف!", flags: 64 });
-    if (state.swapCount >= 10) return interaction.reply({ content: "❌ وصلت لأقصى عدد تغييرات (10)!", flags: 64 });
-    const current = state.template;
-    let newTemplate;
-    do { newTemplate = MEME_TEMPLATES[Math.floor(Math.random() * MEME_TEMPLATES.length)]; }
-    while (newTemplate === current && MEME_TEMPLATES.length > 1);
-    state.template = newTemplate;
-    state.swapCount++;
-    return interaction.update({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(gameId, state) });
+    return interaction.update({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(gameId) });
   }
 
   if (action === "cancel") {
     if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يلغيها!", flags: 64 });
+    if (state.timer) clearTimeout(state.timer);
     memeGames.delete(gameId); memeChannelMap.delete(state.channelId);
-    return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("😂 تم إلغاء صنع الميم")], components: [] });
+    await interaction.message.delete().catch(() => {});
+    return interaction.reply({ content: "😂 تم إلغاء صنع الميم!", flags: 64 });
   }
 
   if (action === "start") {
     if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يبدأها!", flags: 64 });
     if (state.players.length < 2) return interaction.reply({ content: "❌ لازم لاعبان على الأقل!", flags: 64 });
+
     state.phase = "captioning";
-    await interaction.update({ embeds: [buildMemeCaptionEmbed(state)], components: buildMemeCaptionRows(gameId) });
+    await interaction.update({ embeds: [buildMemeCaptionEmbed(state)], components: [] });
+
+    // بعت DMs لكل لاعب
+    await sendMemeDMs(interaction.client, state);
+
+    // تحديث الرسالة عشان يظهر عدد اللي بعتوا
+    const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
+    if (msg) await msg.edit({ embeds: [buildMemeCaptionEmbed(state)], components: [] }).catch(() => {});
 
     if (state.timer) clearTimeout(state.timer);
-    state.timer = setTimeout(() => startMemeVoting(interaction, gameId, state), 60 * 1000);
+    state.timer = setTimeout(() => startMemeVoting(interaction, gameId, state), 90 * 1000);
     return;
-  }
-
-  if (action === "caption") {
-    if (!state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت مش في اللعبة!", flags: 64 });
-    if (state.captions[interaction.user.id]) return interaction.reply({ content: "✅ إنت بالفعل بعتت كابشنك!", flags: 64 });
-    const modal = new ModalBuilder().setCustomId(`mememodal_${gameId}`).setTitle("😂 صنع الميم — كابشنك");
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("meme_caption_input")
-        .setLabel(`الموقف: ${state.template.title.slice(0, 40)}...`)
-        .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(200)
-        .setPlaceholder(`${state.template.prompt} اكتب كابشنك هنا...`)
-    ));
-    return interaction.showModal(modal);
   }
 
   if (action === "vote") {
@@ -599,7 +688,8 @@ export async function handleMemeButton(interaction, db) {
     state.votes[interaction.user.id] = targetId;
     await interaction.reply({ content: "✅ صوتك اتسجل!", flags: 64 });
 
-    if (Object.keys(state.votes).length >= state.players.filter(p => !state.captions[p] || state.captions[p]).length) {
+    const allVoted = state.players.filter(p => state.captions[p]).every(p => state.votes[p] || p === targetId);
+    if (Object.keys(state.votes).length >= state.players.filter(p => state.captions[p]).length) {
       if (state.timer) clearTimeout(state.timer);
       const result = await endMemeGame(interaction, gameId, state);
       if (result?.winnerId && db) {
@@ -611,22 +701,147 @@ export async function handleMemeButton(interaction, db) {
   }
 }
 
+// معالج أزرار الـ DM لصنع الميم
+async function handleMemeDmButton(interaction, subaction, gameId, playerId, db) {
+  // تحقق إن الضاغط هو صاحب الـ DM
+  if (interaction.user.id !== playerId)
+    return interaction.reply({ content: "❌ ده مش DM بتاعك!", flags: 64 });
+
+  const state = memeGames.get(gameId);
+  if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
+  if (state.phase !== "captioning") return interaction.reply({ content: "❌ مش وقت اختيار الـ GIF دلوقتي!", flags: 64 });
+
+  const currentIdx = state.playerTemplateIdx[playerId] ?? 0;
+  const history    = state.playerHistory[playerId] ?? [];
+
+  if (subaction === "change") {
+    // حفظ الحالي في السجل وانتقل للتالي
+    history.push(currentIdx);
+    state.playerHistory[playerId] = history;
+    state.playerTemplateIdx[playerId] = nextTemplate(currentIdx);
+    return interaction.update({
+      embeds: [buildPlayerDmEmbed(state, playerId)],
+      components: buildPlayerDmRows(gameId, playerId),
+    });
+  }
+
+  if (subaction === "back") {
+    if (history.length === 0)
+      return interaction.reply({ content: "❌ مفيش GIF قديم ترجع ليه!", flags: 64 });
+    const prevIdx = history.pop();
+    state.playerHistory[playerId] = history;
+    state.playerTemplateIdx[playerId] = prevIdx;
+    return interaction.update({
+      embeds: [buildPlayerDmEmbed(state, playerId)],
+      components: buildPlayerDmRows(gameId, playerId),
+    });
+  }
+
+  if (subaction === "caption") {
+    if (state.captions[playerId])
+      return interaction.reply({ content: "✅ إنت بالفعل بعتت كابشنك!", flags: 64 });
+    const idx = state.playerTemplateIdx[playerId] ?? 0;
+    const tmpl = MEME_TEMPLATES[idx];
+    const modal = new ModalBuilder()
+      .setCustomId(`memedmmodal_${gameId}_${playerId}`)
+      .setTitle("😂 صنع الميم — كابشنك");
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId("meme_caption_input")
+        .setLabel(`الموقف: ${tmpl.title.slice(0, 40)}`)
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true).setMaxLength(200)
+        .setPlaceholder("اكتب كابشن مضحك...")
+    ));
+    return interaction.showModal(modal);
+  }
+}
+
 export async function handleMemeModal(interaction, db) {
+  // مودال كابشن DM
+  if (interaction.customId.startsWith("memedmmodal_")) {
+    const rest = interaction.customId.replace("memedmmodal_", "");
+    const playerId = rest.split("_").pop();
+    const gameId   = rest.split("_").slice(0, -1).join("_");
+
+    const state = memeGames.get(gameId);
+    if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
+    if (state.captions[playerId]) return interaction.reply({ content: "✅ بعتت كابشنك بالفعل!", flags: 64 });
+
+    const text = interaction.fields.getTextInputValue("meme_caption_input").trim();
+    const templateIdx = state.playerTemplateIdx[playerId] ?? 0;
+    state.captions[playerId] = { text, templateIdx };
+
+    // تعطيل أزرار الـ DM
+    await interaction.update({
+      embeds: [new EmbedBuilder()
+        .setColor(0x2ecc71)
+        .setTitle("✅ تم إرسال كابشنك!")
+        .setDescription(`**كابشنك:** ${text}\n\nاستنى إجابات باقي اللاعبين وانتظر التصويت في الشات! 🗳️`)
+        .setImage(MEME_TEMPLATES[templateIdx]?.gif)
+      ],
+      components: [],
+    });
+
+    // تحديث رسالة الشات
+    try {
+      const channelMsg = await interaction.client.channels.fetch(state.channelId)
+        .then(ch => ch.messages.fetch(state.messageId)).catch(() => null);
+      if (channelMsg) await channelMsg.edit({ embeds: [buildMemeCaptionEmbed(state)], components: [] }).catch(() => {});
+    } catch {}
+
+    // لو الكل بعت
+    const submitted = Object.keys(state.captions).length;
+    if (submitted >= state.players.length) {
+      if (state.timer) clearTimeout(state.timer);
+      const fakeChannel = await interaction.client.channels.fetch(state.channelId).catch(() => null);
+      if (fakeChannel) {
+        const fakeInteraction = {
+          channel: fakeChannel,
+          reply: () => {},
+        };
+        await startMemeVoting(fakeInteraction, gameId, state);
+      }
+    }
+    return;
+  }
+
+  // مودال كابشن قديم (fallback)
   const gameId = interaction.customId.replace("mememodal_", "");
   const state  = memeGames.get(gameId);
   if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
   if (state.captions[interaction.user.id]) return interaction.reply({ content: "✅ بعتت كابشنك بالفعل!", flags: 64 });
 
   const text = interaction.fields.getTextInputValue("meme_caption_input").trim();
-  state.captions[interaction.user.id] = text;
-  await interaction.reply({ content: `✅ كابشنك اتحفظ: **"${text}"**`, flags: 64 });
+  state.captions[interaction.user.id] = { text, templateIdx: 0 };
+  await interaction.reply({ content: `✅ كابشنك: **"${text}"**`, flags: 64 });
 
   const submitted = Object.keys(state.captions).length;
   const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
-  if (msg) await msg.edit({ embeds: [buildMemeCaptionEmbed(state)], components: buildMemeCaptionRows(gameId) }).catch(() => {});
+  if (msg) await msg.edit({ embeds: [buildMemeCaptionEmbed(state)], components: [] }).catch(() => {});
 
   if (submitted >= state.players.length) {
     if (state.timer) clearTimeout(state.timer);
     await startMemeVoting(interaction, gameId, state);
   }
+}
+
+// مودال رابط دعوة صنع الميم
+export async function handleMemeInviteModal(interaction) {
+  const gameId = interaction.customId.replace("memeplay_", "");
+  const state = memeGames.get(gameId);
+  if (!state) return interaction.reply({ content: "❌ اللعبة انتهت بالفعل!", flags: 64 });
+
+  const link = (interaction.fields.getTextInputValue("invite_link") || "").trim();
+  if (state.timer) clearTimeout(state.timer);
+  memeGames.delete(gameId); memeChannelMap.delete(state.channelId);
+
+  await interaction.message.delete().catch(() => {});
+  return interaction.reply({
+    embeds: [new EmbedBuilder()
+      .setColor(0xf39c12)
+      .setTitle("🌐 روحوا العبوا صنع الميم الأصلي!")
+      .setDescription(`**${interaction.user.displayName}** بعت رابط الدعوة! 🎮\n*(اللعبة على البوت اتلغت)*\n\n🔗 **رابط الدعوة:** ${link}`)
+      .setTimestamp()],
+  });
 }

@@ -8,3 +8,4 @@
 - [Auto-Mod Smart](auto-mod-smart.md) — two-pass scan: EXTREME_REGEX instant → SUSPICIOUS_REGEX + Gemini text confirm (5s throttle); scanMessage now accepts 5th param geminiTextModel; called in index.js with geminiModel() as 5th arg
 - [Speech Mode](speech-mode.md) — 3 modes: normal(no swearing)/free(mirror swear back)/toxic(swears freely); buildUserPrompt in index.js; /تغيير-طريقة-الكلام owner-only
 - [Latest Features Rule](latest-features-rule.md) — every new feature MUST be added to LATEST_FEATURES array in commands/games-hub.js (newest entry first)
+- [Codenames 5-Row Limit](codenames-5row.md) — Discord max 5 ActionRows: board alone takes all 5 rows; skip/cancel buttons go as separate control message in channel; spymaster gets "give clue" via DM (sendActiveSpymasterControl); modal submits must NOT use interaction.update() — edit message by fetching state.channelId+state.messageId directly

@@ -32,8 +32,8 @@ import { handleBattleCommand, handleBattleButton } from "./commands/battle.js";
 import { handleBankLifeCommand, handleBankLifeButton, lifeGames, lifeChannelMap } from "./commands/bank-life.js";
 import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap } from "./commands/bank-luck.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
-import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage } from "./commands/codenames.js";
-import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
+import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage, handleCodenamesSettingsModal, handleCodenamesClueModal, handleCodenamesInviteModal } from "./commands/codenames.js";
+import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, handleGarticInviteModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, handleMemeInviteModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
@@ -3187,7 +3187,8 @@ client.on("interactionCreate", async (interaction) => {
           if (lifeChannelMap.has(cid))     { const lId = lifeChannelMap.get(cid);   lifeGames.delete(lId);   lifeChannelMap.delete(cid); }
           if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
           if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
-          return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", ephemeral: true });
+          await interaction.message.delete().catch(() => {});
+          return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", flags: 64 });
         }
       }
 
@@ -3762,14 +3763,39 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
-      // ─── مودالات جارتك فون ───────────────────────────────────────
+      // ─── مودالات الهاتف المكسور ──────────────────────────────────
       if (interaction.customId.startsWith("garmodal_")) {
         return await handleGarticModal(interaction);
       }
 
-      // ─── مودالات ميم جيم ─────────────────────────────────────────
-      if (interaction.customId.startsWith("mememodal_")) {
+      // ─── مودال رابط دعوة الهاتف المكسور ─────────────────────────
+      if (interaction.customId.startsWith("garplay_")) {
+        return await handleGarticInviteModal(interaction);
+      }
+
+      // ─── مودالات صنع الميم ───────────────────────────────────────
+      if (interaction.customId.startsWith("mememodal_") || interaction.customId.startsWith("memedmmodal_")) {
         return await handleMemeModal(interaction, db);
+      }
+
+      // ─── مودال رابط دعوة صنع الميم ──────────────────────────────
+      if (interaction.customId.startsWith("memeplay_")) {
+        return await handleMemeInviteModal(interaction);
+      }
+
+      // ─── مودالات كود نيمز — إعدادات ─────────────────────────────
+      if (interaction.customId.startsWith("cdnsettings_")) {
+        return await handleCodenamesSettingsModal(interaction);
+      }
+
+      // ─── مودالات كود نيمز — التلميح ─────────────────────────────
+      if (interaction.customId.startsWith("cdnclue_")) {
+        return await handleCodenamesClueModal(interaction);
+      }
+
+      // ─── مودال رابط دعوة كود نيمز ───────────────────────────────
+      if (interaction.customId.startsWith("cdninvite_")) {
+        return await handleCodenamesInviteModal(interaction);
       }
 
       // ─── مودال حجر ورقة مقص العادية ─────────────────────────────
