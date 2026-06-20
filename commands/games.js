@@ -940,37 +940,47 @@ export async function handleMafiaButton(interaction, db) {
 // ══════════════════════════════════════════════════════════════
 //  ❌⭕ اكس اوه (Tic-Tac-Toe)
 // ══════════════════════════════════════════════════════════════
-export async function handleTTTCommand(interaction, db) {
+export async function handleTTTCommand(interaction, db, forceAI = false) {
   // ── تحديد الخصم: من الأمر /اكس-اوه أو تحدي مفتوح من مركز الألعاب ──
   const isButton   = interaction.isButton?.();
   const opponent   = isButton ? null : interaction.options?.getUser("خصم");
+  const vsAI       = forceAI || (!isButton && !opponent);
 
-  if (!isButton) {
-    if (!opponent) return interaction.reply({ content: "❌ لازم تختار خصم!", flags: 64 });
+  if (!isButton && !vsAI) {
     if (opponent.id === interaction.user.id) return interaction.reply({ content: "❌ ما تعبش مع نفسك 😅", flags: 64 });
-    if (opponent.bot) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد بوت!", flags: 64 });
+    if (opponent.bot) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد بوت تاني 😄", flags: 64 });
   }
 
   if (channelGames.has(interaction.channel.id))
     return interaction.reply({ content: "❌ في لعبة شغالة هنا بالفعل!", flags: 64 });
 
   const gameId = makeId();
-  const isOpen = isButton; // تحدي مفتوح — أي حد يقدر يقبل
+  const isOpen = isButton && !forceAI;
   const state = {
     id: gameId,
     channelId: interaction.channel.id,
     playerX: interaction.user.id,
-    playerO: isOpen ? null : opponent.id,
+    playerO: vsAI ? AI_PLAYER_ID : (isOpen ? null : opponent.id),
     board: Array(9).fill(""),
     currentTurn: "X",
     winner: null,
-    phase: "waiting",
+    phase: vsAI ? "playing" : "waiting",
     isOpen,
+    isAI: vsAI,
   };
 
   tttGames.set(gameId, state);
   channelGames.set(interaction.channel.id, gameId);
 
+  // ── لعبة ضد AI — تبدأ فوراً ──────────────────────────────────
+  if (vsAI) {
+    const embed = buildTTTEmbed(state);
+    const rows  = buildTTTRows(gameId, state);
+    await interaction.reply({ embeds: [embed], components: rows });
+    return;
+  }
+
+  // ── لعبة ضد لاعب — انتظار قبول ──────────────────────────────
   const embed = new EmbedBuilder()
     .setColor(0x3498db)
     .setTitle("❌⭕ اكس اوه — دعوة للعب!")
@@ -1004,22 +1014,32 @@ function buildTTTEmbed(state) {
     [0, 1, 2].map(col => symbols[state.board[row + col]]).join("")
   ).join("\n");
 
-  const currentPlayer = state.currentTurn === "X" ? state.playerX : state.playerO;
+  const isAI = state.isAI;
+  const oName = isAI ? "🤖 الذكاء الاصطناعي" : `<@${state.playerO}>`;
+  const currentPlayer = state.currentTurn === "X" ? `<@${state.playerX}>` : oName;
+
+  let statusLine;
+  if (state.winner === "draw") {
+    statusLine = "🤝 **تعادل!** الذكاء الاصطناعي كانت تعادلت معاك!";
+  } else if (state.winner) {
+    statusLine = state.winner === AI_PLAYER_ID
+      ? `🤖 **الذكاء الاصطناعي فاز!** — جرّب تاني وهتقدر تكسبه 💪`
+      : `🏆 **فزت على الذكاء الاصطناعي! مبروك! 🎉**`;
+    if (!isAI) {
+      statusLine = `🏆 **فاز <@${state.winner}>!**`;
+    }
+  } else {
+    statusLine = `🎯 **دور:** ${currentPlayer} (${state.currentTurn === "X" ? "❌" : "⭕"})`;
+    if (isAI && state.currentTurn === "O") statusLine = "🤖 **الذكاء الاصطناعي بيفكر...**";
+  }
 
   return new EmbedBuilder()
-    .setColor(state.winner ? 0xf1c40f : 0x3498db)
-    .setTitle("❌⭕ اكس اوه")
-    .setDescription(
-      `${boardStr}\n\n` +
-      (state.winner === "draw"
-        ? "🤝 **تعادل!** الاتنين فكروا زي بعض!"
-        : state.winner
-          ? `🏆 **فاز <@${state.winner}>!**`
-          : `🎯 **دور:** <@${currentPlayer}> (${state.currentTurn === "X" ? "❌" : "⭕"})`)
-    )
+    .setColor(state.winner ? 0xf1c40f : (isAI ? 0x9b59b6 : 0x3498db))
+    .setTitle(isAI ? "❌⭕ اكس اوه — ضد الذكاء الاصطناعي 🤖" : "❌⭕ اكس اوه")
+    .setDescription(`${boardStr}\n\n${statusLine}`)
     .addFields(
       { name: "❌ اكس", value: `<@${state.playerX}>`, inline: true },
-      { name: "⭕ دايرة", value: `<@${state.playerO}>`, inline: true },
+      { name: "⭕ دايرة", value: oName, inline: true },
     )
     .setTimestamp();
 }
@@ -1056,6 +1076,60 @@ function checkTTTWinner(board) {
   }
   if (board.every(c => c !== "")) return "draw";
   return null;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  🤖 Minimax AI — Alpha-Beta Pruning
+// ══════════════════════════════════════════════════════════════
+const AI_SYMBOL    = "O";
+const HUMAN_SYMBOL = "X";
+const AI_PLAYER_ID = "AI_BOT";
+
+function minimaxTTT(board, depth, alpha, beta, isMaximizing) {
+  const result = checkTTTWinner(board);
+  if (result === AI_SYMBOL)    return 10 - depth;
+  if (result === HUMAN_SYMBOL) return depth - 10;
+  if (result === "draw")       return 0;
+
+  if (isMaximizing) {
+    let best = -Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (board[i] === "") {
+        board[i] = AI_SYMBOL;
+        best = Math.max(best, minimaxTTT(board, depth + 1, alpha, beta, false));
+        board[i] = "";
+        alpha = Math.max(alpha, best);
+        if (beta <= alpha) break;
+      }
+    }
+    return best;
+  } else {
+    let best = +Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (board[i] === "") {
+        board[i] = HUMAN_SYMBOL;
+        best = Math.min(best, minimaxTTT(board, depth + 1, alpha, beta, true));
+        board[i] = "";
+        beta = Math.min(beta, best);
+        if (beta <= alpha) break;
+      }
+    }
+    return best;
+  }
+}
+
+function getAIMove(board) {
+  let bestScore = -Infinity;
+  let bestMove  = -1;
+  for (let i = 0; i < 9; i++) {
+    if (board[i] === "") {
+      board[i] = AI_SYMBOL;
+      const score = minimaxTTT(board, 0, -Infinity, +Infinity, false);
+      board[i] = "";
+      if (score > bestScore) { bestScore = score; bestMove = i; }
+    }
+  }
+  return bestMove;
 }
 
 export async function handleTTTButton(interaction, db) {
@@ -1102,42 +1176,114 @@ export async function handleTTTButton(interaction, db) {
     if (state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة ما بدأتش!", ephemeral: true });
 
     const currentPlayer = state.currentTurn === "X" ? state.playerX : state.playerO;
-    if (interaction.user.id !== currentPlayer) return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
+    if (interaction.user.id !== state.playerX && !state.isAI) {
+      if (interaction.user.id !== currentPlayer) return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
+    } else if (state.isAI) {
+      if (interaction.user.id !== state.playerX) return interaction.reply({ content: "❌ دي لعبتك إنت بس!", ephemeral: true });
+      if (state.currentTurn !== "X") return interaction.reply({ content: "⏳ الذكاء الاصطناعي بيلعب دلوقتي!", ephemeral: true });
+    } else {
+      if (interaction.user.id !== currentPlayer) return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
+    }
     if (state.board[idx] !== "") return interaction.reply({ content: "❌ الخانة دي محجوزة!", ephemeral: true });
 
+    // ── حركة اللاعب ──────────────────────────────────────────
     state.board[idx] = state.currentTurn;
-    const result = checkTTTWinner(state.board);
+    let result = checkTTTWinner(state.board);
+
+    const finishGame = (winnerValue) => {
+      state.winner = winnerValue;
+      tttGames.delete(gameId);
+      channelGames.delete(state.channelId);
+    };
 
     if (result) {
       if (result === "draw") {
-        state.winner = "draw";
+        finishGame("draw");
       } else {
-        state.winner = result === "X" ? state.playerX : state.playerO;
-        const prize = 150;
-        db.updateUser(state.winner, { coins: (db.getUser(state.winner).coins || 0) + prize });
+        const winnerId = result === "X" ? state.playerX : (state.isAI ? AI_PLAYER_ID : state.playerO);
+        finishGame(winnerId);
+        if (!state.isAI && winnerId !== AI_PLAYER_ID) {
+          db.updateUser(winnerId, { coins: (db.getUser(winnerId).coins || 0) + 150 });
+        } else if (state.isAI && winnerId === state.playerX) {
+          db.updateUser(state.playerX, { coins: (db.getUser(state.playerX).coins || 0) + 200 });
+        }
       }
-      tttGames.delete(gameId);
-      channelGames.delete(state.channelId);
-    } else {
-      state.currentTurn = state.currentTurn === "X" ? "O" : "X";
-    }
-
-    const embed = buildTTTEmbed(state);
-    const rows  = buildTTTRows(gameId, state);
-    if (state.winner) {
-      rows.push(new ActionRowBuilder().addComponents(
+      const embed = buildTTTEmbed(state);
+      const endRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`ttt_rematch_${state.playerX}_${state.playerO}`)
+          .setCustomId(state.isAI ? `ttt_ai_rematch_${state.playerX}` : `ttt_rematch_${state.playerX}_${state.playerO}`)
           .setLabel("🔁 لعبة جديدة").setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId(`ttt_exit_${state.channelId}`)
           .setLabel("🚪 خروج").setStyle(ButtonStyle.Secondary),
-      ));
+      );
+      return interaction.update({ embeds: [embed], components: [endRow] });
     }
+
+    // ── لو مفيش winner — بدّل الدور ──────────────────────────
+    state.currentTurn = state.currentTurn === "X" ? "O" : "X";
+
+    // ── لو AI ودوره — اعمل حركة تلقائية ─────────────────────
+    if (state.isAI && state.currentTurn === "O") {
+      const embedThinking = buildTTTEmbed(state);
+      const rowsThinking  = buildTTTRows(gameId, state);
+      await interaction.update({ embeds: [embedThinking], components: rowsThinking });
+
+      const aiIdx = getAIMove(state.board);
+      if (aiIdx !== -1) {
+        state.board[aiIdx] = AI_SYMBOL;
+        result = checkTTTWinner(state.board);
+
+        if (result) {
+          if (result === "draw") {
+            finishGame("draw");
+          } else {
+            finishGame(AI_PLAYER_ID);
+          }
+          const finalEmbed = buildTTTEmbed(state);
+          const endRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`ttt_ai_rematch_${state.playerX}`).setLabel("🔁 العب تاني").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`ttt_exit_${state.channelId}`).setLabel("🚪 خروج").setStyle(ButtonStyle.Secondary),
+          );
+          const msg = await interaction.fetchReply().catch(() => null);
+          if (msg) await msg.edit({ embeds: [finalEmbed], components: [endRow] }).catch(() => {});
+          return;
+        }
+        state.currentTurn = "X";
+        const finalEmbed = buildTTTEmbed(state);
+        const finalRows  = buildTTTRows(gameId, state);
+        const msg = await interaction.fetchReply().catch(() => null);
+        if (msg) await msg.edit({ embeds: [finalEmbed], components: finalRows }).catch(() => {});
+      }
+      return;
+    }
+
+    const embed = buildTTTEmbed(state);
+    const rows  = buildTTTRows(gameId, state);
     return interaction.update({ embeds: [embed], components: rows });
   }
 
-  // ── إعادة اللعبة ──────────────────────────────────────────────
+  // ── إعادة اللعبة ضد AI ────────────────────────────────────────
+  if (id.startsWith("ttt_ai_rematch_")) {
+    const pX = id.replace("ttt_ai_rematch_", "");
+    if (interaction.user.id !== pX)
+      return interaction.reply({ content: "❌ دي لعبتك إنت بس!", flags: 64 });
+    if (channelGames.has(interaction.channel.id))
+      return interaction.reply({ content: "❌ في لعبة شغالة هنا!", flags: 64 });
+
+    const newId = makeId();
+    const newState = {
+      id: newId, channelId: interaction.channel.id,
+      playerX: pX, playerO: AI_PLAYER_ID,
+      board: Array(9).fill(""), currentTurn: "X",
+      winner: null, phase: "playing", isOpen: false, isAI: true,
+    };
+    tttGames.set(newId, newState);
+    channelGames.set(interaction.channel.id, newId);
+    return interaction.update({ embeds: [buildTTTEmbed(newState)], components: buildTTTRows(newId, newState) });
+  }
+
+  // ── إعادة اللعبة ضد لاعب ──────────────────────────────────────
   if (id.startsWith("ttt_rematch_")) {
     const p = id.replace("ttt_rematch_", "").split("_");
     const pX = p[0], pO = p[1];
@@ -1151,7 +1297,7 @@ export async function handleTTTButton(interaction, db) {
       id: newId, channelId: interaction.channel.id,
       playerX: pX, playerO: pO,
       board: Array(9).fill(""), currentTurn: "X",
-      winner: null, phase: "playing", isOpen: false,
+      winner: null, phase: "playing", isOpen: false, isAI: false,
     };
     tttGames.set(newId, newState);
     channelGames.set(interaction.channel.id, newId);
@@ -1180,8 +1326,8 @@ export const mafiaCommand = new SlashCommandBuilder()
 
 export const tttCommand = new SlashCommandBuilder()
   .setName("اكس-اوه")
-  .setDescription("❌⭕ تيك تاك تو — العب ضد حد!")
-  .addUserOption(o => o.setName("خصم").setDescription("اختار خصمك").setRequired(true));
+  .setDescription("❌⭕ تيك تاك تو — العب ضد حد أو ضد الذكاء الاصطناعي!")
+  .addUserOption(o => o.setName("خصم").setDescription("اختار خصمك (اتركه فاضي للعب ضد AI 🤖)").setRequired(false));
 
 export const rpsCommand = new SlashCommandBuilder()
   .setName("حجر-ورقة-مقص-الخارقة")

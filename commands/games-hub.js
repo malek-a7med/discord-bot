@@ -13,6 +13,11 @@ import {
 // ══════════════════════════════════════════════════════════════
 export const LATEST_FEATURES = [
   {
+    name: "🤖 اكس-اوه ضد الذكاء الاصطناعي — جديد!",
+    value: "دلوقتي تقدر تلعب اكس-اوه ضد **AI لا يُهزم** يستخدم خوارزمية Minimax!\n❌ إنت (X) ضد 🤖 AI (O) — جرّب تكسبه لو قدرت!\n🏆 لو كسبت بتاخد **200 كوينز** — أما التعادل مجاني!\n→ `/اكس-اوه` (من غير تحديد خصم) أو من `/الألعاب` → 🤖 اكس-اوه ضد AI",
+    inline: false,
+  },
+  {
     name: "🌍 لعبة الحياة — جديد!",
     value: "عيش رحلة حياتك كاملة! 8 مواقف واقعية بتظهر للكل في نفس الوقت\n⚡ 20 ثانية كل موقف تختار من 3 خيارات (جريء / متوازن / آمن)\n🏆 أعلى نقاط في الآخر يكسب الكوينز!\n→ `/لعبة-الحياة` أو من `/الألعاب`",
     inline: false,
@@ -150,7 +155,7 @@ function buildHubEmbed() {
       `**اضغط على أي لعبة عشان تبدأها في الروم ده الحين!**\n\n` +
       `🎰 **روليت** — روليت روسية، آخر ناجي يأخذ الكوينز\n` +
       `🕵️ **مافيا** — اكشف المافيا قبل ما يقضوا على البلدة\n` +
-      `❌⭕ **اكس-اوه** — تيك تاك تو الكلاسيكي مع التحديات\n` +
+      `❌⭕ **اكس-اوه** — تيك تاك تو ضد لاعب أو ضد الذكاء الاصطناعي 🤖\n` +
       `🃏 **كود نيمز** — فريقين يخمنوا الكلمات السرية\n` +
       `📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة\n` +
       `😂 **صنع الميم** — اكتب أحلى كابشن وفوز بالكوينز\n` +
@@ -182,6 +187,7 @@ function buildHubRows() {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🌍 الحياة").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("ghub_ttt_ai").setLabel("🤖 اكس-اوه ضد AI").setStyle(ButtonStyle.Danger),
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_bankluck").setLabel("🎰 بنك الحظ المصري").setStyle(ButtonStyle.Primary),

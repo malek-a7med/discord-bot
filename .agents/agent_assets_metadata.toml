@@ -12,3 +12,9 @@ id = "kSNVQ8pMTAd3ZBKoxMmKa"
 uri = "file://BOT_GUIDE.md"
 type = "text"
 title = "دليل بوت زنجي — توثيق شامل للـ Minimax Agent"
+
+[[outputs]]
+id = "ih4j-OWvE-wb8HS9lt01i"
+uri = "file://ZANGI_BOT_GUIDE.md"
+type = "text"
+title = "شرح كامل — بوت زنجي"

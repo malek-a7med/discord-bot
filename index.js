@@ -3216,7 +3216,8 @@ client.on("interactionCreate", async (interaction) => {
         const gid = interaction.customId;
         if (gid === "ghub_rlt" || gid === "ftr_rlt")   return await handleRouletteCommand(interaction, db);
         if (gid === "ghub_maf" || gid === "ftr_maf")   return await handleMafiaCommand(interaction, db);
-        if (gid === "ghub_ttt")                         return await handleTTTCommand(interaction, db);
+        if (gid === "ghub_ttt")                         return await handleTTTCommand(interaction, db, false);
+        if (gid === "ghub_ttt_ai")                      return await handleTTTCommand(interaction, db, true);
         if (gid === "ghub_cdn" || gid === "ftr_cdn")   return await handleCodenamesCommand(interaction);
         if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
         if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
