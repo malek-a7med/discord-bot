@@ -48,10 +48,14 @@ class Database {
         coins: 0,
         lastDaily: null,
         warnings: [],
-        timeouts: []
+        timeouts: [],
+        bankCoins: 0,
+        lastBankInterest: 0,
       };
       this.save();
     }
+    if (typeof this.data.users[userId].bankCoins !== "number") this.data.users[userId].bankCoins = 0;
+    if (typeof this.data.users[userId].lastBankInterest !== "number") this.data.users[userId].lastBankInterest = 0;
     return this.data.users[userId];
   }
 

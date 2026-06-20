@@ -37,6 +37,8 @@ import { pollCommand, handlePollCommand, handlePollButton, activePolls } from ".
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand, LATEST_FEATURES } from "./commands/games-hub.js";
+import { bankSavingsCommand, handleBankButton, handleBankModal } from "./commands/bank-savings.js";
+import { bankLuckEgCommand, handleBankLuckEgButton, handleBankLuckEgModal } from "./commands/bank-luck-eg.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -557,6 +559,8 @@ const LEGACY_COMMANDS = [
         .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
     ),
   pollCommand,
+  bankSavingsCommand.data,
+  bankLuckEgCommand.data,
   new ContextMenuCommandBuilder()
     .setName("✏️ تعديل رسالة")
     .setType(ApplicationCommandType.Message),
@@ -586,7 +590,7 @@ function validateLatestFeatures(allCommands) {
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
-      "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ",
+      "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","بنك-الادخار","بنك-الحظ-مصري",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
     ];
@@ -2090,6 +2094,8 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "استفتاء")      return await handlePollCommand(interaction);
       if (cmd === "الألعاب")     return await handleGamesHubCommand(interaction);
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
+      if (cmd === "بنك-الادخار")  return await bankSavingsCommand.execute(interaction, db);
+      if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
       if (cmd === "تغيير-طريقة-الكلام") {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         const mode = interaction.options.getString("أسلوب");
@@ -3180,6 +3186,16 @@ client.on("interactionCreate", async (interaction) => {
         return await handleBankLuckButton(interaction, db);
       }
 
+      // ─── أزرار بنك الادخار ───────────────────────────────────────
+      if (interaction.customId.startsWith("bsav_")) {
+        return await handleBankButton(interaction, db);
+      }
+
+      // ─── أزرار بنك الحظ المصري ───────────────────────────────────
+      if (interaction.customId.startsWith("bleg_")) {
+        return await handleBankLuckEgButton(interaction, db);
+      }
+
       // ─── أزرار تجديد اللعبة ───────────────────────────────────────
       if (interaction.customId.startsWith("replay_")) {
         const parts = interaction.customId.split("_");
@@ -3795,6 +3811,16 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      // ─── مودالات بنك الادخار ─────────────────────────────────────
+      if (interaction.customId.startsWith("bsav_modal_")) {
+        return await handleBankModal(interaction, db);
+      }
+
+      // ─── مودالات بنك الحظ المصري ─────────────────────────────────
+      if (interaction.customId.startsWith("bleg_modal_")) {
+        return await handleBankLuckEgModal(interaction, db);
+      }
+
       // ─── مودالات الهاتف المكسور ──────────────────────────────────
       if (interaction.customId.startsWith("garmodal_")) {
         return await handleGarticModal(interaction);
