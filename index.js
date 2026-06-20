@@ -355,13 +355,13 @@ const LEGACY_COMMANDS = [
     .setName("طرد")
     .setDescription("طرد عضو [مشرف] / Kick a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
-    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
     .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
   new SlashCommandBuilder()
     .setName("تبنيد")
     .setDescription("حظر عضو نهائياً [مشرف] / Ban a member")
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID").setRequired(true))
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
     .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
   new SlashCommandBuilder().setName("مساعدة").setDescription("قائمة جميع الأوامر / Help"),
   new SlashCommandBuilder()
@@ -2737,9 +2737,10 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "طرد") {
-        const nameOrId = interaction.options.getString("عضو");
-        const target = await resolveMember(guild, nameOrId);
-        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
         const actionId = `modkick_${Date.now()}_${user.id}`;
         pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
@@ -2757,9 +2758,10 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "تبنيد") {
-        const nameOrId = interaction.options.getString("عضو");
-        const target = await resolveMember(guild, nameOrId);
-        if (!target) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
         const reason = interaction.options.getString("السبب") ?? "غير محدد";
         const actionId = `modban_${Date.now()}_${user.id}`;
         pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
