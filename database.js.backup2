@@ -278,59 +278,6 @@ class Database {
     return this.data;
   }
 
-  // ─── 🌍 لعبة الحياة (نظام اقتصادي شخصي مستمر، per-guild) ──────
-  // ✅ مستقل بالكامل عن users[userId].coins — بروفايل اللعبة الجديدة
-  //   بيبدأ من الصفر لما اليوزر يلعب لأول مرة، ومحلي لكل سيرفر لوحده
-  //   (نفس اليوزر في سيرفرين مختلفين = بروفايلين مختلفين تمامًا)
-  ensureLifeProfile(guildId, userId) {
-    if (!this.data.lifeProfiles) this.data.lifeProfiles = {};
-    if (!this.data.lifeProfiles[guildId]) this.data.lifeProfiles[guildId] = {};
-
-    if (!this.data.lifeProfiles[guildId][userId]) {
-      this.data.lifeProfiles[guildId][userId] = {
-        coins: 0,
-        jobLevel: 0,        // 0 = بدون وظيفة
-        jobSince: null,     // وقت بداية الوظيفة الحالية (لحساب الخبرة)
-        assets: { house: false, car: false, company: false },
-        debt: 0,            // قيمة موجبة = مديون
-        debtSince: null,    // وقت أول ما الدين بدأ
-        debtWarned: false,  // اتبعتله إنذار قبل كده؟
-        health: 100,
-        lastTick: Date.now(),
-        createdAt: Date.now(),
-      };
-      this.save();
-    }
-
-    const p = this.data.lifeProfiles[guildId][userId];
-    // backward-safety: لو فيه بروفايل قديم من نسخة تجريبية وناقصه حقل
-    if (typeof p.coins !== "number") p.coins = 0;
-    if (typeof p.jobLevel !== "number") p.jobLevel = 0;
-    if (!p.assets) p.assets = { house: false, car: false, company: false };
-    if (typeof p.debt !== "number") p.debt = 0;
-    if (typeof p.health !== "number") p.health = 100;
-    if (typeof p.lastTick !== "number") p.lastTick = Date.now();
-    // ✅ migration: لو فيه بروفايل قديم من نسخة تجريبية كانت بمنطق "محفظة
-    //   سالبة = دين" (قبل ما نفصل المحفظة عن الدين)، نحوّل أي رصيد سالب
-    //   لدين فعلي ونصفّر المحفظة، عشان النظام الجديد يفضل متّسق دايمًا
-    if (p.coins < 0) {
-      p.debt += -p.coins;
-      p.coins = 0;
-      if (!p.debtSince) p.debtSince = Date.now();
-    }
-
-    return p;
-  }
-
-  getLifeProfile(guildId, userId) {
-    return this.ensureLifeProfile(guildId, userId);
-  }
-
-  getGuildLifeProfiles(guildId) {
-    if (!this.data.lifeProfiles || !this.data.lifeProfiles[guildId]) return {};
-    return this.data.lifeProfiles[guildId];
-  }
-
   clearOldData(maxAge = 86400000) {
     // Clear spam tracking after 24 hours
     const now = Date.now();

@@ -28,7 +28,7 @@ import {
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
 import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleRPSButton, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
-import { bankLifeCommand, handleBankLifeCommand, handleBankLifeButton } from "./commands/bank-life.js";
+import { handleBankLifeCommand, handleBankLifeButton, lifeGames, lifeChannelMap } from "./commands/bank-life.js";
 import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap } from "./commands/bank-luck.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage, handleCodenamesSettingsModal, handleCodenamesClueModal, handleCodenamesInviteModal } from "./commands/codenames.js";
@@ -559,7 +559,7 @@ const LEGACY_COMMANDS = [
         .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
     ),
   pollCommand,
-  bankLifeCommand,
+  new SlashCommandBuilder().setName("لعبة-الحياة").setDescription("🌍 عيش رحلة حياتك — 8 مواقف تحدد مصيرك!"),
   bankLuckEgCommand.data,
   new ContextMenuCommandBuilder()
     .setName("✏️ تعديل رسالة")
@@ -590,7 +590,7 @@ function validateLatestFeatures(allCommands) {
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
-      "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","حياة","بنك-الحظ-مصري",
+      "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","لعبة-الحياة","بنك-الحظ-مصري",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
     ];
@@ -2100,7 +2100,7 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "استفتاء")      return await handlePollCommand(interaction);
       if (cmd === "الألعاب")     return await handleGamesHubCommand(interaction);
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
-      if (cmd === "حياة")          return await handleBankLifeCommand(interaction, db);
+      if (cmd === "لعبة-الحياة")   return await handleBankLifeCommand(interaction);
       if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
       if (cmd === "تغيير-طريقة-الكلام") {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
@@ -3214,7 +3214,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── أزرار الحياة ────────────────────────────────────────────
-      if (interaction.customId.startsWith("life_")) {
+      if (interaction.customId.startsWith("bnk_")) {
         return await handleBankLifeButton(interaction, db);
       }
 
@@ -3234,8 +3234,6 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── أزرار تجديد اللعبة ───────────────────────────────────────
-      // ✅ FIX: شلنا "life" من هنا — لعبة الحياة الجديدة (نظام مستمر) مالها
-      //   "جلسة" تتجدد أصلاً، البروفايل دايمًا موجود ومستمر
       if (interaction.customId.startsWith("replay_")) {
         const parts = interaction.customId.split("_");
         const game  = parts[1];
@@ -3243,6 +3241,7 @@ client.on("interactionCreate", async (interaction) => {
         if (game === "maf")  return await handleMafiaCommand(interaction, db);
         if (game === "gar")  return await handleGarticCommand(interaction);
         if (game === "meme") return await handleMemeCommand(interaction);
+        if (game === "life") return await handleBankLifeCommand(interaction);
         if (game === "luck") return await handleBankLuckCommand(interaction);
         if (game === "cdn")  return await handleCodenamesCommand(interaction);
         if (game === "quiz") return await startQuizGame(interaction);
@@ -3261,7 +3260,7 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
         if (gid === "ghub_rps_easy")                    return await handleRPSBasicCommand(interaction);
         if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
-        if (gid === "ghub_banklife")                    return await handleBankLifeButton(interaction, db);
+        if (gid === "ghub_banklife")                    return await handleBankLifeCommand(interaction);
         if (gid === "ghub_bankluck")                    return await bankLuckEgCommand.execute(interaction, db);
         if (gid === "ghub_cancel") {
           const cid = interaction.channel.id;
@@ -3270,8 +3269,7 @@ client.on("interactionCreate", async (interaction) => {
           if (memeChannelMap.has(cid))     { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
           if (rpsChannelMap.has(cid))      { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
           if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
-          // ✅ FIX: lifeChannelMap/lifeGames اتشالوا — لعبة الحياة الجديدة نظام
-          //   مستمر مالوش "جلسة في روم" تتلغى أصلاً
+          if (lifeChannelMap.has(cid))     { const lId = lifeChannelMap.get(cid);   lifeGames.delete(lId);   lifeChannelMap.delete(cid); }
           if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
           if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
           await interaction.message.delete().catch(() => {});
