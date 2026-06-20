@@ -4170,18 +4170,44 @@ process.on("SIGINT", async () => {
 });
 
 // ================= نظام الترحيب الأسطوري للفراعنة =================
-// deduplication: نمنع إرسال أكتر من رسالة للنفس العضو في 10 ثواني
-const _recentJoins = new Map();
+// deduplication دائمة: بتتحفظ في ملف بتتحمل الـ restart
+const _WELCOME_DEDUPE_PATH = path.join(__dirname, 'data', 'welcome-dedupe.json');
+const _WELCOME_TTL = 5 * 60 * 1000; // 5 دقايق
+
+function _loadWelcomeDedupe() {
+  try {
+    const raw = fs.readFileSync(_WELCOME_DEDUPE_PATH, 'utf8');
+    const obj = JSON.parse(raw);
+    // امسح المداخل القديمة
+    const now = Date.now();
+    for (const [k, t] of Object.entries(obj)) {
+      if (now - t > _WELCOME_TTL) delete obj[k];
+    }
+    return obj;
+  } catch { return {}; }
+}
+function _saveWelcomeDedupe(obj) {
+  try { fs.writeFileSync(_WELCOME_DEDUPE_PATH, JSON.stringify(obj)); } catch {}
+}
+function _dedupeWelcome(key) {
+  const obj = _loadWelcomeDedupe();
+  if (obj[key] && Date.now() - obj[key] < _WELCOME_TTL) return false;
+  obj[key] = Date.now();
+  _saveWelcomeDedupe(obj);
+  return true;
+}
+
+// in-memory للوداع (مش ضروري تتحفظ)
 const _recentLeaves = new Map();
-function _dedupe(map, key, ttl = 10000) {
-  if (map.has(key)) return false;
-  map.set(key, true);
-  setTimeout(() => map.delete(key), ttl);
+function _dedupeLeave(key, ttl = 10000) {
+  if (_recentLeaves.has(key)) return false;
+  _recentLeaves.set(key, true);
+  setTimeout(() => _recentLeaves.delete(key), ttl);
   return true;
 }
 
 client.on('guildMemberAdd', async (member) => {
-  if (!_dedupe(_recentJoins, `${member.guild.id}-${member.id}`)) return;
+  if (!_dedupeWelcome(`${member.guild.id}-${member.id}`)) return;
 
   const WELCOME_CHANNEL_ID = "1486100560494203183";
 
@@ -4218,7 +4244,7 @@ client.on('guildMemberAdd', async (member) => {
 
 // ================= نظام الوداع للفراعنة =================
 client.on('guildMemberRemove', async (member) => {
-  if (!_dedupe(_recentLeaves, `${member.guild.id}-${member.id}`)) return;
+  if (!_dedupeLeave(`${member.guild.id}-${member.id}`)) return;
 
   const WELCOME_CHANNEL_ID = "1486100560494203183";
 
