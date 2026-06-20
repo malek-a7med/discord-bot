@@ -1,0 +1,10 @@
+242a243,251
+>         // ✅ FIX: لو مفيش ADMIN_CHANNEL_ID متظبط، البوت كان حيقفل كل القنوات
+>         //   بدون ما يقدر يبلّغ أي حد — ده أخطر من الـ raid نفسه. نوقف هنا ونلوج بس.
+>         if (!this.isEnabled()) {
+>           this.logger.warn(
+>             `[Anti-Raid] اكتشفنا ${recentJoins.length} انضمام مريب في ${member.guild?.name ?? guildId} ` +
+>             `بس ADMIN_CHANNEL_ID/OWNER_ID مش متظبطين — تجاهلنا القفل التلقائي عشان منقفلش بدون تنبيه.`
+>           );
+>           return;
+>         }

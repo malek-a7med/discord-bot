@@ -756,12 +756,6 @@ const activeGames = new Collection();
 // إجراءات التأديب المعلقة — تنتظر تأكيد المشرف
 const pendingModActions = new Map(); // actionId → { type, targetId, reason, duration, modId, guildId }
 let autoModEnabled = true; // تشغيل/إيقاف Auto-Mod
-// ✅ FIX: ModerationListener كانت معمولة new بس مش متربطة بأي event (كانت ميتة فعليًا).
-//   بنفعّل بس anti-raid (scanGuildJoin في guildMemberAdd) لأنها الميزة الوحيدة الناقصة فعلاً.
-//   anti-spam وanti-link اللي جوه moderation.scanMessage() متعمدين مانستخدمهاش —
-//   auto-mod.js (helpers/auto-mod.js) بيغطي حماية المحتوى فعليًا، واستخدام النظامين مع بعض
-//   ممكن يعمل تحذيرات/عقوبات مزدوجة على نفس الرسالة. لو احتجت anti-spam/anti-link من هنا
-//   لاحقًا، لازم تنسّق الـ thresholds بينهم الأول.
 const moderation = new ModerationListener(client, db, logger);
 
 // ───────────────────────────────────────────────────────────────
@@ -2148,10 +2142,7 @@ client.on("interactionCreate", async (interaction) => {
 
       // Music Commands (New System)
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      // ✅ FIX: ضممنا أوامر الموسيقى العربية (تشغيل/إيقاف/تخطي/قائمة-تشغيل/توقف-مؤقت/استئناف)
-      //   لنفس الـ array عشان تستخدم بالظبط نفس منطق الـ DM proxy المستخدم مع الأوامر الإنجليزية
-      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume",
-                          "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف"];
+      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume"];
       if (MUSIC_CMDS.includes(cmd)) {
         let musicInteraction = interaction;
         if (isFromDM && guild) {
@@ -2166,55 +2157,27 @@ client.on("interactionCreate", async (interaction) => {
             }
           });
         }
-
-        // ✅ FIX: أمر "تشغيل" العربي بيستخدم اسم الخيار "بحث" مش "query".
-        //   نلف الـ interaction بـ proxy خفيف يحوّل getString('query') → getString('بحث')
-        //   تلقائيًا، عشان handlePlay الأصلية تشتغل من غير أي تعديل في commands/music.js
-        if (cmd === "تشغيل") {
-          musicInteraction = new Proxy(musicInteraction, {
-            get(target, prop) {
-              if (prop === "options") {
-                const opts = target.options;
-                return new Proxy(opts, {
-                  get(optTarget, optProp) {
-                    if (optProp === "getString") {
-                      return (name, ...rest) => {
-                        if (name === "query") return optTarget.getString("بحث", ...rest);
-                        return optTarget.getString(name, ...rest);
-                      };
-                    }
-                    const v = optTarget[optProp];
-                    return typeof v === "function" ? v.bind(optTarget) : v;
-                  }
-                });
-              }
-              const val = target[prop];
-              return typeof val === "function" ? val.bind(target) : val;
-            }
-          });
-        }
-
-        if (cmd === "play" || cmd === "تشغيل") {
+        if (cmd === "play") {
           const { handlePlay } = await import("./commands/music.js");
           return await handlePlay(musicInteraction);
         }
-        if (cmd === "skip" || cmd === "تخطي") {
+        if (cmd === "skip") {
           const { handleSkip } = await import("./commands/music.js");
           return await handleSkip(musicInteraction);
         }
-        if (cmd === "stop" || cmd === "إيقاف") {
+        if (cmd === "stop") {
           const { handleStop } = await import("./commands/music.js");
           return await handleStop(musicInteraction);
         }
-        if (cmd === "queue" || cmd === "قائمة-تشغيل") {
+        if (cmd === "queue") {
           const { handleQueue } = await import("./commands/music.js");
           return await handleQueue(musicInteraction);
         }
-        if (cmd === "pause" || cmd === "توقف-مؤقت") {
+        if (cmd === "pause") {
           const { handlePause } = await import("./commands/music.js");
           return await handlePause(musicInteraction);
         }
-        if (cmd === "resume" || cmd === "استئناف") {
+        if (cmd === "resume") {
           const { handleResume } = await import("./commands/music.js");
           return await handleResume(musicInteraction);
         }
@@ -3253,7 +3216,8 @@ client.on("interactionCreate", async (interaction) => {
         const gid = interaction.customId;
         if (gid === "ghub_rlt" || gid === "ftr_rlt")   return await handleRouletteCommand(interaction, db);
         if (gid === "ghub_maf" || gid === "ftr_maf")   return await handleMafiaCommand(interaction, db);
-        if (gid === "ghub_ttt")                         return await handleTTTCommand(interaction, db);
+        if (gid === "ghub_ttt")                         return await handleTTTCommand(interaction, db, false);
+        if (gid === "ghub_ttt_ai")                      return await handleTTTCommand(interaction, db, true);
         if (gid === "ghub_cdn" || gid === "ftr_cdn")   return await handleCodenamesCommand(interaction);
         if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
         if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
@@ -4272,12 +4236,6 @@ function _dedupeLeave(key, ttl = 10000) {
 }
 
 client.on('guildMemberAdd', async (member) => {
-  // ✅ FIX: تفعيل anti-raid من moderation-listener.js (كانت معمولة new بس مش مربوطة بأي event)
-  //   بنستدعيها هنا بشكل مستقل عن منطق الترحيب عشان تشتغل دايمًا حتى لو الترحيب اتعمله dedupe
-  moderation.scanGuildJoin(member).catch((err) => {
-    logger.error("[Anti-Raid] خطأ في فحص انضمام العضو:", err);
-  });
-
   if (!_dedupeWelcome(`${member.guild.id}-${member.id}`)) return;
 
   const WELCOME_CHANNEL_ID = "1486100560494203183";
