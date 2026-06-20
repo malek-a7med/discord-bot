@@ -1726,9 +1726,32 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
-  const isMentioned  = msg.mentions.has(client.user.id);
   const isOwner      = config.isOwner(msg.author.id);
   const calledByName = /زنجي/i.test(msg.content) && isOwner;
+
+  // تحقق من الـ mention بشكل أدق
+  let isMentioned = msg.mentions.has(client.user.id);
+
+  // لو الرسالة "reply" على رسالة تانية، تحقق إن المنشن صريح في النص
+  // (مش بس من زرار "Mention Reply" اللي بيحصل لما يعملوا reply على رسالتهم)
+  if (isMentioned && msg.reference) {
+    const explicitMentionInContent =
+      msg.content.includes(`<@${client.user.id}>`) ||
+      msg.content.includes(`<@!${client.user.id}>`);
+
+    if (!explicitMentionInContent) {
+      // المنشن جاي من الـ reply mechanism بس — تحقق لو الـ reply على رسالة البوت
+      try {
+        const refMsg = await msg.channel.messages.fetch(msg.reference.messageId).catch(() => null);
+        if (!refMsg || refMsg.author.id !== client.user.id) {
+          // مش reply على رسالة البوت ومفيش mention صريح → تجاهل
+          isMentioned = false;
+        }
+      } catch {
+        isMentioned = false;
+      }
+    }
+  }
 
   if (!isMentioned && !calledByName) return;
 

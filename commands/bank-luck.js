@@ -237,7 +237,18 @@ export async function handleBankLuckButton(interaction, db) {
   const gameId = full.split("_").slice(2).join("_");
 
   const state = luckGames.get(gameId);
-  if (!state) return interaction.reply({ content: "❌ اللعبة انتهت أو ما لقتهاش!", flags: 64 });
+  if (!state) {
+    // اللعبة مش موجودة (ربما البوت اعاد التشغيل) — شيل الأزرار من الرسالة
+    try {
+      await interaction.update({
+        content: "❌ انتهت اللعبة أو البوت اتعمل له restart — ابدأ لعبة جديدة من `/الألعاب`!",
+        components: [],
+      });
+    } catch {
+      await interaction.reply({ content: "❌ اللعبة انتهت — ابدأ لعبة جديدة!", flags: 64 });
+    }
+    return;
+  }
 
   if (second === "join") {
     if (state.phase !== "lobby")              return interaction.reply({ content: "❌ اللعبة بدأت!", flags: 64 });
