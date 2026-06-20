@@ -162,7 +162,12 @@ async function revealGarticChains(interaction, gameId, state) {
     const msg = await interaction.channel?.messages?.fetch(state.messageId).catch(() => null);
     if (msg) await msg.delete().catch(() => {});
   } catch {}
-  await interaction.channel?.send({ embeds: embeds.slice(0, 10) }).catch(() => {});
+  await interaction.channel?.send({
+    embeds: embeds.slice(0, 10),
+    components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`replay_gar_${state.channelId}`).setLabel("🔄 لعبة هاتف مكسور جديدة").setStyle(ButtonStyle.Primary),
+    )],
+  }).catch(() => {});
   await interaction.reply({ content: "📞 اللعبة خلصت! شوف النتايج فوق ☝️", flags: 64 }).catch(() => {});
 }
 
@@ -603,6 +608,10 @@ async function endMemeGame(interaction, gameId, state) {
         .setStyle(ButtonStyle.Link)
     ));
   }
+
+  components.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`replay_meme_${state.channelId}`).setLabel("🔄 لعبة ميم جديدة").setStyle(ButtonStyle.Primary),
+  ));
 
   const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
   if (msg) await msg.edit({ embeds: [endEmbed], components }).catch(() => {});

@@ -329,7 +329,9 @@ async function endGame(client, state) {
 
   const msg = await fetchMsg(client, state.channelId, state.messageId);
   if (msg) {
-    await msg.edit({ embeds: [scoreboardEmbed(state)], components: [] }).catch(() => {});
+    await msg.edit({ embeds: [scoreboardEmbed(state)], components: [new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`replay_life_${state.channelId}`).setLabel("🔄 لعبة حياة جديدة").setStyle(ButtonStyle.Primary),
+    )] }).catch(() => {});
   }
 
   if (client._db) {

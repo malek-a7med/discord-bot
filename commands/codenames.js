@@ -251,8 +251,29 @@ export async function handleCodenamesButton(interaction) {
     return interaction.showModal(modal);
   }
 
-  // ── لعب اللعبة الأصلية — فورم رابط الدعوة ─────────────────
+  // ── لعب اللعبة الأصلية — أول افتح الموقع، بعدين ابعت رابط الدعوة ─
   if (action === "realplay") {
+    return interaction.reply({
+      flags: 64,
+      embeds: [new EmbedBuilder()
+        .setColor(0x3498db)
+        .setTitle("🌐 العب كود نيمز الأصلي!")
+        .setDescription("**الخطوات:**\n1️⃣ افتح الموقع واعمل روم جديد\n2️⃣ لما تاخد رابط الدعوة اضغط **📨 ابعت رابط الدعوة**\n3️⃣ الرابط هيتبعت للكل في الشات!")
+      ],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel("🃏 افتح كود نيمز")
+          .setURL("https://codenames.game")
+          .setStyle(ButtonStyle.Link),
+        new ButtonBuilder()
+          .setCustomId(`cdn_sendlink_${gameId}`)
+          .setLabel("📨 ابعت رابط الدعوة")
+          .setStyle(ButtonStyle.Primary),
+      )],
+    });
+  }
+
+  if (action === "sendlink") {
     const modal = new ModalBuilder()
       .setCustomId(`cdninvite_${gameId}`)
       .setTitle("🌐 لعب كود نيمز الأصلي");

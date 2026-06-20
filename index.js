@@ -3176,6 +3176,21 @@ client.on("interactionCreate", async (interaction) => {
         return await handleBankLuckButton(interaction, db);
       }
 
+      // ─── أزرار تجديد اللعبة ───────────────────────────────────────
+      if (interaction.customId.startsWith("replay_")) {
+        const parts = interaction.customId.split("_");
+        const game  = parts[1];
+        if (game === "rlt")  return await handleRouletteCommand(interaction, db);
+        if (game === "maf")  return await handleMafiaCommand(interaction, db);
+        if (game === "gar")  return await handleGarticCommand(interaction);
+        if (game === "meme") return await handleMemeCommand(interaction);
+        if (game === "life") return await handleBankLifeCommand(interaction);
+        if (game === "luck") return await handleBankLuckCommand(interaction);
+        if (game === "cdn")  return await handleCodenamesCommand(interaction);
+        if (game === "quiz") return await startQuizGame(interaction);
+        return interaction.reply({ content: "❌ مش عارف أجدد اللعبة دي!", flags: 64 });
+      }
+
       // ─── أزرار هب الألعاب + احدث المميزات ───────────────────────
       if (interaction.customId.startsWith("ghub_") || interaction.customId.startsWith("ftr_")) {
         const gid = interaction.customId;

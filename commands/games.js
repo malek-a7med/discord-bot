@@ -355,7 +355,9 @@ export async function handleRouletteButton(interaction, db) {
           .setTitle("🏆 روليت — فاز اللاعب الأخير!")
           .setDescription(`${eliminationMsg}\n\n👑 **الفائز: <@${winner}>**\n${COIN} ربح **${prize} كوينز**!`)
           .setTimestamp();
-        return interaction.update({ embeds: [winEmbed], components: [] });
+        return interaction.update({ embeds: [winEmbed], components: [new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId(`replay_rlt_${state.channelId}`).setLabel("🔄 لعبة روليت جديدة").setStyle(ButtonStyle.Primary),
+        )] });
       }
 
       // تحديث الدور
@@ -756,7 +758,9 @@ async function endMafiaGame(interaction, gameId, state, winner, previousEmbed) {
     )
     .setTimestamp();
 
-  await interaction.editReply({ embeds: [previousEmbed, endEmbed], components: [] });
+  await interaction.editReply({ embeds: [previousEmbed, endEmbed], components: [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`replay_maf_${state.channelId}`).setLabel("🔄 لعبة مافيا جديدة").setStyle(ButtonStyle.Primary),
+  )] });
 }
 
 function buildRolesReveal(state) {

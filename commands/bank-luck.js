@@ -224,7 +224,9 @@ async function endGame(interaction, state, lastEmbed) {
     .setFooter({ text: `🍀 بنك الحظ — الفايز بياخد ${WIN_REWARD} 🪙` })
     .setTimestamp();
 
-  await interaction.update({ embeds: [lastEmbed, endEmbed], components: [] });
+  await interaction.update({ embeds: [lastEmbed, endEmbed], components: [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`replay_luck_${state.channelId}`).setLabel("🔄 لعبة بنك حظ جديدة").setStyle(ButtonStyle.Primary),
+  )] });
 
   if (interaction.client?._db) {
     try { interaction.client._db.addCoins(winner, WIN_REWARD); } catch {}
