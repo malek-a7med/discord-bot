@@ -27,8 +27,7 @@ import {
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
-import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
-import { handleBattleCommand, handleBattleButton } from "./commands/battle.js";
+import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleRPSButton, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
 import { handleBankLifeCommand, handleBankLifeButton, lifeGames, lifeChannelMap } from "./commands/bank-life.js";
 import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap } from "./commands/bank-luck.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
@@ -307,7 +306,7 @@ const LEGACY_COMMANDS = [
     .addStringOption((o) => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم مثل red)"))
     .addBooleanOption((o) => o.setName("ظهور-منفصل").setDescription("يظهر الرول منفصلاً في قائمة الأعضاء")),
   new SlashCommandBuilder()
-    .setName("تعديل-رول")
+    .setName("تعديل-الرول")
     .setDescription("تعديل رتبة موجودة (صلاحيات + اسم + لون) [إدارة]")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .addRoleOption((o) => o.setName("الرول").setDescription("الرتبة المراد تعديلها").setRequired(true))
@@ -580,14 +579,14 @@ function validateLatestFeatures(allCommands) {
       "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","✏️ تعديل رسالة",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات",
-      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-رول",
+      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة",
       "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف",
       "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
-      "مصارعة","روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ",
+      "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
     ];
@@ -2413,10 +2412,6 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
       }
 
-      if (cmd === "مصارعة") {
-        return await handleBattleCommand(interaction, db, geminiModel());
-      }
-
       if (cmd === "متجر") {
         const embed = new EmbedBuilder()
           .setColor(0xffd700)
@@ -2621,7 +2616,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── تعديل رول (صلاحيات + اسم + لون) ────────────────────────
-      if (cmd === "تعديل-رول") {
+      if (cmd === "تعديل-الرول") {
         await interaction.deferReply({ ephemeral: true });
         const targetRole = interaction.options.getRole("الرول");
         const roleType   = interaction.options.getString("نوع");
@@ -3147,9 +3142,9 @@ client.on("interactionCreate", async (interaction) => {
         return await handleRPSBasicButton(interaction);
       }
 
-      // ─── أزرار مصارعة ────────────────────────────────────────────
-      if (interaction.customId.startsWith("btl_")) {
-        return await handleBattleButton(interaction, db);
+      // ─── أزرار حجر ورقة مقص الخارقة (accept/decline/open) ──────
+      if (interaction.customId.startsWith("rps_")) {
+        return await handleRPSButton(interaction);
       }
 
       // ─── أزرار الحياة ────────────────────────────────────────────
@@ -3174,7 +3169,6 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
         if (gid === "ghub_rps_easy")                    return await handleRPSBasicCommand(interaction);
         if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
-        if (gid === "ghub_battle")                      return await handleBattleCommand(interaction, db);
         if (gid === "ghub_banklife")                    return await handleBankLifeCommand(interaction);
         if (gid === "ghub_bankluck")                    return await handleBankLuckCommand(interaction);
         if (gid === "ghub_cancel") {

@@ -38,11 +38,6 @@ export const LATEST_FEATURES = [
     inline: false,
   },
   {
-    name: "🪖 مصارعة في مركز الألعاب — جديد!",
-    value: "حجر ورقة مقص كلاسيك — تحدّى حد أو العب ضد زنجي مباشرة والفايز يكسب كوينز!\n→ من `/الألعاب` بس",
-    inline: false,
-  },
-  {
     name: "🗳️ تغيير الصوت في الاستفتاء — جديد!",
     value: "دلوقتي تقدر تغيّر صوتك في الاستفتاء لو غيّرت رأيك — مش مقفول على اختيارك الأول!\n→ `/استفتاء`",
     inline: false,
@@ -152,7 +147,6 @@ function buildHubEmbed() {
       `🧠 **مسابقة** — أسئلة ثقافية، أول واحد يجاوب صح يكسب الكوينز\n` +
       `🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك، بدون AI\n` +
       `✂️ **ح.و.م الخارقة** — اختار أي حاجة في الكون والـ AI يحكم!\n` +
-      `🪖 **مصارعة** — تحدّى حد بحجر ورقة مقص وكسب كوينز!\n` +
       `🌍 **الحياة** — عيش حياة كاملة (تعليم→شغل→أسرة→استثمار→تقاعد) واكسب أعلى نقاط!\n` +
       `🎰 **بنك الحظ** — دوّر عجلة الحظ وارفع رصيدك — أكتر فلوس يفوز!\n\n` +
       `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
@@ -177,7 +171,6 @@ function buildHubRows() {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("ghub_battle").setLabel("🪖 مصارعة").setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🌍 الحياة").setStyle(ButtonStyle.Success),
     ),
     new ActionRowBuilder().addComponents(
