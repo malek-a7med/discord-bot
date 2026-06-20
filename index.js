@@ -1654,10 +1654,6 @@ client.on("messageCreate", async (msg) => {
     // 🃏 إشارات قائد كود نيمز (clue parsing)
     if (handleCodenamesMessage(msg)) return;
 
-    // Autonomous Moderation Scanning (spam + links)
-    if (moderation.isEnabled()) {
-      await moderation.scanMessage(msg);
-    }
   }
 
   // XP فقط في السيرفر — حماية مزدوجة من التكرار (memory + DB)

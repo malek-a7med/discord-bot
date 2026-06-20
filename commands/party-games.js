@@ -202,8 +202,29 @@ export async function handleGarticButton(interaction) {
     return interaction.update({ embeds: [buildGarticLobbyEmbed(state)], components: buildGarticLobbyRows(gameId) });
   }
 
-  // لعب اللعبة الأصلية — فورم رابط الدعوة
+  // لعب اللعبة الأصلية — أول افتح الموقع، بعدين ابعت رابط الدعوة
   if (action === "realplay") {
+    return interaction.reply({
+      flags: 64,
+      embeds: [new EmbedBuilder()
+        .setColor(0xe91e63)
+        .setTitle("🌐 العب الهاتف المكسور الأصلي!")
+        .setDescription("**الخطوات:**\n1️⃣ افتح الموقع واعمل روم جديد\n2️⃣ لما تاخد رابط الدعوة اضغط **📨 ابعت رابط الدعوة**\n3️⃣ الرابط هيتبعت للكل في الشات!")
+      ],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel("🎮 افتح الهاتف المكسور")
+          .setURL("https://garticphone.com/ar")
+          .setStyle(ButtonStyle.Link),
+        new ButtonBuilder()
+          .setCustomId(`gar_sendlink_${gameId}`)
+          .setLabel("📨 ابعت رابط الدعوة")
+          .setStyle(ButtonStyle.Primary),
+      )],
+    });
+  }
+
+  if (action === "sendlink") {
     const modal = new ModalBuilder()
       .setCustomId(`garplay_${gameId}`)
       .setTitle("🌐 لعب الهاتف المكسور الأصلي");
@@ -628,8 +649,29 @@ export async function handleMemeButton(interaction, db) {
   const state = memeGames.get(gameId);
   if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
 
-  // لعب اللعبة الأصلية — فورم رابط الدعوة
+  // لعب اللعبة الأصلية — أول افتح الموقع، بعدين ابعت رابط الدعوة
   if (action === "realplay") {
+    return interaction.reply({
+      flags: 64,
+      embeds: [new EmbedBuilder()
+        .setColor(0xf39c12)
+        .setTitle("🌐 العب صنع الميم الأصلي!")
+        .setDescription("**الخطوات:**\n1️⃣ افتح الموقع واعمل روم جديد\n2️⃣ لما تاخد رابط الدعوة اضغط **📨 ابعت رابط الدعوة**\n3️⃣ الرابط هيتبعت للكل في الشات!")
+      ],
+      components: [new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel("😂 افتح صنع الميم")
+          .setURL("https://makeitmeme.com")
+          .setStyle(ButtonStyle.Link),
+        new ButtonBuilder()
+          .setCustomId(`meme_sendlink_${gameId}`)
+          .setLabel("📨 ابعت رابط الدعوة")
+          .setStyle(ButtonStyle.Primary),
+      )],
+    });
+  }
+
+  if (action === "sendlink") {
     const modal = new ModalBuilder()
       .setCustomId(`memeplay_${gameId}`)
       .setTitle("🌐 لعب صنع الميم الأصلي");
