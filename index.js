@@ -559,7 +559,7 @@ const LEGACY_COMMANDS = [
         .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
     ),
   pollCommand,
-  bankSavingsCommand.data,
+  new SlashCommandBuilder().setName("لعبة-الحياة").setDescription("🌍 عيش رحلة حياتك — 8 مواقف تحدد مصيرك!"),
   bankLuckEgCommand.data,
   new ContextMenuCommandBuilder()
     .setName("✏️ تعديل رسالة")
@@ -590,7 +590,7 @@ function validateLatestFeatures(allCommands) {
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
-      "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","بنك-الادخار","بنك-الحظ-مصري",
+      "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","لعبة-الحياة","بنك-الحظ-مصري",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
     ];
@@ -2094,7 +2094,7 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "استفتاء")      return await handlePollCommand(interaction);
       if (cmd === "الألعاب")     return await handleGamesHubCommand(interaction);
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
-      if (cmd === "بنك-الادخار")  return await bankSavingsCommand.execute(interaction, db);
+      if (cmd === "لعبة-الحياة")   return await handleBankLifeCommand(interaction);
       if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
       if (cmd === "تغيير-طريقة-الكلام") {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
@@ -3224,7 +3224,7 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_rps_easy")                    return await handleRPSBasicCommand(interaction);
         if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
         if (gid === "ghub_banklife")                    return await handleBankLifeCommand(interaction);
-        if (gid === "ghub_bankluck")                    return await handleBankLuckCommand(interaction);
+        if (gid === "ghub_bankluck")                    return await bankLuckEgCommand.execute(interaction, db);
         if (gid === "ghub_cancel") {
           const cid = interaction.channel.id;
           if (channelGames.has(cid))       { channelGames.delete(cid); }

@@ -13,8 +13,8 @@ import {
 // ══════════════════════════════════════════════════════════════
 export const LATEST_FEATURES = [
   {
-    name: "🏦 بنك الادخار — جديد!",
-    value: "احفظ كوينزك في البنك واكسب **فايدة يومية 5%** (حد أقصى 50% من رصيدك)!\n💰 إيداع | 💸 سحب | 🔁 تحويل لأي عضو | 🎁 تحصيل الفايدة\n→ `/بنك-الادخار`",
+    name: "🌍 لعبة الحياة — جديد!",
+    value: "عيش رحلة حياتك كاملة! 8 مواقف واقعية بتظهر للكل في نفس الوقت\n⚡ 20 ثانية كل موقف تختار من 3 خيارات (جريء / متوازن / آمن)\n🏆 أعلى نقاط في الآخر يكسب الكوينز!\n→ `/لعبة-الحياة` أو من `/الألعاب`",
     inline: false,
   },
   {
@@ -157,8 +157,8 @@ function buildHubEmbed() {
       `🧠 **مسابقة** — أسئلة ثقافية، أول واحد يجاوب صح يكسب الكوينز\n` +
       `🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك، بدون AI\n` +
       `✂️ **ح.و.م الخارقة** — اختار أي حاجة في الكون والـ AI يحكم!\n` +
-      `🌍 **الحياة** — عيش حياة كاملة (تعليم→شغل→أسرة→استثمار→تقاعد) واكسب أعلى نقاط!\n` +
-      `🎰 **بنك الحظ** — دوّر عجلة الحظ وارفع رصيدك — أكتر فلوس يفوز!\n\n` +
+      `🌍 **الحياة** — 8 مواقف حياة واقعية، اختار صح واكسب أعلى نقاط!\n` +
+      `🎰 **بنك الحظ المصري** — كرتونة بنك الحظ الأوتنتك، دوّر العجلة وارفع رصيدك!\n\n` +
       `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
     )
     .setFooter({ text: "💡 تحتاج 3+ لاعبين لمعظم الألعاب — دعوّ أصحابك!" })
@@ -184,7 +184,7 @@ function buildHubRows() {
       new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🌍 الحياة").setStyle(ButtonStyle.Success),
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("ghub_bankluck").setLabel("🎰 بنك الحظ").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("ghub_bankluck").setLabel("🎰 بنك الحظ المصري").setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء").setStyle(ButtonStyle.Danger),
     ),
   ];
