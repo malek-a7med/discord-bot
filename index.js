@@ -2824,7 +2824,152 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "مساعدة") {
-        return interaction.reply({ content: "🤖 **جميع الأوامر بتشتغل بـ السلاش (`/`):**\nعامة: `ping`, `hello`, `serverinfo`\nنظام مالي: `بروفايل`, `محفظة`, `يومي`, `ليدربورد`\nميوزك: `play`, `skip`, `stop`, `queue`\n🎁 متقدم: `clean_chapter`, `translate_chapter`\n🧹 تنظيف سريع: `تنظيف_صورة`, `تنظيف_رابط`, `استخراج_نص`" });
+        const HELP_PAGES = [
+          {
+            title: "🌐 الأوامر العامة",
+            color: 0x3498db,
+            fields: [
+              { name: "/ping", value: "فحص سرعة البوت (latency)", inline: true },
+              { name: "/hello", value: "تحية من البوت 👋", inline: true },
+              { name: "/serverinfo", value: "معلومات السيرفر", inline: true },
+              { name: "/userinfo [@عضو]", value: "معلومات عن أي عضو", inline: true },
+              { name: "/roll", value: "رمي نرد عشوائي 🎲", inline: true },
+              { name: "/صورة [وصف]", value: "توليد صورة بالـ AI 🖼️", inline: true },
+              { name: "/القوانين", value: "قوانين السيرفر 📋", inline: true },
+              { name: "/اقتراح [نص]", value: "اقتراح أو مشكلة أو تعليق", inline: true },
+              { name: "/زنجي [رسالة]", value: "دردشة مع الـ AI 🤖", inline: true },
+              { name: "/مساعدة", value: "القائمة دي 😄", inline: true },
+              { name: "/احدث-المميزات", value: "آخر 5 تحديثات في البوت ✨", inline: true },
+              { name: "/حالة-البوت", value: "إحصائيات وأداء البوت 📊", inline: true },
+            ],
+          },
+          {
+            title: "💰 الاقتصاد والكوينز",
+            color: 0xf1c40f,
+            fields: [
+              { name: "/بروفايل [@عضو]", value: "اللفل والـ XP والكوينز والبنك", inline: true },
+              { name: "/محفظة", value: "رصيدك بالكوينز بسرعة 👛", inline: true },
+              { name: "/يومي", value: "مكافأة يومية (كل 24 ساعة) 🎁", inline: true },
+              { name: "/ليدربورد [coins/xp]", value: "أفضل 10 مستخدمين 🏆", inline: true },
+              { name: "/متجر", value: "شراء أدوار بالكوينز 🛒", inline: true },
+              { name: "/شراء [الرتبة]", value: "شراء رتبة محددة", inline: true },
+              { name: "/إعطاء @عضو [مبلغ]", value: "إعطاء كوينز (أدمن فقط) 💸", inline: true },
+              { name: "/متجر-قدرات", value: "شراء قدرات خاصة للألعاب ⚡", inline: true },
+              { name: "/قدراتي", value: "عرض القدرات اللي عندك الحالية", inline: true },
+              { name: "/تحدي-يومي", value: "التحديات الأسبوعية 🎯 (كل جمعة)", inline: true },
+            ],
+          },
+          {
+            title: "🎮 الألعاب",
+            color: 0x9b59b6,
+            fields: [
+              { name: "/الألعاب", value: "مركز كل الألعاب — اضغط وابدأ! 🕹️", inline: true },
+              { name: "/اكس-اوه [@خصم]", value: "تيك تاك تو — فاضي = ضد AI 🤖", inline: true },
+              { name: "/روليت", value: "روليت روسية 🔫 (من /الألعاب)", inline: true },
+              { name: "/مافيا", value: "لعبة المافيا 🕵️ (من /الألعاب)", inline: true },
+              { name: "/كود-نيمز", value: "كود نيمز — فريقين وكلمات سرية 🃏", inline: true },
+              { name: "/الهاتف-المكسور", value: "الهاتف المكسور المضحك 📞", inline: true },
+              { name: "/صنع-الميم", value: "صنع الميم + تصويت 😂", inline: true },
+              { name: "/استفتاء", value: "إنشاء استفتاء في الروم 🗳️", inline: true },
+              { name: "/بنك-الحظ-مصري", value: "عجلة الحظ المصرية 🎰", inline: true },
+              { name: "/حياة", value: "نظام اقتصادي مستمر 🌍 (وظائف + ممتلكات)", inline: true },
+            ],
+          },
+          {
+            title: "🛡️ المودريشن",
+            color: 0xe74c3c,
+            fields: [
+              { name: "/تحذير @عضو [سبب]", value: "إعطاء تحذير لعضو ⚠️", inline: true },
+              { name: "/اسكات @عضو [دق] [سبب]", value: "إسكات مؤقت 🔇", inline: true },
+              { name: "/طرد @عضو [سبب]", value: "طرد عضو (مع تأكيد) 👢", inline: true },
+              { name: "/تبنيد @عضو [سبب]", value: "بان عضو (مع تأكيد) 🔨", inline: true },
+              { name: "/مسح [عدد]", value: "مسح رسائل (حتى 10,000) 🗑️", inline: true },
+              { name: "/مسح-الكل", value: "مسح الروم بالكامل ⚠️", inline: true },
+              { name: "/تحذيرات [@عضو]", value: "عرض سجل تحذيرات عضو 📋", inline: true },
+              { name: "/auto-mod [حالة]", value: "تشغيل/إيقاف نظام المراقبة 🤖", inline: true },
+              { name: "/رفع-بلوك @عضو", value: "رفع البلوك عن عضو", inline: true },
+              { name: "/قائمة-مبلوكين", value: "قائمة الأعضاء المبلوكين", inline: true },
+            ],
+          },
+          {
+            title: "🎵 الموسيقى  ·  🖼️ المانجا",
+            color: 0x1abc9c,
+            fields: [
+              { name: "─── 🎵 الموسيقى ───", value: "\u200b", inline: false },
+              { name: "/تشغيل [رابط/اسم]", value: "تشغيل أغنية من YouTube 🎶", inline: true },
+              { name: "/إيقاف", value: "إيقاف الموسيقى والخروج ⏹️", inline: true },
+              { name: "/تخطي", value: "تخطي الأغنية الحالية ⏭️", inline: true },
+              { name: "/قائمة-تشغيل", value: "عرض قائمة الأغاني 📃", inline: true },
+              { name: "/توقف-مؤقت", value: "إيقاف مؤقت ⏸️", inline: true },
+              { name: "/استئناف", value: "استكمال التشغيل ▶️", inline: true },
+              { name: "─── 🖼️ المانجا ───", value: "\u200b", inline: false },
+              { name: "/مانهوا-إنشاء [اسم]", value: "إنشاء قاموس مصطلحات مانهوا 📖", inline: true },
+              { name: "/مانهوا-إضافة-مصطلح", value: "إضافة مصطلح للقاموس ➕", inline: true },
+              { name: "/مانهوا-عرض-المصطلحات", value: "عرض مصطلحات مانهوا 📚", inline: true },
+            ],
+          },
+          {
+            title: "⚙️ الإدارة  ·  👑 الأونر",
+            color: 0x2c3e50,
+            fields: [
+              { name: "─── ⚙️ إدارة السيرفر ───", value: "\u200b", inline: false },
+              { name: "/انشاء-رول [اسم] [نوع] [لون]", value: "إنشاء رول جديد 🏷️", inline: true },
+              { name: "/تعديل-الرول", value: "تعديل اسم أو لون أو صلاحيات رول", inline: true },
+              { name: "/ترحيب-قناة [قناة]", value: "تحديد قناة رسائل الترحيب 👋", inline: true },
+              { name: "/رتب-المستويات", value: "إدارة أدوار المستويات التلقائية", inline: true },
+              { name: "/قناة-اللوجز [قناة]", value: "تحديد قناة سجلات المودريشن", inline: true },
+              { name: "/تعديل-إعلان", value: "تعديل رسالة إعلان موجودة ✏️", inline: true },
+              { name: "/لوحة-إدارة", value: "لوحة تحكم سريعة للأدمن 🖥️", inline: true },
+              { name: "/لوحة-اقتراحات", value: "نشر/تجديد لوحة الاقتراحات 📌", inline: true },
+              { name: "─── 👑 الأونر فقط ───", value: "\u200b", inline: false },
+              { name: "/تغيير-طريقة-الكلام [أسلوب]", value: "شخصية البوت: محترم/حر/توكسيك 💬", inline: true },
+              { name: "/مفاتيح-جيميني", value: "إدارة مفاتيح Gemini API 🔑", inline: true },
+              { name: "/نسخة-احتياطية", value: "نسخة احتياطية يدوية للداتا 💾", inline: true },
+              { name: "/استرجاع [ملف]", value: "استرجاع نسخة احتياطية قديمة", inline: true },
+              { name: "/قناة-النسخ [قناة]", value: "قناة حفظ النسخ الاحتياطية", inline: true },
+              { name: "/رسالة-جماعية [نوع]", value: "إرسال رسالة جماعية 📢", inline: true },
+              { name: "/لوحة-dm", value: "لوحة تحكم عن بُعد عبر DM 🔒", inline: true },
+            ],
+          },
+        ];
+
+        const buildHelpEmbed = (page) => {
+          const p = HELP_PAGES[page];
+          return new EmbedBuilder()
+            .setColor(p.color)
+            .setTitle(`📖 دليل زنجي بوت — ${p.title}`)
+            .setDescription(`**كل الأوامر بتشتغل بالسلاش** \`/\` — اختار الفئة اللي تحتاجها 👇`)
+            .addFields(...p.fields)
+            .setFooter({ text: `📄 صفحة ${page + 1} من ${HELP_PAGES.length}  •  زنجي بوت` })
+            .setTimestamp();
+        };
+
+        const buildHelpButtons = (page) => {
+          const total = HELP_PAGES.length;
+          return [new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`help_page_${page - 1}`)
+              .setLabel("◀️ السابق")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(page === 0),
+            new ButtonBuilder()
+              .setCustomId("help_page_info")
+              .setLabel(`${page + 1} / ${total}`)
+              .setStyle(ButtonStyle.Primary)
+              .setDisabled(true),
+            new ButtonBuilder()
+              .setCustomId(`help_page_${page + 1}`)
+              .setLabel("التالي ▶️")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(page === total - 1),
+          )];
+        };
+
+        return interaction.reply({
+          embeds: [buildHelpEmbed(0)],
+          components: buildHelpButtons(0),
+          ephemeral: true,
+        });
       }
 
       if (cmd === "تحذيرات") {
@@ -3160,6 +3305,133 @@ client.on("interactionCreate", async (interaction) => {
   // التعامل مع الأزرار والمودال التفاعلية
   if (interaction.isButton()) {
     try {
+
+      // ─── أزرار المساعدة (التنقل بين الصفحات) ────────────────────
+      if (interaction.customId.startsWith("help_page_")) {
+        const page = parseInt(interaction.customId.replace("help_page_", ""), 10);
+        if (isNaN(page)) return;
+        const HELP_PAGES = [
+          {
+            title: "🌐 الأوامر العامة", color: 0x3498db,
+            fields: [
+              { name: "/ping", value: "فحص سرعة البوت (latency)", inline: true },
+              { name: "/hello", value: "تحية من البوت 👋", inline: true },
+              { name: "/serverinfo", value: "معلومات السيرفر", inline: true },
+              { name: "/userinfo [@عضو]", value: "معلومات عن أي عضو", inline: true },
+              { name: "/roll", value: "رمي نرد عشوائي 🎲", inline: true },
+              { name: "/صورة [وصف]", value: "توليد صورة بالـ AI 🖼️", inline: true },
+              { name: "/القوانين", value: "قوانين السيرفر 📋", inline: true },
+              { name: "/اقتراح [نص]", value: "اقتراح أو مشكلة أو تعليق", inline: true },
+              { name: "/زنجي [رسالة]", value: "دردشة مع الـ AI 🤖", inline: true },
+              { name: "/مساعدة", value: "القائمة دي 😄", inline: true },
+              { name: "/احدث-المميزات", value: "آخر 5 تحديثات في البوت ✨", inline: true },
+              { name: "/حالة-البوت", value: "إحصائيات وأداء البوت 📊", inline: true },
+            ],
+          },
+          {
+            title: "💰 الاقتصاد والكوينز", color: 0xf1c40f,
+            fields: [
+              { name: "/بروفايل [@عضو]", value: "اللفل والـ XP والكوينز والبنك", inline: true },
+              { name: "/محفظة", value: "رصيدك بالكوينز بسرعة 👛", inline: true },
+              { name: "/يومي", value: "مكافأة يومية (كل 24 ساعة) 🎁", inline: true },
+              { name: "/ليدربورد [coins/xp]", value: "أفضل 10 مستخدمين 🏆", inline: true },
+              { name: "/متجر", value: "شراء أدوار بالكوينز 🛒", inline: true },
+              { name: "/شراء [الرتبة]", value: "شراء رتبة محددة", inline: true },
+              { name: "/إعطاء @عضو [مبلغ]", value: "إعطاء كوينز (أدمن فقط) 💸", inline: true },
+              { name: "/متجر-قدرات", value: "شراء قدرات خاصة للألعاب ⚡", inline: true },
+              { name: "/قدراتي", value: "عرض القدرات اللي عندك الحالية", inline: true },
+              { name: "/تحدي-يومي", value: "التحديات الأسبوعية 🎯 (كل جمعة)", inline: true },
+            ],
+          },
+          {
+            title: "🎮 الألعاب", color: 0x9b59b6,
+            fields: [
+              { name: "/الألعاب", value: "مركز كل الألعاب — اضغط وابدأ! 🕹️", inline: true },
+              { name: "/اكس-اوه [@خصم]", value: "تيك تاك تو — فاضي = ضد AI 🤖", inline: true },
+              { name: "/روليت", value: "روليت روسية 🔫 (من /الألعاب)", inline: true },
+              { name: "/مافيا", value: "لعبة المافيا 🕵️ (من /الألعاب)", inline: true },
+              { name: "/كود-نيمز", value: "كود نيمز — فريقين وكلمات سرية 🃏", inline: true },
+              { name: "/الهاتف-المكسور", value: "الهاتف المكسور المضحك 📞", inline: true },
+              { name: "/صنع-الميم", value: "صنع الميم + تصويت 😂", inline: true },
+              { name: "/استفتاء", value: "إنشاء استفتاء في الروم 🗳️", inline: true },
+              { name: "/بنك-الحظ-مصري", value: "عجلة الحظ المصرية 🎰", inline: true },
+              { name: "/حياة", value: "نظام اقتصادي مستمر 🌍 (وظائف + ممتلكات)", inline: true },
+            ],
+          },
+          {
+            title: "🛡️ المودريشن", color: 0xe74c3c,
+            fields: [
+              { name: "/تحذير @عضو [سبب]", value: "إعطاء تحذير لعضو ⚠️", inline: true },
+              { name: "/اسكات @عضو [دق] [سبب]", value: "إسكات مؤقت 🔇", inline: true },
+              { name: "/طرد @عضو [سبب]", value: "طرد عضو (مع تأكيد) 👢", inline: true },
+              { name: "/تبنيد @عضو [سبب]", value: "بان عضو (مع تأكيد) 🔨", inline: true },
+              { name: "/مسح [عدد]", value: "مسح رسائل (حتى 10,000) 🗑️", inline: true },
+              { name: "/مسح-الكل", value: "مسح الروم بالكامل ⚠️", inline: true },
+              { name: "/تحذيرات [@عضو]", value: "عرض سجل تحذيرات عضو 📋", inline: true },
+              { name: "/auto-mod [حالة]", value: "تشغيل/إيقاف نظام المراقبة 🤖", inline: true },
+              { name: "/رفع-بلوك @عضو", value: "رفع البلوك عن عضو", inline: true },
+              { name: "/قائمة-مبلوكين", value: "قائمة الأعضاء المبلوكين", inline: true },
+            ],
+          },
+          {
+            title: "🎵 الموسيقى  ·  🖼️ المانجا", color: 0x1abc9c,
+            fields: [
+              { name: "─── 🎵 الموسيقى ───", value: "\u200b", inline: false },
+              { name: "/تشغيل [رابط/اسم]", value: "تشغيل أغنية من YouTube 🎶", inline: true },
+              { name: "/إيقاف", value: "إيقاف الموسيقى والخروج ⏹️", inline: true },
+              { name: "/تخطي", value: "تخطي الأغنية الحالية ⏭️", inline: true },
+              { name: "/قائمة-تشغيل", value: "عرض قائمة الأغاني 📃", inline: true },
+              { name: "/توقف-مؤقت", value: "إيقاف مؤقت ⏸️", inline: true },
+              { name: "/استئناف", value: "استكمال التشغيل ▶️", inline: true },
+              { name: "─── 🖼️ المانجا ───", value: "\u200b", inline: false },
+              { name: "/مانهوا-إنشاء [اسم]", value: "إنشاء قاموس مصطلحات مانهوا 📖", inline: true },
+              { name: "/مانهوا-إضافة-مصطلح", value: "إضافة مصطلح للقاموس ➕", inline: true },
+              { name: "/مانهوا-عرض-المصطلحات", value: "عرض مصطلحات مانهوا 📚", inline: true },
+            ],
+          },
+          {
+            title: "⚙️ الإدارة  ·  👑 الأونر", color: 0x2c3e50,
+            fields: [
+              { name: "─── ⚙️ إدارة السيرفر ───", value: "\u200b", inline: false },
+              { name: "/انشاء-رول [اسم] [نوع] [لون]", value: "إنشاء رول جديد 🏷️", inline: true },
+              { name: "/تعديل-الرول", value: "تعديل اسم أو لون أو صلاحيات رول", inline: true },
+              { name: "/ترحيب-قناة [قناة]", value: "تحديد قناة رسائل الترحيب 👋", inline: true },
+              { name: "/رتب-المستويات", value: "إدارة أدوار المستويات التلقائية", inline: true },
+              { name: "/قناة-اللوجز [قناة]", value: "تحديد قناة سجلات المودريشن", inline: true },
+              { name: "/تعديل-إعلان", value: "تعديل رسالة إعلان موجودة ✏️", inline: true },
+              { name: "/لوحة-إدارة", value: "لوحة تحكم سريعة للأدمن 🖥️", inline: true },
+              { name: "/لوحة-اقتراحات", value: "نشر/تجديد لوحة الاقتراحات 📌", inline: true },
+              { name: "─── 👑 الأونر فقط ───", value: "\u200b", inline: false },
+              { name: "/تغيير-طريقة-الكلام [أسلوب]", value: "شخصية البوت: محترم/حر/توكسيك 💬", inline: true },
+              { name: "/مفاتيح-جيميني", value: "إدارة مفاتيح Gemini API 🔑", inline: true },
+              { name: "/نسخة-احتياطية", value: "نسخة احتياطية يدوية للداتا 💾", inline: true },
+              { name: "/استرجاع [ملف]", value: "استرجاع نسخة احتياطية قديمة", inline: true },
+              { name: "/قناة-النسخ [قناة]", value: "قناة حفظ النسخ الاحتياطية", inline: true },
+              { name: "/رسالة-جماعية [نوع]", value: "إرسال رسالة جماعية 📢", inline: true },
+              { name: "/لوحة-dm", value: "لوحة تحكم عن بُعد عبر DM 🔒", inline: true },
+            ],
+          },
+        ];
+        const buildHelpEmbed = (pg) => {
+          const p = HELP_PAGES[pg];
+          return new EmbedBuilder()
+            .setColor(p.color)
+            .setTitle(`📖 دليل زنجي بوت — ${p.title}`)
+            .setDescription("**كل الأوامر بتشتغل بالسلاش** `/` — اختار الفئة اللي تحتاجها 👇")
+            .addFields(...p.fields)
+            .setFooter({ text: `📄 صفحة ${pg + 1} من ${HELP_PAGES.length}  •  زنجي بوت` })
+            .setTimestamp();
+        };
+        const buildHelpButtons = (pg) => {
+          const total = HELP_PAGES.length;
+          return [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`help_page_${pg - 1}`).setLabel("◀️ السابق").setStyle(ButtonStyle.Secondary).setDisabled(pg === 0),
+            new ButtonBuilder().setCustomId("help_page_info").setLabel(`${pg + 1} / ${total}`).setStyle(ButtonStyle.Primary).setDisabled(true),
+            new ButtonBuilder().setCustomId(`help_page_${pg + 1}`).setLabel("التالي ▶️").setStyle(ButtonStyle.Secondary).setDisabled(pg === total - 1),
+          )];
+        };
+        return interaction.update({ embeds: [buildHelpEmbed(page)], components: buildHelpButtons(page) });
+      }
 
       // ─── أزرار الألعاب الكلاسيكية ────────────────────────────────
       if (interaction.customId.startsWith("rlt_") ||
