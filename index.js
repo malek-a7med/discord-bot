@@ -1481,7 +1481,7 @@ client.on("messageCreate", async (msg) => {
           try {
             const resp = await fetch(imageUrl);
             if (resp.ok) imgBuffer = Buffer.from(await resp.arrayBuffer());
-          } catch { /* ignore — fallback to URL */ }
+          } catch { /* ignore */ }
 
           await msg.delete().catch(() => {});
 
@@ -1489,40 +1489,43 @@ client.on("messageCreate", async (msg) => {
             const suggCh  = msg.channel;
             const suggMsg = await suggCh.messages.fetch(pending.publicMessageId).catch(() => null);
 
-            // ── استخدام الـ URL الأصلي مباشرة بدون إعادة رفع ──────────
-            const finalImageUrl = imageUrl;
-
-            // ── تحديث embed الاقتراح العام ────────────────────────────
-            if (suggMsg) {
+            // ── تحديث embed الاقتراح العام — الصورة كـ attachment على الرسالة نفسها ──
+            if (suggMsg && imgBuffer) {
               const updatedEmbed = buildSuggestionEmbed({
                 user: msg.author,
                 text: pending.text,
                 statusKey: "pending",
                 type: pending.type,
-                imageUrl: finalImageUrl,
+                imageUrl: `attachment://${filename}`,
               });
-              await suggMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
+              await suggMsg.edit({
+                embeds: [updatedEmbed],
+                files: [new AttachmentBuilder(imgBuffer, { name: filename })],
+              }).catch(() => {});
             }
 
-            // ── تحديث رسالة الإدارة بنفس الـ URL الثابت ──────────────
-            if (pending.adminMessageId) {
+            // ── تحديث رسالة الإدارة — نفس الصورة كـ attachment ──────
+            if (pending.adminMessageId && imgBuffer) {
               const adminCh = await msg.client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
               if (adminCh?.isTextBased()) {
                 const adminMsg = await adminCh.messages.fetch(pending.adminMessageId).catch(() => null);
                 if (adminMsg) {
-                  const oldEmbed  = adminMsg.embeds[0];
-                  const refField  = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
+                  const oldEmbed = adminMsg.embeds[0];
+                  const refField = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
                   const updatedAdminEmbed = buildSuggestionEmbed({
                     user: msg.author,
                     text: pending.text,
                     statusKey: "pending",
                     type: pending.type,
-                    imageUrl: finalImageUrl,
+                    imageUrl: `attachment://${filename}`,
                   });
                   if (refField) {
                     updatedAdminEmbed.addFields({ name: SUGGESTION_REF_FIELD, value: refField.value, inline: false });
                   }
-                  await adminMsg.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
+                  await adminMsg.edit({
+                    embeds: [updatedAdminEmbed],
+                    files: [new AttachmentBuilder(imgBuffer, { name: filename })],
+                  }).catch(() => {});
                 }
               }
             }
@@ -1575,37 +1578,41 @@ client.on("messageCreate", async (msg) => {
           const suggCh  = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
           const suggMsg = suggCh ? await suggCh.messages.fetch(dmPending.publicMessageId).catch(() => null) : null;
 
-          // ── استخدام الـ URL الأصلي مباشرة بدون إعادة رفع ──────────
-          const dmFinalImageUrl = dmImageUrl;
-
-          // ── تحديث embed الاقتراح العام ──────────────────────────
-          if (suggMsg) {
+          // ── تحديث embed الاقتراح العام — الصورة كـ attachment على الرسالة نفسها ──
+          if (suggMsg && dmImgBuffer) {
             const updatedEmbed = buildSuggestionEmbed({
               user: msg.author,
               text: dmPending.text,
               statusKey: "pending",
               type: dmPending.type,
-              imageUrl: dmFinalImageUrl,
+              imageUrl: `attachment://${dmFilename}`,
             });
-            await suggMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
+            await suggMsg.edit({
+              embeds: [updatedEmbed],
+              files: [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })],
+            }).catch(() => {});
           }
 
-          if (dmPending.adminMessageId) {
+          // ── تحديث رسالة الإدارة — نفس الصورة كـ attachment ──────
+          if (dmPending.adminMessageId && dmImgBuffer) {
             const adminCh = await client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
             if (adminCh?.isTextBased()) {
               const adminMsg = await adminCh.messages.fetch(dmPending.adminMessageId).catch(() => null);
               if (adminMsg) {
-                const oldEmbed  = adminMsg.embeds[0];
-                const refField  = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
+                const oldEmbed = adminMsg.embeds[0];
+                const refField = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
                 const updatedAdminEmbed = buildSuggestionEmbed({
                   user: msg.author,
                   text: dmPending.text,
                   statusKey: "pending",
                   type: dmPending.type,
-                  imageUrl: dmFinalImageUrl,
+                  imageUrl: `attachment://${dmFilename}`,
                 });
                 if (refField) updatedAdminEmbed.addFields({ name: SUGGESTION_REF_FIELD, value: refField.value, inline: false });
-                await adminMsg.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
+                await adminMsg.edit({
+                  embeds: [updatedAdminEmbed],
+                  files: [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })],
+                }).catch(() => {});
               }
             }
           }
