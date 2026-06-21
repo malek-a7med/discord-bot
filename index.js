@@ -220,6 +220,7 @@ const LEGACY_COMMANDS = [
     .addStringOption((o) => o.setName("وصف").setDescription("وصف الصورة المطلوبة").setRequired(true)),
   new SlashCommandBuilder().setName("حالة-البوت").setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
   new SlashCommandBuilder().setName("كاشف-الأخطاء").setDescription("🔍 فحص شامل للبوت وإرسال تقرير بالمشاكل [أونر فقط]"),
+  new SlashCommandBuilder().setName("إصلاح-تلقائي").setDescription("🔧 إصلاح تلقائي للمشاكل الشائعة في البوت [أونر فقط]"),
   // ── اقتصاد ───────────────────────────────────────────────────────
   new SlashCommandBuilder()
     .setName("اقتصاد")
@@ -2030,6 +2031,154 @@ client.on("interactionCreate", async (interaction) => {
           content: sentToDiag
             ? `✅ تم إرسال التقرير الكامل في <#${DIAG_CHANNEL_ID}>\n**ملخص:** ${statusIcon} (${passed}/${checks.length} نجح)`
             : `⚠️ ما قدرتش أبعت للروم — هنا الملخص:\n**${statusIcon}** (${passed}/${checks.length} نجح)\n${failed > 0 ? checks.filter(c => !c.ok).map(c => `❌ **${c.name}:** ${c.detail}`).join("\n") : ""}`,
+        });
+      }
+
+      // ── إصلاح-تلقائي ───────────────────────────────────────────────
+      if (cmd === "إصلاح-تلقائي") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+
+        const fixes = [];
+
+        // ── 1. مفاتيح Gemini المحروقة ─────────────────────────────
+        try {
+          const restored = resetExhaustedKeys();
+          fixes.push({
+            name: "🔑 مفاتيح Gemini",
+            done: true,
+            detail: restored > 0 ? `✅ تم استرجاع ${restored} مفتاح كان محروق` : `ℹ️ مفيش مفاتيح محروقة — الكل شغال (${getKeyCount()} مفتاح)`,
+          });
+        } catch (e) {
+          fixes.push({ name: "🔑 مفاتيح Gemini", done: false, detail: `❌ فشل: ${e.message}` });
+        }
+
+        // ── 2. تنظيف الألعاب المتعلقة (stuck games) ─────────────
+        try {
+          const before =
+            channelGames.size + garticChannelMap.size + memeChannelMap.size +
+            rpsChannelMap.size + rpsBasicChannelMap.size + luckChannelMap.size + quizChannelMap.size;
+          if (before > 0) {
+            channelGames.clear();
+            garticChannelMap.clear();
+            memeChannelMap.clear();
+            rpsChannelMap.clear();
+            rpsBasicChannelMap.clear();
+            luckChannelMap.clear();
+            quizChannelMap.clear();
+            if (typeof rpsGames !== "undefined") rpsGames.clear();
+            if (typeof rpsBasicGames !== "undefined") rpsBasicGames.clear();
+            if (typeof garticGames !== "undefined") garticGames.clear();
+            if (typeof memeGames !== "undefined") memeGames.clear();
+            if (typeof luckGames !== "undefined") luckGames.clear();
+            fixes.push({ name: "🎮 الألعاب المتعلقة", done: true, detail: `✅ تم مسح ${before} لعبة متعلقة وتصفيرها` });
+          } else {
+            fixes.push({ name: "🎮 الألعاب المتعلقة", done: true, detail: "ℹ️ مفيش ألعاب متعلقة أصلاً" });
+          }
+        } catch (e) {
+          fixes.push({ name: "🎮 الألعاب المتعلقة", done: false, detail: `❌ فشل: ${e.message}` });
+        }
+
+        // ── 3. تنظيف إجراءات التأديب المنتهية ───────────────────
+        try {
+          const now = Date.now();
+          let expired = 0;
+          for (const [id, action] of pendingModActions.entries()) {
+            if (action.expiresAt && action.expiresAt < now) {
+              pendingModActions.delete(id);
+              expired++;
+            }
+          }
+          fixes.push({
+            name: "⚖️ إجراءات التأديب المنتهية",
+            done: true,
+            detail: expired > 0 ? `✅ تم حذف ${expired} إجراء منتهي الصلاحية` : `ℹ️ مفيش إجراءات منتهية (${pendingModActions.size} نشط)`,
+          });
+        } catch (e) {
+          fixes.push({ name: "⚖️ إجراءات التأديب المنتهية", done: false, detail: `❌ فشل: ${e.message}` });
+        }
+
+        // ── 4. تنظيف سجل Auto-Mod القديم ─────────────────────────
+        try {
+          const before = autoModLogs.size;
+          autoModLogs.clear();
+          fixes.push({
+            name: "🤖 سجل Auto-Mod",
+            done: true,
+            detail: before > 0 ? `✅ تم مسح ${before} سجل قديم من الذاكرة` : "ℹ️ السجل فاضي أصلاً",
+          });
+        } catch (e) {
+          fixes.push({ name: "🤖 سجل Auto-Mod", done: false, detail: `❌ فشل: ${e.message}` });
+        }
+
+        // ── 5. تجديد لوحة الاقتراحات ─────────────────────────────
+        try {
+          const posted = await ensureSuggestionsPanel(client, true);
+          fixes.push({
+            name: "📬 لوحة الاقتراحات",
+            done: true,
+            detail: posted ? "✅ تم تجديد لوحة الاقتراحات بنجاح" : "ℹ️ اللوحة شغالة — مش محتاجة تجديد",
+          });
+        } catch (e) {
+          fixes.push({ name: "📬 لوحة الاقتراحات", done: false, detail: `❌ فشل: ${e.message}` });
+        }
+
+        // ── 6. فحص قاعدة البيانات وسلامتها ──────────────────────
+        try {
+          const data = db.getAllData();
+          const userCount = Object.keys(data.users || {}).length;
+          fixes.push({
+            name: "💾 قاعدة البيانات",
+            done: true,
+            detail: `✅ سليمة — ${userCount} عضو محفوظ`,
+          });
+        } catch (e) {
+          fixes.push({ name: "💾 قاعدة البيانات", done: false, detail: `❌ خطأ: ${e.message}` });
+        }
+
+        // ── 7. تنظيف errorCooldowns ───────────────────────────────
+        try {
+          const before = errorCooldowns.size;
+          errorCooldowns.clear();
+          fixes.push({
+            name: "🛡️ تاريخ الأخطاء (cooldowns)",
+            done: true,
+            detail: before > 0 ? `✅ تم مسح ${before} سجل خطأ قديم` : "ℹ️ مفيش سجلات قديمة",
+          });
+        } catch (e) {
+          fixes.push({ name: "🛡️ تاريخ الأخطاء", done: false, detail: `❌ فشل: ${e.message}` });
+        }
+
+        // ── Build Report ──────────────────────────────────────────
+        const done  = fixes.filter(f => f.done).length;
+        const failed = fixes.filter(f => !f.done).length;
+        const color  = failed === 0 ? 0x2ecc71 : 0xf39c12;
+
+        const reportLines = fixes.map(f =>
+          `${f.done ? "✅" : "❌"} **${f.name}**\n┗ ${f.detail}`
+        ).join("\n\n");
+
+        const embed = new EmbedBuilder()
+          .setColor(color)
+          .setTitle("🔧 تقرير الإصلاح التلقائي — زنجي بوت")
+          .setDescription(
+            `**✅ نجح:** ${done}  •  **❌ فشل:** ${failed}\n` +
+            `**الوقت:** <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+            reportLines
+          )
+          .setFooter({ text: `طلب من: ${user.username} | زنجي Bot Auto-Fix` })
+          .setTimestamp();
+
+        // إرسال التقرير في روم التشخيص
+        const DIAG_CHANNEL_ID = "1517362832063074324";
+        const diagCh = await client.channels.fetch(DIAG_CHANNEL_ID).catch(() => null);
+        if (diagCh) await diagCh.send({ embeds: [embed] }).catch(() => {});
+
+        return interaction.editReply({
+          content: `🔧 **الإصلاح التلقائي اتنفّذ!**\n✅ نجح: ${done} | ❌ فشل: ${failed}\n${diagCh ? `التقرير الكامل في <#${DIAG_CHANNEL_ID}>` : ""}`,
         });
       }
 
