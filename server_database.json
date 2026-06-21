@@ -1,21 +1,21 @@
 {
   "users": {
     "954816748140503090": {
-      "xp": 1785,
+      "xp": 1790,
       "level": 5,
       "coins": 1e+41,
       "lastDaily": 1780602154196,
-      "_lastXpMsg": "1518124625723134012",
+      "_lastXpMsg": "1518135322242842694",
       "_lastAiMsg": "1516940874049781920",
       "bankCoins": 0,
       "lastBankInterest": 0
     },
     "1448840687763325018": {
-      "xp": 2100,
+      "xp": 2130,
       "level": 6,
       "coins": 100,
       "lastDaily": null,
-      "_lastXpMsg": "1518124566541504604",
+      "_lastXpMsg": "1518135703660134540",
       "bankCoins": 0,
       "lastBankInterest": 0
     },

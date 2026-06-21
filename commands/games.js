@@ -1052,7 +1052,7 @@ function buildTTTEmbed(state) {
     }
   } else {
     statusLine = `🎯 **دور:** ${currentPlayer} (${state.currentTurn === "X" ? "❌" : "⭕"})`;
-    if (isAI && state.currentTurn === "O") statusLine = "🤖 **الذكاء الاصطناعي بيفكر...**";
+    if (isAI && state.currentTurn === "O") statusLine = `🎯 **دور:** 🤖 الذكاء الاصطناعي (⭕)`;
   }
 
   return new EmbedBuilder()
@@ -1291,12 +1291,8 @@ export async function handleTTTButton(interaction, db) {
     // ── لو مفيش winner — بدّل الدور ──────────────────────────
     state.currentTurn = state.currentTurn === "X" ? "O" : "X";
 
-    // ── لو AI ودوره — اعمل حركة تلقائية ─────────────────────
+    // ── لو AI ودوره — احسب الحركة فوراً وعمل update واحد بس ────
     if (state.isAI && state.currentTurn === "O") {
-      const embedThinking = buildTTTEmbed(state);
-      const rowsThinking  = buildTTTRows(gameId, state);
-      await interaction.update({ embeds: [embedThinking], components: rowsThinking });
-
       const aiIdx = getAIMove(state.board);
       if (aiIdx !== -1) {
         state.board[aiIdx] = AI_SYMBOL;
@@ -1313,20 +1309,15 @@ export async function handleTTTButton(interaction, db) {
             new ButtonBuilder().setCustomId(`ttt_ai_rematch_${state.playerX}`).setLabel("🔁 العب تاني").setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`ttt_exit_${state.channelId}`).setLabel("🚪 خروج").setStyle(ButtonStyle.Secondary),
           );
-          const msg = await interaction.fetchReply().catch(() => null);
-          if (msg) await msg.edit({ embeds: [finalEmbed], components: [endRow] }).catch(() => {});
-          return;
+          tttProcessing.delete(gameId);
+          return interaction.update({ embeds: [finalEmbed], components: [endRow] });
         }
         state.currentTurn = "X";
-        tttProcessing.delete(gameId);
-        const finalEmbed = buildTTTEmbed(state);
-        const finalRows  = buildTTTRows(gameId, state);
-        const msg = await interaction.fetchReply().catch(() => null);
-        if (msg) await msg.edit({ embeds: [finalEmbed], components: finalRows }).catch(() => {});
-      } else {
-        tttProcessing.delete(gameId);
       }
-      return;
+      tttProcessing.delete(gameId);
+      const finalEmbed = buildTTTEmbed(state);
+      const finalRows  = buildTTTRows(gameId, state);
+      return interaction.update({ embeds: [finalEmbed], components: finalRows });
     }
 
     tttProcessing.delete(gameId);
