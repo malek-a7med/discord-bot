@@ -1489,16 +1489,18 @@ client.on("messageCreate", async (msg) => {
             const suggCh  = msg.channel;
             const suggMsg = await suggCh.messages.fetch(pending.publicMessageId).catch(() => null);
 
-            // ── رفع الصورة كـ reply للاقتراح عشان نجيب URL ثابت ──────
+            // ── رفع الصورة في روم الإدارة فقط عشان نجيب URL ثابت ──────
             // (الرسالة بتفضل حية = الـ URL ما بيبطلش أبداً)
             let stableImageUrl = null;
             if (imgBuffer) {
-              const hostMsg = await suggCh.send({
-                reply: { messageReference: pending.publicMessageId, failIfNotExists: false },
-                files: [new AttachmentBuilder(imgBuffer, { name: filename })],
-              }).catch(() => null);
-              if (hostMsg?.attachments?.size > 0) {
-                stableImageUrl = hostMsg.attachments.first()?.url;
+              const adminChHost = await msg.client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
+              if (adminChHost?.isTextBased()) {
+                const hostMsg = await adminChHost.send({
+                  files: [new AttachmentBuilder(imgBuffer, { name: filename })],
+                }).catch(() => null);
+                if (hostMsg?.attachments?.size > 0) {
+                  stableImageUrl = hostMsg.attachments.first()?.url;
+                }
               }
             }
             const finalImageUrl = stableImageUrl || imageUrl;
@@ -1586,15 +1588,17 @@ client.on("messageCreate", async (msg) => {
           const suggCh  = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
           const suggMsg = suggCh ? await suggCh.messages.fetch(dmPending.publicMessageId).catch(() => null) : null;
 
-          // ── رفع الصورة كـ reply للاقتراح عشان URL ثابت ─────────
+          // ── رفع الصورة في روم الإدارة فقط عشان URL ثابت ─────────
           let dmStableImageUrl = null;
-          if (dmImgBuffer && suggCh) {
-            const hostMsg = await suggCh.send({
-              reply: { messageReference: dmPending.publicMessageId, failIfNotExists: false },
-              files: [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })],
-            }).catch(() => null);
-            if (hostMsg?.attachments?.size > 0) {
-              dmStableImageUrl = hostMsg.attachments.first()?.url;
+          if (dmImgBuffer) {
+            const adminChHost = await client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
+            if (adminChHost?.isTextBased()) {
+              const hostMsg = await adminChHost.send({
+                files: [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })],
+              }).catch(() => null);
+              if (hostMsg?.attachments?.size > 0) {
+                dmStableImageUrl = hostMsg.attachments.first()?.url;
+              }
             }
           }
           const dmFinalImageUrl = dmStableImageUrl || dmImageUrl;
