@@ -157,18 +157,23 @@ async function revealGarticChains(interaction, gameId, state) {
     if (embeds.length >= 10) break;
   }
 
-  // مسح الرسالة الأصلية وبعت النتايج جديدة
+  const replayRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`replay_gar_${state.channelId}`).setLabel("🔄 لعبة هاتف مكسور جديدة").setStyle(ButtonStyle.Primary),
+  );
+
+  // عدّل الرسالة الأصلية بدل ما تمسحها وتبعت جديدة
   try {
-    const msg = await interaction.channel?.messages?.fetch(state.messageId).catch(() => null);
-    if (msg) await msg.delete().catch(() => {});
-  } catch {}
-  await interaction.channel?.send({
-    embeds: embeds.slice(0, 10),
-    components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`replay_gar_${state.channelId}`).setLabel("🔄 لعبة هاتف مكسور جديدة").setStyle(ButtonStyle.Primary),
-    )],
-  }).catch(() => {});
-  await interaction.reply({ content: "📞 اللعبة خلصت! شوف النتايج فوق ☝️", flags: 64 }).catch(() => {});
+    const ch  = interaction.channel ?? await interaction.client?.channels?.fetch(state.channelId).catch(() => null);
+    const msg = ch ? await ch.messages.fetch(state.messageId).catch(() => null) : null;
+    if (msg) {
+      await msg.edit({ embeds: embeds.slice(0, 10), components: [replayRow] }).catch(() => {});
+      return;
+    }
+    // fallback: لو الرسالة اتمسحت ابعت جديدة
+    await ch?.send({ embeds: embeds.slice(0, 10), components: [replayRow] }).catch(() => {});
+  } catch {
+    await interaction.channel?.send({ embeds: embeds.slice(0, 10), components: [replayRow] }).catch(() => {});
+  }
 }
 
 export const garticCommand = new SlashCommandBuilder()
