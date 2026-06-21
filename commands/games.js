@@ -988,11 +988,10 @@ export async function handleTTTCommand(interaction, db, forceAI = false) {
   tttGames.set(gameId, state);
   channelGames.set(interaction.channel.id, gameId);
 
-  // ── لعبة ضد AI — تبدأ فوراً ──────────────────────────────────
+  // ── لعبة ضد AI — اختار الصعوبة الأول ───────────────────────
   if (vsAI) {
-    const embed = buildTTTEmbed(state);
-    const rows  = buildTTTRows(gameId, state);
-    await replyOrUpdate(interaction, { embeds: [embed], components: rows });
+    state.phase = "difficulty";
+    await replyOrUpdate(interaction, { embeds: [buildDifficultyEmbed()], components: [buildDifficultyRow(gameId)] });
     return;
   }
 
@@ -1055,7 +1054,11 @@ function buildTTTEmbed(state) {
     if (isAI && state.currentTurn === "O") statusLine = `🎯 **دور:** 🤖 الذكاء الاصطناعي (⭕)`;
   }
 
-  return new EmbedBuilder()
+  const diffLabel = isAI && state.difficulty
+    ? ({ easy: "🟢 سهل", medium: "🟡 متوسط", hard: "🔴 صعب" }[state.difficulty] ?? state.difficulty)
+    : null;
+
+  const embed = new EmbedBuilder()
     .setColor(state.winner ? 0xf1c40f : (isAI ? 0x9b59b6 : 0x3498db))
     .setTitle(isAI ? "❌⭕ اكس اوه — ضد الذكاء الاصطناعي 🤖" : "❌⭕ اكس اوه")
     .setDescription(`${boardStr}\n\n${statusLine}`)
@@ -1064,6 +1067,9 @@ function buildTTTEmbed(state) {
       { name: "⭕ دايرة", value: oName, inline: true },
     )
     .setTimestamp();
+
+  if (diffLabel) embed.setFooter({ text: `مستوى الصعوبة: ${diffLabel}` });
+  return embed;
 }
 
 function buildTTTRows(gameId, state) {
@@ -1140,7 +1146,23 @@ function minimaxTTT(board, depth, alpha, beta, isMaximizing) {
   }
 }
 
-function getAIMove(board) {
+function getAIMove(board, difficulty = "hard") {
+  const empty = board.map((v, i) => v === "" ? i : -1).filter(i => i !== -1);
+  if (empty.length === 0) return -1;
+
+  // سهل — حركة عشوائية بالكامل
+  if (difficulty === "easy") {
+    return empty[Math.floor(Math.random() * empty.length)];
+  }
+
+  // متوسط — يدافع بس أحياناً يغلط (60% minimax / 40% عشوائي)
+  if (difficulty === "medium") {
+    if (Math.random() < 0.4) {
+      return empty[Math.floor(Math.random() * empty.length)];
+    }
+  }
+
+  // صعب (أو متوسط fallthrough) — minimax كامل
   let bestScore = -Infinity;
   let bestMove  = -1;
   for (let i = 0; i < 9; i++) {
@@ -1152,6 +1174,37 @@ function getAIMove(board) {
     }
   }
   return bestMove;
+}
+
+// ── شاشة اختيار الصعوبة ────────────────────────────────────────
+function buildDifficultyEmbed() {
+  return new EmbedBuilder()
+    .setColor(0x9b59b6)
+    .setTitle("❌⭕ اكس اوه — ضد الذكاء الاصطناعي 🤖")
+    .setDescription(
+      "اختار مستوى الصعوبة:\n\n" +
+      "🟢 **سهل** — AI بيلعب عشوائي، هتكسب بسهولة\n" +
+      "🟡 **متوسط** — AI بيدافع أحياناً وأحياناً بيغلط\n" +
+      "🔴 **صعب** — AI بيلعب بكامل قوته، صعب تكسبه"
+    )
+    .setTimestamp();
+}
+
+function buildDifficultyRow(gameId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`ttt_diff_easy_${gameId}`)
+      .setLabel("🟢 سهل")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId(`ttt_diff_medium_${gameId}`)
+      .setLabel("🟡 متوسط")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`ttt_diff_hard_${gameId}`)
+      .setLabel("🔴 صعب")
+      .setStyle(ButtonStyle.Danger),
+  );
 }
 
 export async function handleTTTButton(interaction, db) {
@@ -1200,11 +1253,30 @@ export async function handleTTTButton(interaction, db) {
     }
     state.isAI   = true;
     state.playerO = AI_PLAYER_ID;
-    state.phase  = "playing";
+    state.phase  = "difficulty";
     state.isOpen = false;
+    return interaction.update({ embeds: [buildDifficultyEmbed()], components: [buildDifficultyRow(gameId)] });
+  }
+
+  // ── اختيار مستوى الصعوبة ──────────────────────────────────────
+  if (id.startsWith("ttt_diff_")) {
+    const parts  = id.split("_");
+    // format: ttt_diff_{level}_{gameId}
+    const level  = parts[2];
+    const gameId = parts.slice(3).join("_");
+    const state  = tttGames.get(gameId);
+    if (!state || state.phase !== "difficulty") {
+      return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
+    }
+    if (interaction.user.id !== state.playerX) {
+      return interaction.reply({ content: "❌ بس اللي بدأ اللعبة يقدر يختار الصعوبة!", flags: 64 });
+    }
+    state.difficulty = level;
+    state.phase      = "playing";
+    const diffLabel = { easy: "🟢 سهل", medium: "🟡 متوسط", hard: "🔴 صعب" }[level] ?? level;
     const embed = buildTTTEmbed(state);
-    const rows  = buildTTTRows(gameId, state);
-    return interaction.update({ embeds: [embed], components: rows });
+    embed.setFooter({ text: `مستوى الصعوبة: ${diffLabel}` });
+    return interaction.update({ embeds: [embed], components: buildTTTRows(gameId, state) });
   }
 
   if (id.startsWith("ttt_move_")) {
@@ -1293,7 +1365,7 @@ export async function handleTTTButton(interaction, db) {
 
     // ── لو AI ودوره — احسب الحركة فوراً وعمل update واحد بس ────
     if (state.isAI && state.currentTurn === "O") {
-      const aiIdx = getAIMove(state.board);
+      const aiIdx = getAIMove(state.board, state.difficulty ?? "hard");
       if (aiIdx !== -1) {
         state.board[aiIdx] = AI_SYMBOL;
         result = checkTTTWinner(state.board);
@@ -1339,11 +1411,11 @@ export async function handleTTTButton(interaction, db) {
       id: newId, channelId: interaction.channel.id,
       playerX: pX, playerO: AI_PLAYER_ID,
       board: Array(9).fill(""), currentTurn: "X",
-      winner: null, phase: "playing", isOpen: false, isAI: true,
+      winner: null, phase: "difficulty", isOpen: false, isAI: true,
     };
     tttGames.set(newId, newState);
     channelGames.set(interaction.channel.id, newId);
-    return interaction.update({ embeds: [buildTTTEmbed(newState)], components: buildTTTRows(newId, newState) });
+    return interaction.update({ embeds: [buildDifficultyEmbed()], components: [buildDifficultyRow(newId)] });
   }
 
   // ── إعادة اللعبة ضد لاعب ──────────────────────────────────────
