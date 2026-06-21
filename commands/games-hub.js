@@ -101,7 +101,6 @@ function buildHubRows() {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🌍 الحياة").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("ghub_ttt_ai").setLabel("🤖 اكس-اوه ضد AI").setStyle(ButtonStyle.Danger),
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_bankluck").setLabel("🎰 بنك الحظ المصري").setStyle(ButtonStyle.Primary),

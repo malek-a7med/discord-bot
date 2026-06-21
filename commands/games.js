@@ -1007,10 +1007,16 @@ export async function handleTTTCommand(interaction, db, forceAI = false) {
     )
     .setTimestamp();
 
-  const rows = [new ActionRowBuilder().addComponents(
+  const acceptRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`ttt_accept_${gameId}`).setLabel("✅ قبول").setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(`ttt_decline_${gameId}`).setLabel("❌ رفض").setStyle(ButtonStyle.Danger),
-  )];
+  );
+  if (isOpen) {
+    acceptRow.addComponents(
+      new ButtonBuilder().setCustomId(`ttt_vsai_${gameId}`).setLabel("🤖 ضد AI").setStyle(ButtonStyle.Primary),
+    );
+  }
+  const rows = [acceptRow];
 
   const msg = await replyOrUpdate(interaction, { embeds: [embed], components: rows });
   if (msg) state.messageId = msg.id;
@@ -1177,6 +1183,25 @@ export async function handleTTTButton(interaction, db) {
     }
 
     state.phase = "playing";
+    const embed = buildTTTEmbed(state);
+    const rows  = buildTTTRows(gameId, state);
+    return interaction.update({ embeds: [embed], components: rows });
+  }
+
+  // ── زرار "ضد AI" من الـ waiting message ──────────────────────
+  if (id.startsWith("ttt_vsai_")) {
+    const gameId = id.split("_").slice(2).join("_");
+    const state  = tttGames.get(gameId);
+    if (!state || state.phase !== "waiting") {
+      return interaction.reply({ content: "❌ اللعبة انتهت أو بدأت!", flags: 64 });
+    }
+    if (interaction.user.id !== state.playerX) {
+      return interaction.reply({ content: "❌ بس اللي بدأ التحدي يقدر يختار مود الـ AI!", flags: 64 });
+    }
+    state.isAI   = true;
+    state.playerO = AI_PLAYER_ID;
+    state.phase  = "playing";
+    state.isOpen = false;
     const embed = buildTTTEmbed(state);
     const rows  = buildTTTRows(gameId, state);
     return interaction.update({ embeds: [embed], components: rows });
