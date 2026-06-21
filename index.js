@@ -826,19 +826,38 @@ async function updateLinkedSuggestionMessages({
   const status = SUGGESTION_STATUSES[statusKey] || SUGGESTION_STATUSES.pending;
   const authorUser = await client.users.fetch(authorUserId).catch(() => null);
 
-  const publicEmbed = buildSuggestionEmbed({
-    user: authorUser || { toString: () => `<@${authorUserId}>`, tag: authorUserId },
-    text,
-    statusKey,
-    moderator,
-  });
+  // ── تحديث رسالة العام — نحافظ على التايتل (نوع الاقتراح) والصورة ──
+  const publicChannel = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
+  if (publicChannel?.isTextBased()) {
+    const publicMessage = await publicChannel.messages.fetch(publicMessageId).catch(() => null);
+    if (publicMessage && publicMessage.embeds[0]) {
+      // نبني من الإمبيد الموجود عشان نحافظ على التايتل والصورة
+      const existingPublicEmbed = new EmbedBuilder(publicMessage.embeds[0].data);
+      existingPublicEmbed.setColor(status.color);
 
+      const pubFields = (existingPublicEmbed.data.fields || []).map(f => {
+        if (f.name === "📊 الحالة") return { ...f, value: status.text };
+        return f;
+      });
+      const hasPubMod = pubFields.some(f => f.name === "🛡️ آخر إجراء إداري");
+      if (moderator) {
+        existingPublicEmbed.setFields(
+          hasPubMod
+            ? pubFields.map(f => f.name === "🛡️ آخر إجراء إداري" ? { ...f, value: `${moderator}` } : f)
+            : [...pubFields, { name: "🛡️ آخر إجراء إداري", value: `${moderator}`, inline: false }]
+        );
+      } else {
+        existingPublicEmbed.setFields(pubFields);
+      }
+      await publicMessage.edit({ embeds: [existingPublicEmbed] }).catch(() => {});
+    }
+  }
+
+  // ── تحديث رسالة الإدارة — نحافظ على التايتل والصورة كمان ──────
   const updatedAdminEmbed = new EmbedBuilder(adminMessage.embeds[0].data).setColor(status.color);
 
   const adminFields = updatedAdminEmbed.data.fields.map((field) => {
-    if (field.name === "📊 الحالة") {
-      return { ...field, value: status.text };
-    }
+    if (field.name === "📊 الحالة") return { ...field, value: status.text };
     return field;
   });
 
@@ -847,9 +866,7 @@ async function updateLinkedSuggestionMessages({
     if (hasModeratorField) {
       updatedAdminEmbed.setFields(
         adminFields.map((field) =>
-          field.name === "🛡️ آخر إجراء إداري"
-            ? { ...field, value: `${moderator}` }
-            : field
+          field.name === "🛡️ آخر إجراء إداري" ? { ...field, value: `${moderator}` } : field
         )
       );
     } else {
@@ -860,14 +877,6 @@ async function updateLinkedSuggestionMessages({
     }
   } else {
     updatedAdminEmbed.setFields(adminFields);
-  }
-
-  const publicChannel = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
-  if (publicChannel?.isTextBased()) {
-    const publicMessage = await publicChannel.messages.fetch(publicMessageId).catch(() => null);
-    if (publicMessage) {
-      await publicMessage.edit({ embeds: [publicEmbed] }).catch(() => {});
-    }
   }
 
   const solvedAlready = statusKey === "solved";
@@ -1467,6 +1476,28 @@ client.on("messageCreate", async (msg) => {
   if (processedMessages.has(msg.id)) return;
   processedMessages.add(msg.id);
   setTimeout(() => processedMessages.delete(msg.id), 60_000);
+
+  // ── روم إدارة الاقتراحات: منشن الإدارة تلقائياً ─────────────────
+  if (msg.guild && msg.channel.id === ADMIN_SUGGESTIONS_CHANNEL_ID) {
+    try {
+      const adminRoles = msg.guild.roles.cache
+        .filter(r =>
+          r.id !== msg.guild.id &&
+          !r.managed &&
+          (r.permissions.has(PermissionFlagsBits.Administrator) ||
+           r.permissions.has(PermissionFlagsBits.ManageMessages))
+        )
+        .sort((a, b) => b.position - a.position);
+      const topRole = adminRoles.first();
+      if (topRole) {
+        await msg.channel.send({
+          content: `<@&${topRole.id}> ← رسالة جديدة من ${msg.author} 📨`,
+          allowedMentions: { roles: [topRole.id] },
+        });
+      }
+    } catch { /* تجاهل */ }
+    return;
+  }
 
   // ── روم الاقتراحات: صور مسموحة — نصوص بس اللي تتمسح ──────────
   if (msg.guild && msg.channel.id === SUGGESTIONS_CHANNEL_ID) {
