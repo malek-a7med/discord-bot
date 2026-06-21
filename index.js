@@ -212,355 +212,275 @@ const LEGACY_COMMANDS = [
     .setDescription("User information / معلومات عضو")
     .addUserOption((o) => o.setName("user").setDescription("User / العضو")),
   new SlashCommandBuilder().setName("القوانين").setDescription("عرض قوانين السيرفر / Server rules"),
-  new SlashCommandBuilder()
-    .setName("بروفايل")
-    .setDescription("عرض بروفايلك (المستوى والكوينز) / Your profile")
-    .addUserOption((o) => o.setName("عضو").setDescription("اختر عضو / Choose member")),
-  new SlashCommandBuilder().setName("محفظة").setDescription("عرض رصيدك من الكوينز / Your wallet"),
-  new SlashCommandBuilder().setName("متجر").setDescription("عرض الرتب المتاحة للشراء / Shop roles"),
-  new SlashCommandBuilder()
-    .setName("شراء")
-    .setDescription("شراء رتبة من المتجر / Buy a role")
-    .addStringOption((o) =>
-      o
-        .setName("الرتبة")
-        .setDescription("اختر الرتبة")
-        .setRequired(true)
-        .addChoices(
-          { name: "Golden🥇 — 5000 كوينز", value: "golden" },
-          { name: "Silver🥈 — 2500 كوينز", value: "silver" },
-          { name: "Bronze🥉 — 1000 كوينز", value: "bronze" }
-        )
-    ),
-  new SlashCommandBuilder()
-    .setName("إعطاء")
-    .setDescription("منح كوينز لعضو [إدارة] / Give coins [Admin]")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
-    .addIntegerOption((o) =>
-      o.setName("كمية").setDescription("الكمية").setRequired(true).setMinValue(1)
-    ),
-  new SlashCommandBuilder().setName("يومي").setDescription("استلم مكافأتك اليومية / Daily reward"),
-  new SlashCommandBuilder()
-    .setName("مانهوا-إنشاء")
-    .setDescription("إنشاء قاموس مصطلحات لمانهوا / Create manhwa dictionary")
-    .addStringOption((o) => o.setName("الاسم").setDescription("اسم المانهوا").setRequired(true)),
-  new SlashCommandBuilder()
-    .setName("مانهوا-إضافة-مصطلح")
-    .setDescription("إضافة مصطلح للقاموس / Add term to dictionary")
-    .addStringOption((o) => o.setName("المانهوا").setDescription("اسم المانهوا").setRequired(true))
-    .addStringOption((o) => o.setName("الإنجليزي").setDescription("الكلمة بالإنجليزية").setRequired(true))
-    .addStringOption((o) => o.setName("العربي").setDescription("الترجمة العربية").setRequired(true)),
-  new SlashCommandBuilder()
-    .setName("مانهوا-عرض-المصطلحات")
-    .setDescription("عرض القواامس المخزنة / List dictionaries")
-    .addStringOption((o) => o.setName("المانهوا").setDescription("اسم مانهوا محددة (اختياري)")),
-  new SlashCommandBuilder()
-    .setName("مسح")
-    .setDescription("مسح رسائل من الشات [مشرف] / Clear messages")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
-    .addIntegerOption((o) =>
-      o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000)
-    ),
-  new SlashCommandBuilder()
-    .setName("مسح-الكل")
-    .setDescription("مسح كل رسايل الروم بالكامل [إدارة] / Wipe entire channel")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-  new SlashCommandBuilder()
-    .setName("تعديل-إعلان")
-    .setDescription("تعديل رسالة البوت في روم الإعلانات [أونر] / Edit bot announcement")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption((o) =>
-      o.setName("message_id").setDescription("الـ ID بتاع الرسالة (اختياري — لو فاضي هياخد الأخيرة)")
-    )
-    .addIntegerOption((o) =>
-      o.setName("موضع").setDescription("رقم الرسالة من الأخر (1=الأخيرة، 2=قبل الأخيرة...)").setMinValue(1).setMaxValue(20)
-    ),
-  new SlashCommandBuilder()
-    .setName("انشاء-رول")
-    .setDescription("إنشاء رتبة جديدة بصلاحيات ذكية [إدارة] / Create role with smart permissions")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-    .addStringOption((o) => o.setName("الاسم").setDescription("اسم الرتبة الجديدة").setRequired(true))
-    .addStringOption((o) =>
-      o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً")
-        .addChoices(
-          { name: "🔴 إدارة (Administrator)",       value: "admin"      },
-          { name: "🟠 مشرف (Moderator)",            value: "mod"        },
-          { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
-          { name: "🟡 VIP",                         value: "vip"        },
-          { name: "💜 بوستر (Server Booster)",      value: "booster"    },
-          { name: "🔵 موثّق (Verified)",            value: "verified"   },
-          { name: "🥇 ذهبية (Golden)",              value: "golden"     },
-          { name: "🥈 فضية (Silver)",               value: "silver"     },
-          { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
-          { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
-          { name: "🟢 موسيقى / Music",              value: "music"      },
-          { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
-          { name: "💗 فن وتصميم / Art",             value: "art"        },
-          { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
-          { name: "🟧 منشئ محتوى / Content",        value: "content"    },
-          { name: "⚫ بوت / Bot",                   value: "bot"        },
-          { name: "⚪ عضو عادي / Normal",           value: "normal"     },
-          { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
-          { name: "🔘 بدون صلاحيات",               value: "none"       },
-        )
-    )
-    .addStringOption((o) => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم مثل red)"))
-    .addBooleanOption((o) => o.setName("ظهور-منفصل").setDescription("يظهر الرول منفصلاً في قائمة الأعضاء")),
-  new SlashCommandBuilder()
-    .setName("تعديل-الرول")
-    .setDescription("تعديل رتبة موجودة (صلاحيات + اسم + لون) [إدارة]")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-    .addRoleOption((o) => o.setName("الرول").setDescription("الرتبة المراد تعديلها").setRequired(true))
-    .addStringOption((o) =>
-      o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً (اختياري)")
-        .addChoices(
-          { name: "🔴 إدارة (Administrator)",       value: "admin"      },
-          { name: "🟠 مشرف (Moderator)",            value: "mod"        },
-          { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
-          { name: "🟡 VIP",                         value: "vip"        },
-          { name: "💜 بوستر (Server Booster)",      value: "booster"    },
-          { name: "🔵 موثّق (Verified)",            value: "verified"   },
-          { name: "🥇 ذهبية (Golden)",              value: "golden"     },
-          { name: "🥈 فضية (Silver)",               value: "silver"     },
-          { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
-          { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
-          { name: "🟢 موسيقى / Music",              value: "music"      },
-          { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
-          { name: "💗 فن وتصميم / Art",             value: "art"        },
-          { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
-          { name: "🟧 منشئ محتوى / Content",        value: "content"    },
-          { name: "⚫ بوت / Bot",                   value: "bot"        },
-          { name: "⚪ عضو عادي / Normal",           value: "normal"     },
-          { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
-          { name: "🔘 مسح كل الصلاحيات",           value: "none"       },
-        )
-    )
-    .addStringOption((o) => o.setName("اسم").setDescription("الاسم الجديد للرتبة (اختياري)"))
-    .addStringOption((o) => o.setName("لون").setDescription("اللون الجديد (hex مثل #FF5733 أو اسم مثل red) (اختياري)")),
-  new SlashCommandBuilder()
-    .setName("تحذير")
-    .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-    .addStringOption((o) => o.setName("السبب").setDescription("السبب").setRequired(true)),
-  new SlashCommandBuilder()
-    .setName("اسكات")
-    .setDescription("إسكات عضو مؤقتاً [مشرف] / Timeout a member")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-    .addIntegerOption((o) =>
-      o.setName("مدة").setDescription("المدة بالدقائق (1-1440)").setRequired(true).setMinValue(1).setMaxValue(1440)
-    )
-    .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
-  new SlashCommandBuilder()
-    .setName("طرد")
-    .setDescription("طرد عضو [مشرف] / Kick a member")
-    .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-    .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
-  new SlashCommandBuilder()
-    .setName("تبنيد")
-    .setDescription("حظر عضو نهائياً [مشرف] / Ban a member")
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-    .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
+  // ── مساعدة واقتراح ──────────────────────────────────────────────
   new SlashCommandBuilder().setName("مساعدة").setDescription("قائمة جميع الأوامر / Help"),
-  new SlashCommandBuilder()
-    .setName("تحذيرات")
-    .setDescription("عرض تحذيرات عضو / View warnings")
-    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID (اتركه فاضي عشان تشوف تحذيراتك)")),
-  new SlashCommandBuilder()
-    .setName("ليدربورد")
-    .setDescription("أفضل 10 أعضاء في السيرفر / Top 10 leaderboard")
-    .addStringOption((o) =>
-      o
-        .setName("نوع")
-        .setDescription("ترتيب حسب / Sort by")
-        .addChoices(
-          { name: "🪙 الكوينز", value: "coins" },
-          { name: "✨ الـ XP", value: "xp" }
-        )
-    ),
-  new SlashCommandBuilder()
-    .setName("ترحيب-قناة")
-    .setDescription("تعيين قناة رسائل الترحيب [إدارة] / Set welcome channel")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addChannelOption((o) => o.setName("القناة").setDescription("القناة المخصصة للترحيب").setRequired(true)),
-  new SlashCommandBuilder()
-    .setName("تشغيل")
-    .setDescription("تشغيل أغنية من يوتيوب أو سبوتيفاي / Play a song")
-    .addStringOption((o) => o.setName("بحث").setDescription("رابط أو اسم الأغنية").setRequired(true)),
-  new SlashCommandBuilder().setName("إيقاف").setDescription("إيقاف الموسيقى وإخراج البوت / Stop music and leave"),
-  new SlashCommandBuilder().setName("تخطي").setDescription("تخطي الأغنية الحالية / Skip current song"),
-  new SlashCommandBuilder().setName("قائمة-تشغيل").setDescription("عرض قائمة الأغاني الحالية / Show music queue"),
-  new SlashCommandBuilder().setName("توقف-مؤقت").setDescription("إيقاف مؤقت / Pause music"),
-  new SlashCommandBuilder().setName("استئناف").setDescription("استئناف التشغيل / Resume music"),
-  new SlashCommandBuilder()
-    .setName("اقتراح")
-    .setDescription("إرسال اقتراح للسيرفر / Submit a suggestion")
-    .addStringOption((o) => o.setName("نص").setDescription("اقتراحك هنا").setRequired(true)),
-  new SlashCommandBuilder()
-    .setName("لوحة-إدارة")
-    .setDescription("إرسال لوحة تحكم الإدارة [إدارة] / Post admin control panel")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-  new SlashCommandBuilder()
-    .setName("لوحة-اقتراحات")
-    .setDescription("إرسال لوحة الاقتراحات مع زر [إدارة] / Post suggestions board")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("صورة")
     .setDescription("توليد صورة بالـ AI / Generate an AI image")
     .addStringOption((o) => o.setName("وصف").setDescription("وصف الصورة المطلوبة").setRequired(true)),
+  new SlashCommandBuilder().setName("حالة-البوت").setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
+  // ── اقتصاد ───────────────────────────────────────────────────────
   new SlashCommandBuilder()
-    .setName("نسخة-احتياطية")
-    .setDescription("تحميل نسخة احتياطية من بيانات السيرفر [إدارة] / Download server database backup")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    .setName("اقتصاد")
+    .setDescription("💰 نظام الاقتصاد والكوينز")
+    .addSubcommand(sub =>
+      sub.setName("بروفايل").setDescription("عرض بروفايلك (المستوى والكوينز)")
+        .addUserOption(o => o.setName("عضو").setDescription("اختر عضو"))
+    )
+    .addSubcommand(sub => sub.setName("محفظة").setDescription("عرض رصيدك من الكوينز"))
+    .addSubcommand(sub => sub.setName("يومي").setDescription("استلم مكافأتك اليومية"))
+    .addSubcommand(sub =>
+      sub.setName("ليدربورد").setDescription("أفضل 10 أعضاء في السيرفر")
+        .addStringOption(o => o.setName("نوع").setDescription("ترتيب حسب").addChoices(
+          { name: "🪙 الكوينز", value: "coins" },
+          { name: "✨ الـ XP", value: "xp" }
+        ))
+    )
+    .addSubcommand(sub =>
+      sub.setName("إعطاء").setDescription("منح كوينز لعضو [إدارة]")
+        .addUserOption(o => o.setName("عضو").setDescription("العضو").setRequired(true))
+        .addIntegerOption(o => o.setName("كمية").setDescription("الكمية").setRequired(true).setMinValue(1))
+    ),
+  // ── متجر ─────────────────────────────────────────────────────────
   new SlashCommandBuilder()
-    .setName("استرجاع")
-    .setDescription("استرجاع بيانات السيرفر من نسخة احتياطية [إدارة] / Restore database from backup")
+    .setName("متجر")
+    .setDescription("🛒 متجر السيرفر والقدرات")
+    .addSubcommand(sub => sub.setName("عرض").setDescription("عرض الرتب المتاحة للشراء"))
+    .addSubcommand(sub =>
+      sub.setName("شراء").setDescription("شراء رتبة من المتجر")
+        .addStringOption(o => o.setName("الرتبة").setDescription("اختر الرتبة").setRequired(true)
+          .addChoices(
+            { name: "Golden🥇 — 5000 كوينز", value: "golden" },
+            { name: "Silver🥈 — 2500 كوينز", value: "silver" },
+            { name: "Bronze🥉 — 1000 كوينز", value: "bronze" }
+          ))
+    )
+    .addSubcommand(sub => sub.setName("قدرات").setDescription("عرض قدرات المتجر المتاحة للشراء"))
+    .addSubcommand(sub => sub.setName("قدراتي").setDescription("عرض قدراتك المشتراة")),
+  // ── مودريشن ──────────────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("مودريشن")
+    .setDescription("🛡️ أوامر الإشراف والإدارة")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .addSubcommand(sub =>
+      sub.setName("تحذير").setDescription("توجيه تحذير رسمي لعضو")
+        .addUserOption(o => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+        .addStringOption(o => o.setName("السبب").setDescription("السبب").setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName("اسكات").setDescription("إسكات عضو مؤقتاً")
+        .addUserOption(o => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+        .addIntegerOption(o => o.setName("مدة").setDescription("المدة بالدقائق (1-1440)").setRequired(true).setMinValue(1).setMaxValue(1440))
+        .addStringOption(o => o.setName("السبب").setDescription("السبب"))
+    )
+    .addSubcommand(sub =>
+      sub.setName("طرد").setDescription("طرد عضو من السيرفر")
+        .addUserOption(o => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+        .addStringOption(o => o.setName("السبب").setDescription("السبب"))
+    )
+    .addSubcommand(sub =>
+      sub.setName("تبنيد").setDescription("حظر عضو نهائياً")
+        .addUserOption(o => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+        .addStringOption(o => o.setName("السبب").setDescription("السبب"))
+    )
+    .addSubcommand(sub =>
+      sub.setName("مسح").setDescription("مسح رسائل من الشات")
+        .addIntegerOption(o => o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000))
+    )
+    .addSubcommand(sub => sub.setName("مسح-كل").setDescription("مسح كل رسايل الروم بالكامل [إدارة]"))
+    .addSubcommand(sub =>
+      sub.setName("سجل").setDescription("عرض سجل تحذيرات عضو")
+        .addStringOption(o => o.setName("عضو").setDescription("اسم العضو أو ID (اتركه فاضي لسجلك)"))
+    )
+    .addSubcommand(sub =>
+      sub.setName("رفع-بلوك").setDescription("رفع البلوك عن يوزر [أونر]")
+        .addUserOption(o => o.setName("يوزر").setDescription("اليوزر اللي هترفع عنه البلوك").setRequired(true))
+    )
+    .addSubcommand(sub => sub.setName("مبلوكين").setDescription("عرض اليوزرز المبلوكين حالياً [أونر]")),
+  // ── موسيقى ───────────────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("موسيقى")
+    .setDescription("🎵 أوامر الموسيقى")
+    .addSubcommand(sub =>
+      sub.setName("تشغيل").setDescription("تشغيل أغنية من يوتيوب أو سبوتيفاي")
+        .addStringOption(o => o.setName("بحث").setDescription("رابط أو اسم الأغنية").setRequired(true))
+    )
+    .addSubcommand(sub => sub.setName("إيقاف").setDescription("إيقاف الموسيقى وإخراج البوت"))
+    .addSubcommand(sub => sub.setName("تخطي").setDescription("تخطي الأغنية الحالية"))
+    .addSubcommand(sub => sub.setName("قائمة").setDescription("عرض قائمة الأغاني الحالية"))
+    .addSubcommand(sub => sub.setName("توقف").setDescription("إيقاف مؤقت للموسيقى"))
+    .addSubcommand(sub => sub.setName("استئناف").setDescription("استئناف التشغيل")),
+  // ── مانهوا ────────────────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("مانهوا")
+    .setDescription("📖 قواميس مصطلحات المانهوا")
+    .addSubcommand(sub =>
+      sub.setName("إنشاء").setDescription("إنشاء قاموس مصطلحات لمانهوا")
+        .addStringOption(o => o.setName("الاسم").setDescription("اسم المانهوا").setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName("إضافة").setDescription("إضافة مصطلح للقاموس")
+        .addStringOption(o => o.setName("المانهوا").setDescription("اسم المانهوا").setRequired(true))
+        .addStringOption(o => o.setName("الإنجليزي").setDescription("الكلمة بالإنجليزية").setRequired(true))
+        .addStringOption(o => o.setName("العربي").setDescription("الترجمة العربية").setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName("عرض").setDescription("عرض القواميس المخزنة")
+        .addStringOption(o => o.setName("المانهوا").setDescription("اسم مانهوا محددة (اختياري)"))
+    ),
+  // ── رول ──────────────────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("رول")
+    .setDescription("🎭 إدارة الرتب والمستويات [إدارة]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addSubcommand(sub =>
+      sub.setName("إنشاء").setDescription("إنشاء رتبة جديدة بصلاحيات ذكية")
+        .addStringOption(o => o.setName("الاسم").setDescription("اسم الرتبة الجديدة").setRequired(true))
+        .addStringOption(o => o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً").addChoices(
+          { name: "🔴 إدارة (Administrator)", value: "admin" },
+          { name: "🟠 مشرف (Moderator)", value: "mod" },
+          { name: "🟤 مساعد مشرف (Helper)", value: "helper" },
+          { name: "🟡 VIP", value: "vip" },
+          { name: "💜 بوستر (Server Booster)", value: "booster" },
+          { name: "🔵 موثّق (Verified)", value: "verified" },
+          { name: "🥇 ذهبية (Golden)", value: "golden" },
+          { name: "🥈 فضية (Silver)", value: "silver" },
+          { name: "🥉 برونزية (Bronze)", value: "bronze" },
+          { name: "💎 بلاتينية (Platinum)", value: "platinum" },
+          { name: "🟢 موسيقى / Music", value: "music" },
+          { name: "🟣 جيمنج / Gaming", value: "gaming" },
+          { name: "💗 فن وتصميم / Art", value: "art" },
+          { name: "🩵 منظّم فعاليات / Event", value: "event" },
+          { name: "🟧 منشئ محتوى / Content", value: "content" },
+          { name: "⚫ بوت / Bot", value: "bot" },
+          { name: "⚪ عضو عادي / Normal", value: "normal" },
+          { name: "🔇 مقيّد (قراءة فقط)", value: "restricted" },
+          { name: "🔘 بدون صلاحيات", value: "none" },
+        ))
+        .addStringOption(o => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم)"))
+        .addBooleanOption(o => o.setName("ظهور-منفصل").setDescription("يظهر الرول منفصلاً في قائمة الأعضاء"))
+    )
+    .addSubcommand(sub =>
+      sub.setName("تعديل").setDescription("تعديل رتبة موجودة (صلاحيات + اسم + لون)")
+        .addRoleOption(o => o.setName("الرول").setDescription("الرتبة المراد تعديلها").setRequired(true))
+        .addStringOption(o => o.setName("نوع").setDescription("نوع الرتبة (اختياري)").addChoices(
+          { name: "🔴 إدارة (Administrator)", value: "admin" },
+          { name: "🟠 مشرف (Moderator)", value: "mod" },
+          { name: "🟤 مساعد مشرف (Helper)", value: "helper" },
+          { name: "🟡 VIP", value: "vip" },
+          { name: "💜 بوستر (Server Booster)", value: "booster" },
+          { name: "🔵 موثّق (Verified)", value: "verified" },
+          { name: "🥇 ذهبية (Golden)", value: "golden" },
+          { name: "🥈 فضية (Silver)", value: "silver" },
+          { name: "🥉 برونزية (Bronze)", value: "bronze" },
+          { name: "💎 بلاتينية (Platinum)", value: "platinum" },
+          { name: "🟢 موسيقى / Music", value: "music" },
+          { name: "🟣 جيمنج / Gaming", value: "gaming" },
+          { name: "💗 فن وتصميم / Art", value: "art" },
+          { name: "🩵 منظّم فعاليات / Event", value: "event" },
+          { name: "🟧 منشئ محتوى / Content", value: "content" },
+          { name: "⚫ بوت / Bot", value: "bot" },
+          { name: "⚪ عضو عادي / Normal", value: "normal" },
+          { name: "🔇 مقيّد (قراءة فقط)", value: "restricted" },
+          { name: "🔘 مسح كل الصلاحيات", value: "none" },
+        ))
+        .addStringOption(o => o.setName("اسم").setDescription("الاسم الجديد (اختياري)"))
+        .addStringOption(o => o.setName("لون").setDescription("اللون الجديد (hex أو اسم) (اختياري)"))
+    )
+    .addSubcommand(sub => sub.setName("مستويات-عرض").setDescription("عرض رتب المستويات الحالية [أونر]"))
+    .addSubcommand(sub =>
+      sub.setName("مستويات-إضافة").setDescription("إضافة رتبة على مستوى معين [أونر]")
+        .addIntegerOption(o => o.setName("لفل").setDescription("رقم المستوى المطلوب").setRequired(true).setMinValue(1).setMaxValue(999))
+        .addRoleOption(o => o.setName("رول").setDescription("الرتبة اللي هتتضاف").setRequired(true))
+        .addStringOption(o => o.setName("اسم").setDescription("اسم الرتبة (اختياري)"))
+    )
+    .addSubcommand(sub =>
+      sub.setName("مستويات-حذف").setDescription("حذف رتبة مستوى معين [أونر]")
+        .addIntegerOption(o => o.setName("لفل").setDescription("رقم المستوى").setRequired(true).setMinValue(1))
+    )
+    .addSubcommand(sub => sub.setName("مستويات-ريست").setDescription("ريست رتب المستويات للافتراضي [أونر]")),
+  // ── إعدادات ──────────────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("إعدادات")
+    .setDescription("⚙️ إعدادات وضبط السيرفر [إدارة]")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addAttachmentOption((o) =>
-      o.setName("ملف").setDescription("ملف الـ JSON اللي حملته من أمر نسخة-احتياطية").setRequired(true)
+    .addSubcommand(sub =>
+      sub.setName("ترحيب").setDescription("تعيين قناة رسائل الترحيب")
+        .addChannelOption(o => o.setName("القناة").setDescription("القناة المخصصة للترحيب").setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName("لوجز").setDescription("تعيين قناة تسجيل أوامر الأونر [أونر]")
+        .addChannelOption(o => o.setName("قناة").setDescription("القناة المخصصة للوجز").setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName("auto-mod").setDescription("تشغيل أو إيقاف نظام Auto-Mod [أونر]")
+        .addStringOption(o => o.setName("حالة").setDescription("تشغيل أو إيقاف").setRequired(true)
+          .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" }))
+    )
+    .addSubcommand(sub => sub.setName("لوحة").setDescription("إرسال لوحة تحكم الإدارة"))
+    .addSubcommand(sub => sub.setName("اقتراحات").setDescription("إرسال لوحة الاقتراحات مع زر"))
+    .addSubcommand(sub =>
+      sub.setName("إعلان").setDescription("تعديل رسالة البوت في روم الإعلانات [أونر]")
+        .addStringOption(o => o.setName("message_id").setDescription("الـ ID بتاع الرسالة (اختياري)"))
+        .addIntegerOption(o => o.setName("موضع").setDescription("رقم الرسالة من الأخر (1=الأخيرة)").setMinValue(1).setMaxValue(20))
+    )
+    .addSubcommand(sub =>
+      sub.setName("اختبار").setDescription("اختبار رسالة الترحيب أو الوداع")
+        .addStringOption(o => o.setName("نوع").setDescription("اختار نوع الرسالة").setRequired(true)
+          .addChoices({ name: "🎉 رسالة ترحيب", value: "welcome" }, { name: "🥀 رسالة وداع", value: "goodbye" }))
     ),
+  // ── نسخة ─────────────────────────────────────────────────────────
   new SlashCommandBuilder()
-    .setName("قناة-النسخ")
-    .setDescription("تعيين قناة النسخ الاحتياطية اليومية [إدارة] / Set daily backup channel")
+    .setName("نسخة")
+    .setDescription("💾 النسخ الاحتياطية [إدارة]")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption((o) =>
-      o.setName("id").setDescription("الـ ID بتاع القناة — انسخه من Discord").setRequired(true)
+    .addSubcommand(sub => sub.setName("احتياطية").setDescription("تحميل نسخة احتياطية من بيانات السيرفر"))
+    .addSubcommand(sub =>
+      sub.setName("استرجاع").setDescription("استرجاع بيانات السيرفر من نسخة احتياطية")
+        .addAttachmentOption(o => o.setName("ملف").setDescription("ملف الـ JSON اللي حملته من أمر نسخة احتياطية").setRequired(true))
+    )
+    .addSubcommand(sub =>
+      sub.setName("قناة").setDescription("تعيين قناة النسخ الاحتياطية اليومية")
+        .addStringOption(o => o.setName("id").setDescription("الـ ID بتاع القناة").setRequired(true))
     ),
+  // ── أونر ─────────────────────────────────────────────────────────
   new SlashCommandBuilder()
-    .setName("تشغيل-اختبار")
-    .setDescription("اختبار رسالة الترحيب أو الوداع [إدارة] / Test welcome or goodbye message")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption((o) =>
-      o.setName("نوع")
-        .setDescription("اختار نوع الرسالة")
-        .setRequired(true)
-        .addChoices(
-          { name: "🎉 رسالة ترحيب", value: "welcome" },
-          { name: "🥀 رسالة وداع",  value: "goodbye" }
-        )
-    ),
-  new SlashCommandBuilder()
-    .setName("قناة-اللوجز")
-    .setDescription("تعيين قناة تسجيل أوامر الأونر [أونر فقط]")
-    .addChannelOption((o) =>
-      o.setName("قناة").setDescription("القناة المخصصة للوجز").setRequired(true)
-    ),
-  new SlashCommandBuilder()
-    .setName("رسالة-جماعية")
-    .setDescription("إرسال رسالة جماعية لكل الأعضاء أو في قناة [أونر فقط]")
-    .addStringOption((o) =>
-      o.setName("نوع")
-        .setDescription("وين تبعت الرسالة؟")
-        .setRequired(true)
-        .addChoices(
-          { name: "📩 رسائل خاصة لكل الأعضاء", value: "dm" },
-          { name: "📢 في قناة محددة", value: "channel" }
-        )
-    )
-    .addStringOption((o) =>
-      o.setName("نص").setDescription("نص الرسالة").setRequired(true)
-    )
-    .addChannelOption((o) =>
-      o.setName("قناة").setDescription("القناة (لو اخترت إرسال في قناة)")
-    ),
-  new SlashCommandBuilder()
-    .setName("لوحة-dm")
-    .setDescription("فتح لوحة تحكم الأونر في الـ DM [أونر فقط]"),
-  new SlashCommandBuilder()
-    .setName("حالة-البوت")
-    .setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
-  new SlashCommandBuilder()
-    .setName("مفاتيح-جيميني")
-    .setDescription("إدارة مفاتيح Gemini API [أونر فقط]")
+    .setName("أونر")
+    .setDescription("👑 أوامر الأونر الخاصة [أونر فقط]")
     .addSubcommand(sub =>
-      sub.setName("عرض").setDescription("اعرض كل المفاتيح وحالتها")
+      sub.setName("طريقة-كلام").setDescription("تغيير طريقة كلام البوت")
+        .addStringOption(o => o.setName("أسلوب").setDescription("اختر الأسلوب المطلوب").setRequired(true).addChoices(
+          { name: "🎩 محترم — رد لطيف ومودّب", value: "normal" },
+          { name: "😈 حر — أكثر حرية في الكلام", value: "free" },
+          { name: "☠️ توكسيك — حاد ومباشر", value: "toxic" }
+        ))
     )
     .addSubcommand(sub =>
-      sub.setName("إضافة")
-        .setDescription("ضيف مفاتيح جديدة للنظام")
-        .addStringOption(opt =>
-          opt.setName("مفاتيح")
-            .setDescription("المفاتيح مفصولة بفاصلة أو سطر جديد")
-            .setRequired(true)
-        )
+      sub.setName("رسالة").setDescription("إرسال رسالة جماعية لكل الأعضاء أو في قناة")
+        .addStringOption(o => o.setName("نوع").setDescription("وين تبعت الرسالة؟").setRequired(true)
+          .addChoices({ name: "📩 رسائل خاصة لكل الأعضاء", value: "dm" }, { name: "📢 في قناة محددة", value: "channel" }))
+        .addStringOption(o => o.setName("نص").setDescription("نص الرسالة").setRequired(true))
+        .addChannelOption(o => o.setName("قناة").setDescription("القناة (لو اخترت إرسال في قناة)"))
+    )
+    .addSubcommand(sub => sub.setName("dm").setDescription("فتح لوحة تحكم الأونر في الـ DM"))
+    .addSubcommand(sub => sub.setName("جيميني-عرض").setDescription("عرض كل مفاتيح Gemini وحالتها"))
+    .addSubcommand(sub =>
+      sub.setName("جيميني-إضافة").setDescription("إضافة مفاتيح Gemini جديدة")
+        .addStringOption(o => o.setName("مفاتيح").setDescription("المفاتيح مفصولة بفاصلة أو سطر جديد").setRequired(true))
     )
     .addSubcommand(sub =>
-      sub.setName("تفريش").setDescription("تفريش المفاتيح المحروقة وإعادة تشغيلها")
+      sub.setName("جيميني-حذف").setDescription("حذف مفتاح Gemini")
+        .addIntegerOption(o => o.setName("رقم").setDescription("رقم المفتاح من قائمة العرض").setRequired(true).setMinValue(1))
     )
     .addSubcommand(sub =>
-      sub.setName("حذف")
-        .setDescription("احذف مفتاح من النظام")
-        .addIntegerOption(opt =>
-          opt.setName("رقم").setDescription("رقم المفتاح من قائمة العرض").setRequired(true).setMinValue(1)
-        )
+      sub.setName("جيميني-تحديد").setDescription("تحديد مفتاح Gemini معين للاستخدام")
+        .addIntegerOption(o => o.setName("رقم").setDescription("رقم المفتاح من قائمة العرض").setRequired(true).setMinValue(1))
     )
-    .addSubcommand(sub =>
-      sub.setName("تحديد")
-        .setDescription("حدد مفتاح معين للاستخدام")
-        .addIntegerOption(opt =>
-          opt.setName("رقم").setDescription("رقم المفتاح من قائمة العرض").setRequired(true).setMinValue(1)
-        )
-    ),
-  new SlashCommandBuilder()
-    .setName("رفع-بلوك")
-    .setDescription("ارفع البلوك عن يوزر قبل ما الوقت يخلص [أونر فقط]")
-    .addUserOption(opt =>
-      opt.setName("يوزر")
-        .setDescription("اليوزر اللي هترفع عنه البلوك")
-        .setRequired(true)
-    ),
-  new SlashCommandBuilder()
-    .setName("قائمة-مبلوكين")
-    .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
-  // ── رتب المستويات ──────────────────────────────────────────
-  new SlashCommandBuilder()
-    .setName("رتب-المستويات")
-    .setDescription("إدارة رتب المستويات التلقائية [أونر فقط]")
-    .addSubcommand(sub =>
-      sub.setName("عرض").setDescription("اعرض كل الرتب المضبوطة حالياً")
-    )
-    .addSubcommand(sub =>
-      sub.setName("إضافة")
-        .setDescription("ضيف رتبة جديدة على مستوى معين")
-        .addIntegerOption(opt =>
-          opt.setName("لفل").setDescription("رقم المستوى المطلوب").setRequired(true).setMinValue(1).setMaxValue(999)
-        )
-        .addRoleOption(opt =>
-          opt.setName("رول").setDescription("الرتبة اللي هتتضاف").setRequired(true)
-        )
-        .addStringOption(opt =>
-          opt.setName("اسم").setDescription("اسم الرتبة (اختياري — لو فاضيه هياخد اسم الرول)")
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName("حذف")
-        .setDescription("احذف الرتبة المضبوطة على مستوى معين")
-        .addIntegerOption(opt =>
-          opt.setName("لفل").setDescription("رقم المستوى المراد حذف رتبته").setRequired(true).setMinValue(1)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName("ريست").setDescription("رجّع الإعدادات الافتراضية (Silver لفل 20 / Golden لفل 50)")
-    ),
-  shopCommand,
-  myAbilitiesCommand,
+    .addSubcommand(sub => sub.setName("جيميني-تفريش").setDescription("تفريش المفاتيح المحروقة وإعادة تشغيلها")),
+  // ── ألعاب وحياة ──────────────────────────────────────────────────
   gamesHubCommand,
   latestFeaturesCommand,
-  speechModeCommand,
-  new SlashCommandBuilder()
-    .setName("auto-mod")
-    .setDescription("🛡️ تشغيل أو إيقاف نظام Auto-Mod [أونر فقط]")
-    .addStringOption(o =>
-      o.setName("حالة").setDescription("تشغيل أو إيقاف").setRequired(true)
-        .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
-    ),
-  pollCommand,
   bankLifeCommand,
-  bankLuckEgCommand.data,
   new ContextMenuCommandBuilder()
     .setName("✏️ تعديل رسالة")
     .setType(ApplicationCommandType.Message),
@@ -582,17 +502,14 @@ function validateLatestFeatures(allCommands) {
       "ping","hello","roll","serverinfo","userinfo",
       "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","✏️ تعديل رسالة",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي",
-      "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات",
-      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول",
-      "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة",
-      "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف",
-      "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
-      "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
-      "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
-      "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
+      "اقتراح","صورة","حالة-البوت",
+      "اقتصاد","متجر","مودريشن","موسيقى","مانهوا","رول","إعدادات","نسخة","أونر",
       "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","حياة","بنك-الحظ-مصري",
-      "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
+      "كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
+      "play","skip","stop","queue","pause","resume","nowplaying","volume",
+      "clean_chapter","translate_chapter","تنظيف_صورة","تنظيف_رابط","استخراج_نص",
+      "مفاتيح-جيميني","تغيير-طريقة-الكلام","auto-mod",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -785,12 +702,19 @@ const SUGGESTION_STATUSES = {
   solved:   { text: "🔧 تم حل المشكلة",          color: 0x1abc9c },
 };
 
-function buildSuggestionEmbed({ user, text, statusKey = "pending", moderator = null }) {
-  const status = SUGGESTION_STATUSES[statusKey] || SUGGESTION_STATUSES.pending;
+const SUGGESTION_TYPES = {
+  idea:  { emoji: "💡", title: "اقتراح جديد"    },
+  bug:   { emoji: "🔴", title: "بلاغ عن مشكلة"  },
+  other: { emoji: "💬", title: "تعليق عام"       },
+};
+
+function buildSuggestionEmbed({ user, text, statusKey = "pending", moderator = null, type = "idea" }) {
+  const status   = SUGGESTION_STATUSES[statusKey] || SUGGESTION_STATUSES.pending;
+  const typeInfo = SUGGESTION_TYPES[type] || SUGGESTION_TYPES.idea;
 
   const embed = new EmbedBuilder()
     .setColor(status.color)
-    .setTitle("💡 اقتراح جديد")
+    .setTitle(`${typeInfo.emoji} ${typeInfo.title}`)
     .addFields(
       {
         name: "👤 مقدم الاقتراح",
@@ -1156,7 +1080,7 @@ async function ensureSuggestionsPanel(clientInstance, force = false) {
 }
 
 // ✅ [تعديل 4] deferReply أول سطر لمنع Rate Limit تحت الضغط
-async function handleSuggestionModalSubmit(interaction, suggestionText) {
+async function handleSuggestionModalSubmit(interaction, suggestionText, type = "idea") {
   // deferReply فوراً قبل أي عملية ثقيلة
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ ephemeral: true });
@@ -1189,6 +1113,7 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
         user: interaction.user,
         text: trimmedText,
         statusKey: "pending",
+        type,
       }),
     ],
   });
@@ -1197,6 +1122,7 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
     user: interaction.user,
     text: trimmedText,
     statusKey: "pending",
+    type,
   }).addFields({
     name: SUGGESTION_REF_FIELD,
     value: `${publicMessage.id}|${interaction.user.id}`,
@@ -1844,41 +1770,7 @@ client.on("interactionCreate", async (interaction) => {
 
     try {
       // ─── قائمة المبلوكين ─────────────────────────────────────────
-      if (cmd === "قائمة-مبلوكين") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const now = Date.now();
-        const blocked = [...spamData.entries()]
-          .filter(([, s]) => s.blockedUntil > now)
-          .map(([uid, s]) => {
-            const mins = Math.ceil((s.blockedUntil - now) / 60_000);
-            return `<@${uid}> — فاضل **${mins} دقيقة**`;
-          });
-        if (blocked.length === 0) {
-          return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
-        }
-        return interaction.reply({
-          content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`,
-          ephemeral: true,
-        });
-      }
-
       // ─── رفع البلوك ──────────────────────────────────────────────
-      if (cmd === "رفع-بلوك") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const target = interaction.options.getUser("يوزر");
-        const entry  = spamData.get(target.id);
-        if (!entry || entry.blockedUntil <= Date.now()) {
-          return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, ephemeral: true });
-        }
-        entry.blockedUntil = 0;
-        entry.timestamps   = [];
-        return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, ephemeral: true });
-      }
-
       // ─── حالة البوت ─────────────────────────────────────────────
       if (cmd === "حالة-البوت") {
         if (!config.isOwner(user.id)) {
@@ -1920,220 +1812,12 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ── مفاتيح-جيميني ──────────────────────────────────────────────
-      if (cmd === "مفاتيح-جيميني") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const sub = interaction.options.getSubcommand();
-        await interaction.deferReply({ ephemeral: true });
-
-        if (sub === "عرض") {
-          const stats = getKeyStats();
-          const total = stats.length;
-          const active = stats.filter(k => !k.exhausted).length;
-          const lines = stats.map(k =>
-            `${k.exhausted ? "🔴" : "🟢"} مفتاح ${k.index} — \`...${k.suffix}\``
-          ).join("\n");
-
-          const embed = new EmbedBuilder()
-            .setColor(active > 0 ? 0x2ecc71 : 0xe74c3c)
-            .setTitle("🔑 مفاتيح Gemini API")
-            .setDescription(lines || "لا يوجد مفاتيح")
-            .addFields(
-              { name: "📊 إجمالي المفاتيح", value: `\`${total}\``, inline: true },
-              { name: "✅ شغالين",           value: `\`${active}\``, inline: true },
-              { name: "🚫 خلصوا",            value: `\`${total - active}\``, inline: true },
-              { name: "📈 طلبات/يوم",        value: `\`${total * 20} طلب\``, inline: true },
-            )
-            .setFooter({ text: "المفاتيح المحمرّة بترجع تلقائياً بعد ساعة" })
-            .setTimestamp();
-          return interaction.editReply({ embeds: [embed] });
-        }
-
-        if (sub === "تفريش") {
-          const count = resetExhaustedKeys();
-          const embed = new EmbedBuilder()
-            .setColor(0x3498db)
-            .setTitle("🔄 تفريش المفاتيح")
-            .setDescription(count > 0
-              ? `✅ اتفرشت **${count}** مفاتيح محروقة وبقت شغالة تاني!`
-              : "ℹ️ مفيش مفاتيح محروقة دلوقتي، كلهم شغالين!"
-            )
-            .addFields({ name: "📊 إجمالي المفاتيح", value: `\`${getKeyCount()} مفتاح\``, inline: true })
-            .setTimestamp();
-          return interaction.editReply({ embeds: [embed] });
-        }
-
-        if (sub === "إضافة") {
-          const raw = interaction.options.getString("مفاتيح");
-          const newKeys = raw.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
-          if (newKeys.length === 0) {
-            return interaction.editReply("❌ مفيش مفاتيح صح في الرسالة!");
-          }
-          const result = addKeys(newKeys);
-          const embed = new EmbedBuilder()
-            .setColor(result.added > 0 ? 0x2ecc71 : 0xf39c12)
-            .setTitle("🔑 إضافة مفاتيح Gemini")
-            .addFields(
-              { name: "✅ اتضافوا",        value: `\`${result.added}\``,          inline: true },
-              { name: "⏭️ مكررين (تجاهل)", value: `\`${newKeys.length - result.added}\``, inline: true },
-              { name: "📊 الإجمالي دلوقتي", value: `\`${result.total} مفتاح\``,   inline: true },
-              { name: "📈 طلبات/يوم",       value: `\`${result.total * 20} طلب\``, inline: true },
-            )
-            .setFooter({ text: "💾 المفاتيح اتحفظت — هتبقى بعد أي restart تلقائياً" })
-            .setTimestamp();
-          return interaction.editReply({ embeds: [embed] });
-        }
-
-        if (sub === "حذف") {
-          const num = interaction.options.getInteger("رقم");
-          const ok = removeKey(num - 1);
-          if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /مفاتيح-جيميني عرض عشان تشوف الأرقام`);
-          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🗑️ تم حذف المفتاح").setDescription(`✅ تم حذف المفتاح رقم **${num}** من النظام والملف المحفوظ.\nإجمالي المفاتيح دلوقتي: **${getKeyCount()}**`).setTimestamp()] });
-        }
-
-        if (sub === "تحديد") {
-          const num = interaction.options.getInteger("رقم");
-          const ok = setActiveKeyIndex(num - 1);
-          if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /مفاتيح-جيميني عرض عشان تشوف الأرقام`);
-          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🎯 تم تحديد المفتاح").setDescription(`✅ البوت هيستخدم المفتاح رقم **${num}** من دلوقتي.\nالمفاتيح المحروقة اتمسحت ومستعدة.`).setTimestamp()] });
-        }
-      }
-
-      // ─── رتب المستويات ────────────────────────────────────────────
-      if (cmd === "رتب-المستويات") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const sub = interaction.options.getSubcommand();
-        await interaction.deferReply({ ephemeral: true });
-
-        // ── عرض ──
-        if (sub === "عرض") {
-          const ranks = getRanks();
-          if (ranks.length === 0) {
-            return interaction.editReply({ embeds: [
-              new EmbedBuilder().setColor(0x95a5a6)
-                .setTitle("🏆 رتب المستويات")
-                .setDescription("مفيش رتب مضبوطة دلوقتي — استخدم `/رتب-المستويات إضافة` عشان تضيف.")
-                .setTimestamp()
-            ]});
-          }
-          const lines = ranks
-            .sort((a, b) => b.level - a.level)
-            .map((r, i) => `**${i + 1}.** لفل \`${r.level}\` ← **${r.name}** \`(${r.roleId})\``)
-            .join("\n");
-          return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(0xFFD700)
-              .setTitle("🏆 رتب المستويات الحالية")
-              .setDescription(lines)
-              .addFields({ name: "📊 إجمالي الرتب", value: `\`${ranks.length}\``, inline: true })
-              .setFooter({ text: "البوت بيدي أعلى رتبة مستحقة عند ارتقاء المستوى" })
-              .setTimestamp()
-          ]});
-        }
-
-        // ── إضافة ──
-        if (sub === "إضافة") {
-          const level  = interaction.options.getInteger("لفل");
-          const role   = interaction.options.getRole("رول");
-          const name   = interaction.options.getString("اسم") || role.name;
-          const result = addRank(level, role.id, name);
-          return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(result.added ? 0x2ecc71 : 0xf39c12)
-              .setTitle(result.added ? "✅ تمت الإضافة" : "🔄 تم التحديث")
-              .addFields(
-                { name: "📶 المستوى",   value: `\`${level}\``,          inline: true },
-                { name: "🎭 الرتبة",    value: `${role} — **${name}**`, inline: true },
-                { name: "📊 إجمالي",    value: `\`${result.total}\``,   inline: true },
-              )
-              .setFooter({ text: "💾 اتحفظ — هيفضل بعد أي restart" })
-              .setTimestamp()
-          ]});
-        }
-
-        // ── حذف ──
-        if (sub === "حذف") {
-          const level = interaction.options.getInteger("لفل");
-          const ok    = removeRank(level);
-          if (!ok) {
-            return interaction.editReply(`❌ مفيش رتبة مضبوطة على المستوى **${level}** — استخدم \`/رتب-المستويات عرض\` عشان تشوف الأرقام الصح.`);
-          }
-          return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(0xe74c3c)
-              .setTitle("🗑️ تم الحذف")
-              .setDescription(`✅ اتحذفت الرتبة المضبوطة على المستوى **${level}** من النظام.\nإجمالي الرتب دلوقتي: **${getRanks().length}**`)
-              .setTimestamp()
-          ]});
-        }
-
-        // ── ريست ──
-        if (sub === "ريست") {
-          const defaults = resetRanks();
-          const lines = defaults.map(r => `لفل \`${r.level}\` ← **${r.name}**`).join("\n");
-          return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(0x3498db)
-              .setTitle("🔄 تم الريست")
-              .setDescription(`✅ رجع للإعدادات الافتراضية:\n${lines}`)
-              .setTimestamp()
-          ]});
-        }
-      }
-
-      // ═══════════════════════════════════════════════════════════════
-      //  Advanced Features Commands
-      // ═══════════════════════════════════════════════════════════════
-
-      // Image Cleaner
-      if (cmd === "clean_chapter") {
-        return await handleCleanChapter(interaction);
-      }
-
-      // Translator
-      if (cmd === "translate_chapter") {
-        return await handleTranslateChapter(interaction);
-      }
-
-      // ── قدرات المتجر ─────────────────────────────────────────────
-      if (cmd === "متجر-قدرات")  return await handleShopCommand(interaction, db);
-      if (cmd === "قدراتي")      return await handleMyAbilitiesCommand(interaction, db);
-      if (cmd === "استفتاء")      return await handlePollCommand(interaction);
       if (cmd === "الألعاب")     return await handleGamesHubCommand(interaction);
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
       if (cmd === "حياة")          return await handleBankLifeCommand(interaction, db);
-      if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
-      if (cmd === "تغيير-طريقة-الكلام") {
-        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        const mode = interaction.options.getString("أسلوب");
-        botSpeechMode = mode;
-        const modeLabel = mode === "free" ? "😈 حر — البوت بيكلم بحرية أكتر"
-          : mode === "toxic" ? "☠️ توكسيك — البوت حاد ومباشر وبيشتم لو شتموه"
-          : "🎩 محترم — رد لطيف ومودّب";
-        const modeColor = mode === "toxic" ? 0xe74c3c : mode === "free" ? 0x9b59b6 : 0x2ecc71;
-        return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(modeColor).setTitle("💬 تم تغيير أسلوب الكلام")
-            .setDescription(`أسلوب البوت دلوقتي: **${modeLabel}**\n\n*التغيير فوري على كل الردود الجديدة*`)
-            .setTimestamp()],
-          ephemeral: true
-        });
-      }
 
-      if (cmd === "auto-mod") {
-        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        const state = interaction.options.getString("حالة");
-        autoModEnabled = state === "on";
-        return interaction.reply({
-          embeds: [new EmbedBuilder()
-            .setColor(autoModEnabled ? 0x2ecc71 : 0xe74c3c)
-            .setTitle(autoModEnabled ? "✅ Auto-Mod شغال" : "❌ Auto-Mod متوقف")
-            .setDescription(
-              autoModEnabled
-                ? "نظام Auto-Mod **شغال** دلوقتي — الرسايل المخالفة هتتحذف تلقائياً."
-                : "نظام Auto-Mod **متوقف** — مفيش رسايل هتتحذف تلقائياً."
-            ).setTimestamp()],
-          ephemeral: true
-        });
-      }
+
+
 
       // Quick Cleaning Tools
       if (cmd === "تنظيف_صورة") {
@@ -2150,8 +1834,7 @@ client.on("interactionCreate", async (interaction) => {
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
       // ✅ FIX: ضممنا أوامر الموسيقى العربية (تشغيل/إيقاف/تخطي/قائمة-تشغيل/توقف-مؤقت/استئناف)
       //   لنفس الـ array عشان تستخدم بالظبط نفس منطق الـ DM proxy المستخدم مع الأوامر الإنجليزية
-      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume",
-                          "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف"];
+      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume"];
       if (MUSIC_CMDS.includes(cmd)) {
         let musicInteraction = interaction;
         if (isFromDM && guild) {
@@ -2170,7 +1853,294 @@ client.on("interactionCreate", async (interaction) => {
         // ✅ FIX: أمر "تشغيل" العربي بيستخدم اسم الخيار "بحث" مش "query".
         //   نلف الـ interaction بـ proxy خفيف يحوّل getString('query') → getString('بحث')
         //   تلقائيًا، عشان handlePlay الأصلية تشتغل من غير أي تعديل في commands/music.js
-        if (cmd === "تشغيل") {
+        if (cmd === "play") {
+          const { handlePlay } = await import("./commands/music.js");
+          return await handlePlay(musicInteraction);
+        }
+        if (cmd === "skip") {
+          const { handleSkip } = await import("./commands/music.js");
+          return await handleSkip(musicInteraction);
+        }
+        if (cmd === "stop") {
+          const { handleStop } = await import("./commands/music.js");
+          return await handleStop(musicInteraction);
+        }
+        if (cmd === "queue") {
+          const { handleQueue } = await import("./commands/music.js");
+          return await handleQueue(musicInteraction);
+        }
+        if (cmd === "pause") {
+          const { handlePause } = await import("./commands/music.js");
+          return await handlePause(musicInteraction);
+        }
+        if (cmd === "resume") {
+          const { handleResume } = await import("./commands/music.js");
+          return await handleResume(musicInteraction);
+        }
+        if (cmd === "nowplaying") {
+          const { handleNowPlaying } = await import("./commands/music.js");
+          return await handleNowPlaying(musicInteraction);
+        }
+        if (cmd === "volume") {
+          const { handleVolume } = await import("./commands/music.js");
+          return await handleVolume(musicInteraction);
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      //  Legacy Commands
+      // ═══════════════════════════════════════════════════════════════
+
+
+      // ══════════════════════════════════════════════════════════════
+      //  Grouped Handlers (Subcommand Groups)
+      // ══════════════════════════════════════════════════════════════
+
+      if (cmd === "اقتصاد") {
+        const sub = interaction.options.getSubcommand();
+        if (sub === "بروفايل") {
+          const target = interaction.options.getUser("عضو") ?? user;
+          const uData = db.getUser(target.id);
+          return interaction.reply({ content: `✨ **بروفايل ${target.username}:**\n📊 المستوى: \`${uData.level}\`\n🪙 الكوينز: \`${uData.coins}\`\n⭐ الـ XP الحالي: \`${uData.xp}\`` });
+        }
+        if (sub === "محفظة") {
+          const uData = db.getUser(user.id);
+          return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
+        }
+        if (sub === "يومي") {
+          const uData = db.getUser(user.id);
+          const now = Date.now();
+          if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت المكافأة بتاعتك النهاردة خلاص يسطا تعالي بكره!", ephemeral: true });
+          db.updateUser(user.id, { coins: uData.coins + 200, lastDaily: now });
+          return interaction.reply({ content: "🎁 أخدت الـ **200 كوينز** اليومية بتاعتك بنجاح! نوّرت المحفظة." });
+        }
+        if (sub === "ليدربورد") {
+          const type = interaction.options.getString("نوع") ?? "coins";
+          const allUsers = db.getAllData().users;
+          const sorted = Object.entries(allUsers).sort((a, b) => b[1][type] - a[1][type]).slice(0, 10);
+          let txt = `🏆 **قائمة الترتيب الأعلى (حسب ${type}):**\n`;
+          sorted.forEach(([id, data], i) => txt += `**#${i+1}** <@${id}> ⬅️ ${data[type]}\n`);
+          return interaction.reply({ content: txt });
+        }
+        if (sub === "إعطاء") {
+          if (!interaction.member?.permissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: "❌ الأمر ده للإدارة بس!", ephemeral: true });
+          const target = interaction.options.getUser("عضو");
+          const amount = interaction.options.getInteger("كمية");
+          const uData = db.getUser(target.id);
+          db.updateUser(target.id, { coins: uData.coins + amount });
+          return interaction.reply({ content: `🪙 تم منح **${amount}** كوينز لـ ${target} بنجاح.` });
+        }
+      }
+
+      if (cmd === "متجر") {
+        const sub = interaction.options.getSubcommand();
+        if (sub === "عرض") {
+          const embed = new EmbedBuilder()
+            .setColor(0xffd700)
+            .setTitle("🛒 متجر رتب السيرفر")
+            .setDescription("🥇 Golden: 5000 كوينز\n🥈 Silver: 2500 كوينز\n🥉 Bronze: 1000 كوينز\n\nللشراء استخدم `/متجر شراء`");
+          return interaction.reply({ embeds: [embed] });
+        }
+        if (sub === "شراء") {
+          const choice = interaction.options.getString("الرتبة");
+          const uData = db.getUser(user.id);
+          const prices = { golden: 5000, silver: 2500, bronze: 1000 };
+          if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية يا غالي!", ephemeral: true });
+          const role = guild.roles.cache.find(r => r.name.toLowerCase() === choice);
+          if (!role) return interaction.reply({ content: "❌ الرتبة مش متأسسة بنفس الاسم في السيرفر ده!", ephemeral: true });
+          const member = await guild.members.fetch(user.id);
+          await member.roles.add(role);
+          db.updateUser(user.id, { coins: uData.coins - prices[choice] });
+          return interaction.reply({ content: `🎉 مبروك! اشتريت الرتبة بنجاح واتخصم ${prices[choice]} كوينز.` });
+        }
+        if (sub === "قدرات") return await handleShopCommand(interaction, db);
+        if (sub === "قدراتي") return await handleMyAbilitiesCommand(interaction, db);
+      }
+
+      if (cmd === "مودريشن") {
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === "تحذير") {
+          const targetUser = interaction.options.getUser("عضو");
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          const target = await guild.members.fetch(targetUser.id).catch(() => null);
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          const reason = interaction.options.getString("السبب");
+          const actionId = `modwarn_${Date.now()}_${user.id}`;
+          pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+          setTimeout(() => pendingModActions.delete(actionId), 90_000);
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تأكيد التحذير")
+              .setDescription(`هتحذّر <@${target.id}>؟\n📋 **السبب:** ${reason}`)
+              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التحذير").setStyle(ButtonStyle.Danger),
+              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+            )],
+            ephemeral: true,
+          });
+        }
+
+        if (sub === "اسكات") {
+          const targetUser = interaction.options.getUser("عضو");
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          const target = await guild.members.fetch(targetUser.id).catch(() => null);
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          const dur = interaction.options.getInteger("مدة");
+          const reason = interaction.options.getString("السبب") ?? "غير محدد";
+          const actionId = `modmute_${Date.now()}_${user.id}`;
+          pendingModActions.set(actionId, { type: "mute", targetId: target.id, reason, duration: dur, modId: user.id, guildId: guild.id });
+          setTimeout(() => pendingModActions.delete(actionId), 90_000);
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تأكيد الإسكات")
+              .setDescription(`هتسكّت <@${target.id}> لمدة **${dur} دقيقة**؟\n📋 **السبب:** ${reason}`)
+              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الإسكات").setStyle(ButtonStyle.Danger),
+              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+            )],
+            ephemeral: true,
+          });
+        }
+
+        if (sub === "طرد") {
+          const targetUser = interaction.options.getUser("عضو");
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          const target = await guild.members.fetch(targetUser.id).catch(() => null);
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          const reason = interaction.options.getString("السبب") ?? "غير محدد";
+          const actionId = `modkick_${Date.now()}_${user.id}`;
+          pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+          setTimeout(() => pendingModActions.delete(actionId), 90_000);
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تأكيد الطرد")
+              .setDescription(`هتطرد <@${target.id}> من السيرفر؟\n📋 **السبب:** ${reason}`)
+              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الطرد").setStyle(ButtonStyle.Danger),
+              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+            )],
+            ephemeral: true,
+          });
+        }
+
+        if (sub === "تبنيد") {
+          const targetUser = interaction.options.getUser("عضو");
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          const target = await guild.members.fetch(targetUser.id).catch(() => null);
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          const reason = interaction.options.getString("السبب") ?? "غير محدد";
+          const actionId = `modban_${Date.now()}_${user.id}`;
+          pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+          setTimeout(() => pendingModActions.delete(actionId), 90_000);
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تأكيد التبنيد")
+              .setDescription(`هتبند <@${target.id}> من السيرفر نهائياً؟\n📋 **السبب:** ${reason}`)
+              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+            components: [new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التبنيد").setStyle(ButtonStyle.Danger),
+              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+            )],
+            ephemeral: true,
+          });
+        }
+
+        if (sub === "مسح") {
+          if (isFromDM) return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** 🤖", ephemeral: true });
+          const num = interaction.options.getInteger("عدد");
+          await interaction.deferReply({ ephemeral: true });
+          let remaining = num, totalDeleted = 0;
+          while (remaining > 0) {
+            const batch = Math.min(remaining, 100);
+            const deleted = await channel.bulkDelete(batch, true);
+            totalDeleted += deleted.size;
+            remaining -= batch;
+            if (deleted.size < batch) break;
+          }
+          sendModLog("clear", interaction.user, null, `مسح ${totalDeleted} رسالة`, { count: totalDeleted, channel: channel.id }).catch(() => {});
+          return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
+        }
+
+        if (sub === "مسح-كل") {
+          if (isFromDM) return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
+          const confirmRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`wipe_confirm|${channel.id}`).setLabel("✅ نعم، امسح كل حاجة").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId("wipe_cancel").setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary)
+          );
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("⚠️ تأكيد مسح الروم بالكامل")
+              .setDescription(`هتمسح **كل** رسايل الروم ${channel} بما فيها اللي فوق 14 يوم!\n\nمتقدرش ترجعها، متأكد؟`)],
+            components: [confirmRow],
+            ephemeral: true
+          });
+        }
+
+        if (sub === "سجل") {
+          const nameOrId = interaction.options.getString("عضو");
+          let targetMember = null, targetUser = user;
+          if (nameOrId) {
+            targetMember = await resolveMember(guild, nameOrId);
+            if (!targetMember) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+            targetUser = targetMember.user;
+          }
+          const warns = db.getWarnings(targetUser.id);
+          if (warns.length === 0) {
+            return interaction.reply({ embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("😇 سجل أبيض!").setDescription(`<@${targetUser.id}> ما عندهوش أي تحذيرات 🌟`).setThumbnail(targetUser.displayAvatarURL())], ephemeral: true });
+          }
+          const warnFields = warns.slice(-10).reverse().map((w, i) => ({
+            name: `⚠️ تحذير #${warns.length - i}`,
+            value: `📋 **السبب:** ${w.reason ?? "غير محدد"}\n🛡️ **المشرف:** <@${w.modId ?? "مجهول"}>\n📅 **التاريخ:** <t:${Math.floor((w.timestamp ?? Date.now()) / 1000)}:R>`,
+            inline: false,
+          }));
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("📋 سجل التحذيرات")
+              .setDescription(`<@${targetUser.id}> عنده **${warns.length}** تحذير${warns.length > 10 ? ` (بيتعرض آخر 10)` : ""}`)
+              .setThumbnail(targetUser.displayAvatarURL())
+              .addFields(...warnFields).setTimestamp()],
+            ephemeral: true,
+          });
+        }
+
+        if (sub === "رفع-بلوك") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          const target = interaction.options.getUser("يوزر");
+          const entry = spamData.get(target.id);
+          if (!entry || entry.blockedUntil <= Date.now()) return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, ephemeral: true });
+          entry.blockedUntil = 0;
+          entry.timestamps = [];
+          return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, ephemeral: true });
+        }
+
+        if (sub === "مبلوكين") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          const now = Date.now();
+          const blocked = [...spamData.entries()]
+            .filter(([, s]) => s.blockedUntil > now)
+            .map(([uid, s]) => {
+              const mins = Math.ceil((s.blockedUntil - now) / 60_000);
+              return `<@${uid}> — فاضل **${mins} دقيقة**`;
+            });
+          if (blocked.length === 0) return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
+          return interaction.reply({ content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`, ephemeral: true });
+        }
+      }
+
+      if (cmd === "موسيقى") {
+        const sub = interaction.options.getSubcommand();
+        let musicInteraction = interaction;
+        if (isFromDM && guild) {
+          const guildMember = await guild.members.fetch(user.id).catch(() => null);
+          musicInteraction = new Proxy(interaction, {
+            get(target, prop) {
+              if (prop === "guild")   return guild;
+              if (prop === "guildId") return guild.id;
+              if (prop === "member")  return guildMember;
+              const val = target[prop];
+              return typeof val === "function" ? val.bind(target) : val;
+            }
+          });
+        }
+        if (sub === "تشغيل") {
           musicInteraction = new Proxy(musicInteraction, {
             get(target, prop) {
               if (prop === "options") {
@@ -2192,45 +2162,388 @@ client.on("interactionCreate", async (interaction) => {
               return typeof val === "function" ? val.bind(target) : val;
             }
           });
-        }
-
-        if (cmd === "play" || cmd === "تشغيل") {
           const { handlePlay } = await import("./commands/music.js");
           return await handlePlay(musicInteraction);
         }
-        if (cmd === "skip" || cmd === "تخطي") {
-          const { handleSkip } = await import("./commands/music.js");
-          return await handleSkip(musicInteraction);
+        if (sub === "إيقاف") { const { handleStop }    = await import("./commands/music.js"); return await handleStop(musicInteraction); }
+        if (sub === "تخطي")  { const { handleSkip }    = await import("./commands/music.js"); return await handleSkip(musicInteraction); }
+        if (sub === "قائمة") { const { handleQueue }   = await import("./commands/music.js"); return await handleQueue(musicInteraction); }
+        if (sub === "توقف")  { const { handlePause }   = await import("./commands/music.js"); return await handlePause(musicInteraction); }
+        if (sub === "استئناف") { const { handleResume } = await import("./commands/music.js"); return await handleResume(musicInteraction); }
+      }
+
+      if (cmd === "مانهوا") {
+        const sub = interaction.options.getSubcommand();
+        if (sub === "إنشاء") {
+          const name = interaction.options.getString("الاسم");
+          if (db.getManhwaDict(name) && Object.keys(db.getManhwaDict(name)).length > 0) return interaction.reply({ content: "❌ القاموس ده موجود بالفعل يسطا!", ephemeral: true });
+          db.addManhwaTerm(name, "_init", "_init");
+          return interaction.reply({ content: `✅ تم إنشاء قاموس مانهوا جديد باسم: **${name}**` });
         }
-        if (cmd === "stop" || cmd === "إيقاف") {
-          const { handleStop } = await import("./commands/music.js");
-          return await handleStop(musicInteraction);
+        if (sub === "إضافة") {
+          const mName = interaction.options.getString("المانهوا");
+          const eng = interaction.options.getString("الإنجليزي");
+          const arb = interaction.options.getString("العربي");
+          if (!db.getManhwaDict(mName) || Object.keys(db.getManhwaDict(mName)).length === 0) return interaction.reply({ content: "❌ القاموس ده مش موجود، اعمله الأول!", ephemeral: true });
+          db.addManhwaTerm(mName, eng, arb);
+          return interaction.reply({ content: `✅ تم إضافة المصطلح بنجاح في قاموس **${mName}**.` });
         }
-        if (cmd === "queue" || cmd === "قائمة-تشغيل") {
-          const { handleQueue } = await import("./commands/music.js");
-          return await handleQueue(musicInteraction);
-        }
-        if (cmd === "pause" || cmd === "توقف-مؤقت") {
-          const { handlePause } = await import("./commands/music.js");
-          return await handlePause(musicInteraction);
-        }
-        if (cmd === "resume" || cmd === "استئناف") {
-          const { handleResume } = await import("./commands/music.js");
-          return await handleResume(musicInteraction);
-        }
-        if (cmd === "nowplaying") {
-          const { handleNowPlaying } = await import("./commands/music.js");
-          return await handleNowPlaying(musicInteraction);
-        }
-        if (cmd === "volume") {
-          const { handleVolume } = await import("./commands/music.js");
-          return await handleVolume(musicInteraction);
+        if (sub === "عرض") {
+          const mName = interaction.options.getString("المانهوا");
+          if (mName) {
+            const dict = db.getManhwaDict(mName);
+            if (!dict || Object.keys(dict).length === 0) return interaction.reply({ content: "❌ مش موجود القاموس ده!", ephemeral: true });
+            let txt = `📖 **مصطلحات مانهوا [ ${mName} ]:**\n`;
+            Object.keys(dict).forEach(k => { if (k !== "_init") txt += `• \`${k}\` ➡️ \`${dict[k]}\` \n`; });
+            return interaction.reply({ content: txt });
+          } else {
+            const allDicts = db.getAllManhwaDicts();
+            const dictNames = Object.keys(allDicts).filter(k => Object.keys(allDicts[k]).length > 1);
+            return interaction.reply({ content: `📂 **القواامس المتوفرة:** ${dictNames.join(", ") || "مفيش"}` });
+          }
         }
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      //  Legacy Commands
-      // ═══════════════════════════════════════════════════════════════
+      if (cmd === "رول") {
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === "إنشاء") {
+          await interaction.deferReply({ ephemeral: true });
+          const roleName  = interaction.options.getString("الاسم");
+          const roleType  = interaction.options.getString("نوع");
+          const roleColor = interaction.options.getString("لون");
+          const roleHoist = interaction.options.getBoolean("ظهور-منفصل");
+          const preset  = roleType ? ROLE_PRESETS[roleType] : smartRolePerms(roleName);
+          const color   = roleColor ? parseRoleColor(roleColor) : (preset?.color ?? 0x99aab5);
+          const hoist   = roleHoist !== null ? roleHoist : (preset?.hoist ?? false);
+          const perms   = preset?.permissions ?? [];
+          try {
+            const newRole = await guild.roles.create({ name: roleName, color, hoist, reason: `بأمر ${user.username}` });
+            if (perms.length) {
+              const valid = perms.filter(p => PermissionFlagsBits[p]);
+              if (valid.length) await newRole.setPermissions(valid.map(p => PermissionFlagsBits[p]));
+            }
+            const presetLabel = preset?.label ?? "تلقائي";
+            return interaction.editReply({ embeds: [new EmbedBuilder().setColor(color).setTitle("✨ تم إنشاء الرتبة")
+              .addFields(
+                { name: "🏷️ الاسم", value: newRole.name, inline: true },
+                { name: "🆔 الـ ID", value: `\`${newRole.id}\``, inline: true },
+                { name: "📌 النوع", value: presetLabel, inline: true },
+                { name: "📌 ظهور منفصل", value: hoist ? "✅" : "❌", inline: true },
+                { name: "🔐 الصلاحيات", value: perms.length ? `\`${perms.join(", ")}\`` : "لا صلاحيات", inline: false },
+              ).setTimestamp()] });
+          } catch (err) {
+            logger.error("خطأ في إنشاء الرول:", err);
+            return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+          }
+        }
+
+        if (sub === "تعديل") {
+          await interaction.deferReply({ ephemeral: true });
+          const targetRole = interaction.options.getRole("الرول");
+          const roleType   = interaction.options.getString("نوع");
+          const newName    = interaction.options.getString("اسم");
+          const newColor   = interaction.options.getString("لون");
+          try {
+            let role = guild.roles.cache.get(targetRole.id);
+            if (!role) role = await guild.roles.fetch(targetRole.id).catch(() => null);
+            if (!role) return interaction.editReply({ content: "❌ مش لاقي الرول — تأكد إنه موجود!" });
+            const changes = [];
+            const editData = {};
+            if (roleType) {
+              const preset = ROLE_PRESETS[roleType];
+              if (!preset) return interaction.editReply({ content: "❌ نوع غير معروف!" });
+              const valid = preset.permissions.filter(p => PermissionFlagsBits[p]);
+              editData.permissions = valid.map(p => PermissionFlagsBits[p]);
+              changes.push({ name: "🔐 الصلاحيات", value: preset.permissions.length ? `\`${preset.permissions.join(", ")}\`` : "لا صلاحيات", inline: false });
+              changes.push({ name: "📋 النوع", value: preset.label, inline: true });
+            }
+            if (newName) { editData.name = newName; changes.push({ name: "🏷️ الاسم الجديد", value: newName, inline: true }); }
+            if (newColor) {
+              const parsedColor = parseRoleColor(newColor);
+              if (parsedColor === null) return interaction.editReply({ content: `❌ اللون **${newColor}** مش صح — استخدم hex مثل #FF5733 أو اسم إنجليزي مثل red` });
+              editData.color = parsedColor;
+              changes.push({ name: "🎨 اللون", value: newColor, inline: true });
+            }
+            if (!roleType && !newName && !newColor) return interaction.editReply({ content: "❌ لازم تحدد نوع أو اسم أو لون على الأقل!" });
+            await role.edit({ ...editData, reason: `بأمر ${user.username}` });
+            return interaction.editReply({ embeds: [new EmbedBuilder().setColor(editData.color ?? 0x9b59b6).setTitle("✅ تم تعديل الرتبة")
+              .addFields({ name: "🏷️ الرتبة", value: role.name, inline: true }, { name: "🆔 الـ ID", value: `\`${role.id}\``, inline: true }, ...changes).setTimestamp()] });
+          } catch (err) {
+            logger.error("خطأ في تعديل الرول:", err);
+            return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+          }
+        }
+
+        if (sub === "مستويات-عرض") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          await interaction.deferReply({ ephemeral: true });
+          const ranks = getRanks();
+          if (ranks.length === 0) return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x95a5a6).setTitle("🏆 رتب المستويات").setDescription("مفيش رتب مضبوطة دلوقتي — استخدم `/رول مستويات-إضافة` عشان تضيف.").setTimestamp()] });
+          const lines = ranks.sort((a, b) => b.level - a.level).map((r, i) => `**${i + 1}.** لفل \`${r.level}\` ← **${r.name}** \`(${r.roleId})\``).join("\n");
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0xFFD700).setTitle("🏆 رتب المستويات الحالية").setDescription(lines).addFields({ name: "📊 إجمالي الرتب", value: `\`${ranks.length}\``, inline: true }).setFooter({ text: "البوت بيدي أعلى رتبة مستحقة عند ارتقاء المستوى" }).setTimestamp()] });
+        }
+
+        if (sub === "مستويات-إضافة") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          await interaction.deferReply({ ephemeral: true });
+          const level = interaction.options.getInteger("لفل");
+          const role  = interaction.options.getRole("رول");
+          const name  = interaction.options.getString("اسم") || role.name;
+          const result = addRank(level, role.id, name);
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(result.added ? 0x2ecc71 : 0xf39c12).setTitle(result.added ? "✅ تمت الإضافة" : "🔄 تم التحديث").addFields({ name: "📶 المستوى", value: `\`${level}\``, inline: true }, { name: "🎭 الرتبة", value: `${role} — **${name}**`, inline: true }, { name: "📊 إجمالي", value: `\`${result.total}\``, inline: true }).setFooter({ text: "💾 اتحفظ — هيفضل بعد أي restart" }).setTimestamp()] });
+        }
+
+        if (sub === "مستويات-حذف") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          await interaction.deferReply({ ephemeral: true });
+          const level = interaction.options.getInteger("لفل");
+          const ok = removeRank(level);
+          if (!ok) return interaction.editReply(`❌ مفيش رتبة مضبوطة على المستوى **${level}** — استخدم \`/رول مستويات-عرض\` عشان تشوف الأرقام الصح.`);
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🗑️ تم الحذف").setDescription(`✅ اتحذفت الرتبة المضبوطة على المستوى **${level}** من النظام.\nإجمالي الرتب دلوقتي: **${getRanks().length}**`).setTimestamp()] });
+        }
+
+        if (sub === "مستويات-ريست") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          await interaction.deferReply({ ephemeral: true });
+          const defaults = resetRanks();
+          const lines = defaults.map(r => `لفل \`${r.level}\` ← **${r.name}**`).join("\n");
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔄 تم الريست").setDescription(`✅ رجع للإعدادات الافتراضية:\n${lines}`).setTimestamp()] });
+        }
+      }
+
+      if (cmd === "إعدادات") {
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === "ترحيب") {
+          const ch = interaction.options.getChannel("القناة");
+          db.setWelcomeChannel(guild.id, ch.id);
+          return interaction.reply({ content: `✅ تم تعيين قناة الترحيب لتكون: ${ch}` });
+        }
+
+        if (sub === "لوجز") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          const ch = interaction.options.getChannel("قناة");
+          if (!db.data.settings) db.data.settings = {};
+          db.data.settings.ownerLogsChannelId = ch.id;
+          db.save();
+          return interaction.reply({ embeds: [new EmbedBuilder().setColor(0xe67e22).setTitle("📋 تم تعيين قناة اللوجز").setDescription(`كل أوامر الأونر هتتسجل في ${ch} من دلوقتي ✅`).setTimestamp()], ephemeral: true });
+        }
+
+        if (sub === "auto-mod") {
+          if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          const state = interaction.options.getString("حالة");
+          autoModEnabled = state === "on";
+          return interaction.reply({ embeds: [new EmbedBuilder().setColor(autoModEnabled ? 0x2ecc71 : 0xe74c3c).setTitle(autoModEnabled ? "✅ Auto-Mod شغال" : "❌ Auto-Mod متوقف").setDescription(autoModEnabled ? "نظام Auto-Mod **شغال** دلوقتي — الرسايل المخالفة هتتحذف تلقائياً." : "نظام Auto-Mod **متوقف** — مفيش رسايل هتتحذف تلقائياً.").setTimestamp()], ephemeral: true });
+        }
+
+        if (sub === "لوحة") {
+          const embed = new EmbedBuilder().setColor(0x2c3e50).setTitle("🔒 لوحة التحكم").setDescription(`أعضاء السيرفر: ${guild.memberCount}`);
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("admin_clear_games").setLabel("🎮 تصفير الألعاب").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId("refresh_suggestions_board").setLabel("🔄 تحديث لوحة الاقتراحات").setStyle(ButtonStyle.Primary)
+          );
+          return interaction.reply({ embeds: [embed], components: [row] });
+        }
+
+        if (sub === "اقتراحات") {
+          try {
+            const posted = await ensureSuggestionsPanel(client, true);
+            if (!posted) return interaction.reply({ content: "❌ لم أجد روم الاقتراحات! تأكد من صحة معرف القناة.", ephemeral: true });
+            return interaction.reply({ content: "✅ تم إرسال لوحة الاقتراحات بنجاح في روم الاقتراحات!", ephemeral: true });
+          } catch (err) {
+            logger.error("خطأ في إرسال لوحة الاقتراحات:", err);
+            return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true });
+          }
+        }
+
+        if (sub === "إعلان") {
+          if (!isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          await interaction.deferReply({ ephemeral: true });
+          try {
+            const msgId = interaction.options.getString("message_id")?.trim();
+            const pos   = interaction.options.getInteger("موضع") ?? 1;
+            const annCh = await client.channels.fetch(ANNOUNCE_CHANNEL_ID);
+            let targetMsg = null;
+            if (msgId) {
+              targetMsg = await annCh.messages.fetch(msgId).catch(() => null);
+              if (!targetMsg) return interaction.editReply({ content: "❌ مش لاقي الرسالة دي! تأكد إن الـ ID صح." });
+            } else {
+              const fetched = await annCh.messages.fetch({ limit: 50 });
+              const botMsgs = [...fetched.values()].filter(m => m.author.id === client.user.id);
+              targetMsg = botMsgs[pos - 1] ?? null;
+              if (!targetMsg) return interaction.editReply({ content: `❌ مش لاقي رسالة رقم **${pos}** من الأخر للبوت في روم الإعلانات!` });
+            }
+            if (targetMsg.author.id !== client.user.id) return interaction.editReply({ content: "❌ الرسالة دي مش بتاعت البوت!" });
+            const preview = (targetMsg.content || "— الرسالة فيها Embed بس —").slice(0, 800);
+            pendingAnnounceEdits.set(targetMsg.id, { content: targetMsg.content || "", channelId: ANNOUNCE_CHANNEL_ID });
+            setTimeout(() => pendingAnnounceEdits.delete(targetMsg.id), 600_000);
+            return interaction.editReply({
+              embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("✏️ تعديل الإعلان — الخطوة الأولى").setDescription(`**الرسالة الحالية:**\n\`\`\`\n${preview}\n\`\`\``).setFooter({ text: `ID: ${targetMsg.id}` }).setTimestamp()],
+              components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`edit_announce_btn|${targetMsg.id}`).setLabel("✏️ افتح المحرر").setStyle(ButtonStyle.Primary))]
+            });
+          } catch (err) {
+            logger.error("خطأ في إعدادات-إعلان:", err);
+            return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+          }
+        }
+
+        if (sub === "اختبار") {
+          const type = interaction.options.getString("نوع");
+          const WELCOME_CHANNEL_ID = "1486100560494203183";
+          const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
+          if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", ephemeral: true });
+          await interaction.deferReply({ ephemeral: true });
+          if (type === "welcome") {
+            const imagePath = path.join(__dirname, "welcome.png");
+            const attachment = new AttachmentBuilder(imagePath, { name: "welcome.png" });
+            const embed = new EmbedBuilder().setColor("#A020F0").setTitle("⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️")
+              .setDescription(`🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n👤 **الـعـضـو الـجـديـد:** ${user}\n🆔 **الـمـعـرّف الـخـاص:** \`${user.id}\`\n📊 **أنـت الـفـرعـون رقـم:** \`${guild.memberCount}\` في مملكتنا!\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`)
+              .setImage("attachment://welcome.png").setFooter({ text: "🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️ [اختبار]" }).setTimestamp();
+            await testChannel.send({ embeds: [embed], files: [attachment] });
+          } else {
+            const embed = new EmbedBuilder().setColor("#A020F0").setTitle("🥀 فرعون جديد سابنا ومشي 🥀")
+              .setDescription(`🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n👤 **الفرعون اللي ودعنا:** ${user}\n🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n📊 **بقينا** \`${guild.memberCount}\` **فرعون في المملكة.**\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`)
+              .setThumbnail(user.displayAvatarURL({ size: 256 })).setFooter({ text: "🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️ [اختبار]" }).setTimestamp();
+            await testChannel.send({ embeds: [embed] });
+          }
+          return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
+        }
+      }
+
+      if (cmd === "نسخة") {
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === "احتياطية") {
+          await interaction.deferReply({ ephemeral: true });
+          try {
+            const allData = db.getAllData();
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+            const jsonBuffer = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
+            const attachment = new AttachmentBuilder(jsonBuffer, { name: `backup_${dateStr}.json` });
+            const userCount = Object.keys(allData.users || {}).length;
+            return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("💾 نسخة احتياطية جاهزة").addFields({ name: "📅 التاريخ", value: dateStr, inline: true }, { name: "👥 عدد الأعضاء المحفوظين", value: `${userCount}`, inline: true }).setFooter({ text: "احتفظ بالملف في مكان آمن ✅" }).setTimestamp()], files: [attachment] });
+          } catch (err) {
+            logger.error("خطأ في النسخة الاحتياطية:", err);
+            return interaction.editReply({ content: "معلش يسطا ثواني بس" });
+          }
+        }
+
+        if (sub === "استرجاع") {
+          await interaction.deferReply({ ephemeral: true });
+          try {
+            const attachment = interaction.options.getAttachment("ملف");
+            if (!attachment.name.endsWith(".json")) return interaction.editReply({ content: "❌ الملف لازم يكون `.json` — ارفع الملف اللي حملته من أمر `/نسخة احتياطية`" });
+            const response = await fetch(attachment.url);
+            const text = await response.text();
+            let parsed;
+            try { parsed = JSON.parse(text); } catch { return interaction.editReply({ content: "❌ الملف تالف أو مش JSON صح!" }); }
+            if (!parsed.users) return interaction.editReply({ content: "❌ الملف ده مش نسخة احتياطية صحيحة — مفيش بيانات أعضاء فيه!" });
+            const oldCount = Object.keys(db.getAllData().users || {}).length;
+            db.data = parsed;
+            db.save();
+            const newCount = Object.keys(parsed.users || {}).length;
+            return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("✅ تم الاسترجاع بنجاح").setDescription("تم استبدال بيانات السيرفر بالنسخة الاحتياطية المرفوعة.").addFields({ name: "👥 أعضاء قبل", value: `${oldCount}`, inline: true }, { name: "👥 أعضاء بعد", value: `${newCount}`, inline: true }, { name: "👤 نفّذ العملية", value: `${user}`, inline: false }).setFooter({ text: "⚠️ البيانات القديمة اتاستبدلت نهائياً" }).setTimestamp()] });
+          } catch (err) {
+            logger.error("خطأ في الاسترجاع:", err);
+            return interaction.editReply({ content: "معلش يسطا ثواني بس" });
+          }
+        }
+
+        if (sub === "قناة") {
+          const channelId = interaction.options.getString("id").trim();
+          const ch = await guild.channels.fetch(channelId).catch(() => null);
+          if (!ch) return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, ephemeral: true });
+          if (!db.data.settings) db.data.settings = {};
+          db.data.settings.backupChannelId = ch.id;
+          db.save();
+          return interaction.reply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("✅ تم تعيين قناة النسخ الاحتياطية").setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ <#${ch.id}> كل 24 ساعة 🔄`).addFields({ name: "📋 الـ ID المحفوظ", value: `\`${ch.id}\``, inline: true }).setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" }).setTimestamp()], ephemeral: true });
+        }
+      }
+
+      if (cmd === "أونر") {
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === "طريقة-كلام") {
+          const mode = interaction.options.getString("أسلوب");
+          botSpeechMode = mode;
+          const modeLabel = mode === "free" ? "😈 حر — البوت بيكلم بحرية أكتر" : mode === "toxic" ? "☠️ توكسيك — البوت حاد ومباشر وبيشتم لو شتموه" : "🎩 محترم — رد لطيف ومودّب";
+          const modeColor = mode === "toxic" ? 0xe74c3c : mode === "free" ? 0x9b59b6 : 0x2ecc71;
+          return interaction.reply({ embeds: [new EmbedBuilder().setColor(modeColor).setTitle("💬 تم تغيير أسلوب الكلام").setDescription(`أسلوب البوت دلوقتي: **${modeLabel}**\n\n*التغيير فوري على كل الردود الجديدة*`).setTimestamp()], ephemeral: true });
+        }
+
+        if (sub === "رسالة") {
+          await interaction.deferReply({ ephemeral: true });
+          const نوع = interaction.options.getString("نوع");
+          const نص  = interaction.options.getString("نص");
+          const embed = new EmbedBuilder().setColor(0xa020f0).setTitle("📣 رسالة من الإدارة").setDescription(نص).setFooter({ text: `⚜️ سيرفر الفراعنة — ${guild.name}` }).setTimestamp();
+          if (نوع === "channel") {
+            const targetChannel = interaction.options.getChannel("قناة");
+            if (!targetChannel) return interaction.editReply({ content: "❌ حدد القناة اللي هتبعت فيها الرسالة!" });
+            await targetChannel.send({ embeds: [embed] });
+            return interaction.editReply({ content: `✅ اتبعتت الرسالة في ${targetChannel} بنجاح!` });
+          }
+          if (نوع === "dm") {
+            await guild.members.fetch();
+            const members = guild.members.cache.filter(m => !m.user.bot);
+            let sent = 0, failed = 0;
+            for (const [, member] of members) {
+              await member.send({ embeds: [embed] }).then(() => sent++).catch(() => failed++);
+              await new Promise(r => setTimeout(r, 500));
+            }
+            return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("✅ تم إرسال الرسالة الجماعية").addFields({ name: "📩 وصلت لـ", value: `${sent} عضو`, inline: true }, { name: "❌ فشلت مع", value: `${failed} عضو`, inline: true }).setFooter({ text: "الفشل عادةً بسبب إعدادات الخصوصية عند العضو" }).setTimestamp()] });
+          }
+        }
+
+        if (sub === "dm") {
+          const g = guild || client.guilds.cache.first();
+          const panel = buildDMControlPanel(g);
+          if (isFromDM) return interaction.reply(panel);
+          return interaction.reply({ ...panel, ephemeral: true });
+        }
+
+        if (sub === "جيميني-عرض") {
+          await interaction.deferReply({ ephemeral: true });
+          const stats = getKeyStats();
+          const total = stats.length;
+          const active = stats.filter(k => !k.exhausted).length;
+          const lines = stats.map(k => `${k.exhausted ? "🔴" : "🟢"} مفتاح ${k.index} — \`...${k.suffix}\``).join("\n");
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(active > 0 ? 0x2ecc71 : 0xe74c3c).setTitle("🔑 مفاتيح Gemini API").setDescription(lines || "لا يوجد مفاتيح").addFields({ name: "📊 إجمالي المفاتيح", value: `\`${total}\``, inline: true }, { name: "✅ شغالين", value: `\`${active}\``, inline: true }, { name: "🚫 خلصوا", value: `\`${total - active}\``, inline: true }, { name: "📈 طلبات/يوم", value: `\`${total * 20} طلب\``, inline: true }).setFooter({ text: "المفاتيح المحمرّة بترجع تلقائياً بعد ساعة" }).setTimestamp()] });
+        }
+
+        if (sub === "جيميني-إضافة") {
+          await interaction.deferReply({ ephemeral: true });
+          const raw = interaction.options.getString("مفاتيح");
+          const newKeys = raw.split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
+          if (newKeys.length === 0) return interaction.editReply("❌ مفيش مفاتيح صح في الرسالة!");
+          const result = addKeys(newKeys);
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(result.added > 0 ? 0x2ecc71 : 0xf39c12).setTitle("🔑 إضافة مفاتيح Gemini").addFields({ name: "✅ اتضافوا", value: `\`${result.added}\``, inline: true }, { name: "⏭️ مكررين (تجاهل)", value: `\`${newKeys.length - result.added}\``, inline: true }, { name: "📊 الإجمالي دلوقتي", value: `\`${result.total} مفتاح\``, inline: true }, { name: "📈 طلبات/يوم", value: `\`${result.total * 20} طلب\``, inline: true }).setFooter({ text: "💾 المفاتيح اتحفظت — هتبقى بعد أي restart تلقائياً" }).setTimestamp()] });
+        }
+
+        if (sub === "جيميني-حذف") {
+          await interaction.deferReply({ ephemeral: true });
+          const num = interaction.options.getInteger("رقم");
+          const ok = removeKey(num - 1);
+          if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /أونر جيميني-عرض عشان تشوف الأرقام`);
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🗑️ تم حذف المفتاح").setDescription(`✅ تم حذف المفتاح رقم **${num}** من النظام.\nإجمالي المفاتيح دلوقتي: **${getKeyCount()}**`).setTimestamp()] });
+        }
+
+        if (sub === "جيميني-تحديد") {
+          await interaction.deferReply({ ephemeral: true });
+          const num = interaction.options.getInteger("رقم");
+          const ok = setActiveKeyIndex(num - 1);
+          if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /أونر جيميني-عرض عشان تشوف الأرقام`);
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🎯 تم تحديد المفتاح").setDescription(`✅ البوت هيستخدم المفتاح رقم **${num}** من دلوقتي.\nالمفاتيح المحروقة اتمسحت ومستعدة.`).setTimestamp()] });
+        }
+
+        if (sub === "جيميني-تفريش") {
+          await interaction.deferReply({ ephemeral: true });
+          const count = resetExhaustedKeys();
+          return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔄 تفريش المفاتيح").setDescription(count > 0 ? `✅ اتفرشت **${count}** مفاتيح محروقة وبقت شغالة تاني!` : "ℹ️ مفيش مفاتيح محروقة دلوقتي، كلهم شغالين!").addFields({ name: "📊 إجمالي المفاتيح", value: `\`${getKeyCount()} مفتاح\``, inline: true }).setTimestamp()] });
+        }
+      }
 
       if (cmd === "ping") {
         return interaction.reply({ content: `🏓 سرعة البوت الحالية: **${client.ws.ping}ms**` });
@@ -2463,365 +2776,7 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: "📜 **قوانين السيرفر:**\n1. الاحترام المتبادل.\n2. عدم نشر روابط خارجية وإعلانات سبام.\n3. التحدث فى الرومات المخصصة." });
       }
 
-      if (cmd === "بروفايل") {
-        const target = interaction.options.getUser("عضو") ?? user;
-        const uData = db.getUser(target.id);
-        return interaction.reply({ content: `✨ **بروفايل ${target.username}:**\n📊 المستوى: \`${uData.level}\`\n🪙 الكوينز: \`${uData.coins}\`\n⭐ الـ XP الحالي: \`${uData.xp}\`` });
-      }
 
-      if (cmd === "محفظة") {
-        const uData = db.getUser(user.id);
-        return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
-      }
-
-      if (cmd === "متجر") {
-        const embed = new EmbedBuilder()
-          .setColor(0xffd700)
-          .setTitle("🛒 متجر رتب السيرفر")
-          .setDescription("🥇 Golden: 5000 كوينز\n🥈 Silver: 2500 كوينز\n🥉 Bronze: 1000 كوينز\n\nللشراء اكتب `/شراء الرتبة:(الاسم)`");
-        return interaction.reply({ embeds: [embed] });
-      }
-
-      if (cmd === "شراء") {
-        const choice = interaction.options.getString("الرتبة");
-        const uData = db.getUser(user.id);
-        const prices = { golden: 5000, silver: 2500, bronze: 1000 };
-        if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية يا غالي!", ephemeral: true });
-
-        const role = guild.roles.cache.find(r => r.name.toLowerCase() === choice);
-        if (!role) return interaction.reply({ content: "❌ الرتبة مش متأسسة بنفس الاسم في السيرفر ده!", ephemeral: true });
-
-        const member = await guild.members.fetch(user.id);
-        await member.roles.add(role);
-        db.updateUser(user.id, { coins: uData.coins - prices[choice] });
-        return interaction.reply({ content: `🎉 مبروك! اشتريت الرتبة بنجاح واتخصم ${prices[choice]} كوينز.` });
-      }
-
-      if (cmd === "إعطاء") {
-        const target = interaction.options.getUser("عضو");
-        const amount = interaction.options.getInteger("كمية");
-        const uData = db.getUser(target.id);
-        db.updateUser(target.id, { coins: uData.coins + amount });
-        return interaction.reply({ content: `🪙 تم منح **${amount}** كوينز لـ ${target} بنجاح.` });
-      }
-
-      if (cmd === "يومي") {
-        const uData = db.getUser(user.id);
-        const now = Date.now();
-        if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت المكافأة بتاعتك النهاردة خلاص يسطا تعالي بكره!", ephemeral: true });
-        db.updateUser(user.id, { coins: uData.coins + 200, lastDaily: now });
-        return interaction.reply({ content: "🎁 أخدت الـ **200 كوينز** اليومية بتاعتك بنجاح! نوّرت المحفظة." });
-      }
-
-      if (cmd === "مانهوا-إنشاء") {
-        const name = interaction.options.getString("الاسم");
-        if (db.getManhwaDict(name) && Object.keys(db.getManhwaDict(name)).length > 0) return interaction.reply({ content: "❌ القاموس ده موجود بالفعل يسطا!", ephemeral: true });
-        db.addManhwaTerm(name, "_init", "_init");
-        return interaction.reply({ content: `✅ تم إنشاء قاموس مانهوا جديد باسم: **${name}**` });
-      }
-
-      if (cmd === "مانهوا-إضافة-مصطلح") {
-        const mName = interaction.options.getString("المانهوا");
-        const eng = interaction.options.getString("الإنجليزي");
-        const arb = interaction.options.getString("العربي");
-        if (!db.getManhwaDict(mName) || Object.keys(db.getManhwaDict(mName)).length === 0) return interaction.reply({ content: "❌ القاموس ده مش موجود، اعمله الأول!", ephemeral: true });
-        db.addManhwaTerm(mName, eng, arb);
-        return interaction.reply({ content: `✅ تم إضافة المصطلح بنجاح في قاموس **${mName}**.` });
-      }
-
-      if (cmd === "مانهوا-عرض-المصطلحات") {
-        const mName = interaction.options.getString("المانهوا");
-        if (mName) {
-          const dict = db.getManhwaDict(mName);
-          if (!dict || Object.keys(dict).length === 0) return interaction.reply({ content: "❌ مش موجود القاموس ده!", ephemeral: true });
-          let txt = `📖 **مصطلحات مانهوا [ ${mName} ]:**\n`;
-          Object.keys(dict).forEach(k => { if (k !== "_init") txt += `• \`${k}\` ➡️ \`${dict[k]}\` \n`; });
-          return interaction.reply({ content: txt });
-        } else {
-          const allDicts = db.getAllManhwaDicts();
-          const dictNames = Object.keys(allDicts).filter(k => Object.keys(allDicts[k]).length > 1);
-          return interaction.reply({ content: `📂 **القواامس المتوفرة:** ${dictNames.join(", ") || "مفيش"}` });
-        }
-      }
-
-      if (cmd === "مسح") {
-        if (isFromDM) {
-          return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** 🤖", ephemeral: true });
-        }
-        const num = interaction.options.getInteger("عدد");
-        await interaction.deferReply({ ephemeral: true });
-        let remaining = num;
-        let totalDeleted = 0;
-        while (remaining > 0) {
-          const batch = Math.min(remaining, 100);
-          const deleted = await channel.bulkDelete(batch, true);
-          totalDeleted += deleted.size;
-          remaining -= batch;
-          if (deleted.size < batch) break;
-        }
-        sendModLog("clear", interaction.user, null, `مسح ${totalDeleted} رسالة`, { count: totalDeleted, channel: channel.id }).catch(() => {});
-        return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
-      }
-
-      if (cmd === "مسح-الكل") {
-        if (isFromDM) {
-          return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
-        }
-        const confirmRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`wipe_confirm|${channel.id}`)
-            .setLabel("✅ نعم، امسح كل حاجة")
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId("wipe_cancel")
-            .setLabel("❌ إلغاء")
-            .setStyle(ButtonStyle.Secondary)
-        );
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xe74c3c)
-              .setTitle("⚠️ تأكيد مسح الروم بالكامل")
-              .setDescription(`هتمسح **كل** رسايل الروم ${channel} بما فيها اللي فوق 14 يوم!\n\nمتقدرش ترجعها، متأكد؟`)
-          ],
-          components: [confirmRow],
-          ephemeral: true
-        });
-      }
-
-      // ─── تعديل إعلان (2-Step: اعرض المحتوى → زر → موداال ممليء) ──
-      if (cmd === "تعديل-إعلان") {
-        if (!isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        await interaction.deferReply({ ephemeral: true });
-        try {
-          const msgId   = interaction.options.getString("message_id")?.trim();
-          const pos     = interaction.options.getInteger("موضع") ?? 1;
-          const annCh   = await client.channels.fetch(ANNOUNCE_CHANNEL_ID);
-
-          let targetMsg = null;
-          if (msgId) {
-            targetMsg = await annCh.messages.fetch(msgId).catch(() => null);
-            if (!targetMsg) return interaction.editReply({ content: "❌ مش لاقي الرسالة دي! تأكد إن الـ ID صح." });
-          } else {
-            const fetched = await annCh.messages.fetch({ limit: 50 });
-            const botMsgs = [...fetched.values()].filter(m => m.author.id === client.user.id);
-            targetMsg = botMsgs[pos - 1] ?? null;
-            if (!targetMsg) return interaction.editReply({ content: `❌ مش لاقي رسالة رقم **${pos}** من الأخر للبوت في روم الإعلانات!` });
-          }
-
-          if (targetMsg.author.id !== client.user.id)
-            return interaction.editReply({ content: "❌ الرسالة دي مش بتاعت البوت!" });
-
-          const preview = (targetMsg.content || "— الرسالة فيها Embed بس —").slice(0, 800);
-          pendingAnnounceEdits.set(targetMsg.id, { content: targetMsg.content || "", channelId: ANNOUNCE_CHANNEL_ID });
-          setTimeout(() => pendingAnnounceEdits.delete(targetMsg.id), 600_000);
-
-          return interaction.editReply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(0x3498db)
-                .setTitle("✏️ تعديل الإعلان — الخطوة الأولى")
-                .setDescription(`**الرسالة الحالية:**\n\`\`\`\n${preview}\n\`\`\``)
-                .setFooter({ text: `ID: ${targetMsg.id}` })
-                .setTimestamp()
-            ],
-            components: [new ActionRowBuilder().addComponents(
-              new ButtonBuilder()
-                .setCustomId(`edit_announce_btn|${targetMsg.id}`)
-                .setLabel("✏️ افتح المحرر")
-                .setStyle(ButtonStyle.Primary)
-            )]
-          });
-        } catch (err) {
-          logger.error("خطأ في تعديل-إعلان:", err);
-          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
-        }
-      }
-
-      // ─── إنشاء رول بصلاحيات ذكية ────────────────────────────────
-      if (cmd === "انشاء-رول") {
-        await interaction.deferReply({ ephemeral: true });
-        const roleName  = interaction.options.getString("الاسم");
-        const roleType  = interaction.options.getString("نوع");
-        const roleColor = interaction.options.getString("لون");
-        const roleHoist = interaction.options.getBoolean("ظهور-منفصل");
-
-        const preset  = roleType ? ROLE_PRESETS[roleType] : smartRolePerms(roleName);
-        const color   = roleColor ? parseRoleColor(roleColor) : (preset?.color ?? 0x99aab5);
-        const hoist   = roleHoist !== null ? roleHoist : (preset?.hoist ?? false);
-        const perms   = preset?.permissions ?? [];
-
-        try {
-          const newRole = await guild.roles.create({ name: roleName, color, hoist, reason: `بأمر ${user.username}` });
-          if (perms.length) {
-            const valid = perms.filter(p => PermissionFlagsBits[p]);
-            if (valid.length) await newRole.setPermissions(valid.map(p => PermissionFlagsBits[p]));
-          }
-          const presetLabel = preset?.label ?? "تلقائي";
-          return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(color)
-              .setTitle("✨ تم إنشاء الرتبة")
-              .addFields(
-                { name: "🏷️ الاسم",       value: newRole.name,                                                  inline: true },
-                { name: "🆔 الـ ID",       value: `\`${newRole.id}\``,                                          inline: true },
-                { name: "📌 النوع",        value: presetLabel,                                                   inline: true },
-                { name: "📌 ظهور منفصل",   value: hoist ? "✅" : "❌",                                          inline: true },
-                { name: "🔐 الصلاحيات",   value: perms.length ? `\`${perms.join(", ")}\`` : "لا صلاحيات",      inline: false },
-              ).setTimestamp()
-          ]});
-        } catch (err) {
-          logger.error("خطأ في إنشاء الرول:", err);
-          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
-        }
-      }
-
-      // ─── تعديل رول (صلاحيات + اسم + لون) ────────────────────────
-      if (cmd === "تعديل-الرول") {
-        await interaction.deferReply({ ephemeral: true });
-        const targetRole = interaction.options.getRole("الرول");
-        const roleType   = interaction.options.getString("نوع");
-        const newName    = interaction.options.getString("اسم");
-        const newColor   = interaction.options.getString("لون");
-
-        try {
-          let role = guild.roles.cache.get(targetRole.id);
-          if (!role) role = await guild.roles.fetch(targetRole.id).catch(() => null);
-          if (!role) return interaction.editReply({ content: "❌ مش لاقي الرول — تأكد إنه موجود!" });
-
-          const changes = [];
-          const editData = {};
-
-          // ── صلاحيات ──────────────────────────────────────────────
-          if (roleType) {
-            const preset = ROLE_PRESETS[roleType];
-            if (!preset) return interaction.editReply({ content: "❌ نوع غير معروف!" });
-            const valid = preset.permissions.filter(p => PermissionFlagsBits[p]);
-            editData.permissions = valid.map(p => PermissionFlagsBits[p]);
-            changes.push({ name: "🔐 الصلاحيات", value: preset.permissions.length ? `\`${preset.permissions.join(", ")}\`` : "لا صلاحيات", inline: false });
-            changes.push({ name: "📋 النوع", value: preset.label, inline: true });
-          }
-
-          // ── اسم ──────────────────────────────────────────────────
-          if (newName) {
-            editData.name = newName;
-            changes.push({ name: "🏷️ الاسم الجديد", value: newName, inline: true });
-          }
-
-          // ── لون ──────────────────────────────────────────────────
-          if (newColor) {
-            const parsedColor = parseRoleColor(newColor);
-            if (parsedColor === null) return interaction.editReply({ content: `❌ اللون **${newColor}** مش صح — استخدم hex مثل #FF5733 أو اسم إنجليزي مثل red` });
-            editData.color = parsedColor;
-            changes.push({ name: "🎨 اللون", value: newColor, inline: true });
-          }
-
-          if (!roleType && !newName && !newColor) {
-            return interaction.editReply({ content: "❌ لازم تحدد نوع أو اسم أو لون على الأقل!" });
-          }
-
-          await role.edit({ ...editData, reason: `بأمر ${user.username}` });
-
-          return interaction.editReply({ embeds: [
-            new EmbedBuilder().setColor(editData.color ?? 0x9b59b6)
-              .setTitle("✅ تم تعديل الرتبة")
-              .addFields(
-                { name: "🏷️ الرتبة", value: role.name, inline: true },
-                { name: "🆔 الـ ID", value: `\`${role.id}\``, inline: true },
-                ...changes
-              ).setTimestamp()
-          ]});
-        } catch (err) {
-          logger.error("خطأ في تعديل الرول:", err);
-          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
-        }
-      }
-
-      if (cmd === "تحذير") {
-        const targetUser = interaction.options.getUser("عضو");
-        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-        const target = await guild.members.fetch(targetUser.id).catch(() => null);
-        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-        const reason = interaction.options.getString("السبب");
-        const actionId = `modwarn_${Date.now()}_${user.id}`;
-        pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
-        setTimeout(() => pendingModActions.delete(actionId), 90_000);
-        return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تأكيد التحذير")
-            .setDescription(`هتحذّر <@${target.id}>؟\n📋 **السبب:** ${reason}`)
-            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-          components: [new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التحذير").setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-          )],
-          ephemeral: true,
-        });
-      }
-
-      if (cmd === "اسكات") {
-        const targetUser = interaction.options.getUser("عضو");
-        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-        const target = await guild.members.fetch(targetUser.id).catch(() => null);
-        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-        const dur = interaction.options.getInteger("مدة");
-        const reason = interaction.options.getString("السبب") ?? "غير محدد";
-        const actionId = `modmute_${Date.now()}_${user.id}`;
-        pendingModActions.set(actionId, { type: "mute", targetId: target.id, reason, duration: dur, modId: user.id, guildId: guild.id });
-        setTimeout(() => pendingModActions.delete(actionId), 90_000);
-        return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تأكيد الإسكات")
-            .setDescription(`هتسكّت <@${target.id}> لمدة **${dur} دقيقة**؟\n📋 **السبب:** ${reason}`)
-            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-          components: [new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الإسكات").setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-          )],
-          ephemeral: true,
-        });
-      }
-
-      if (cmd === "طرد") {
-        const targetUser = interaction.options.getUser("عضو");
-        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-        const target = await guild.members.fetch(targetUser.id).catch(() => null);
-        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-        const reason = interaction.options.getString("السبب") ?? "غير محدد";
-        const actionId = `modkick_${Date.now()}_${user.id}`;
-        pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
-        setTimeout(() => pendingModActions.delete(actionId), 90_000);
-        return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تأكيد الطرد")
-            .setDescription(`هتطرد <@${target.id}> من السيرفر؟\n📋 **السبب:** ${reason}`)
-            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-          components: [new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الطرد").setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-          )],
-          ephemeral: true,
-        });
-      }
-
-      if (cmd === "تبنيد") {
-        const targetUser = interaction.options.getUser("عضو");
-        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-        const target = await guild.members.fetch(targetUser.id).catch(() => null);
-        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-        const reason = interaction.options.getString("السبب") ?? "غير محدد";
-        const actionId = `modban_${Date.now()}_${user.id}`;
-        pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
-        setTimeout(() => pendingModActions.delete(actionId), 90_000);
-        return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تأكيد التبنيد")
-            .setDescription(`هتبند <@${target.id}> من السيرفر نهائياً؟\n📋 **السبب:** ${reason}`)
-            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-          components: [new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التبنيد").setStyle(ButtonStyle.Danger),
-            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-          )],
-          ephemeral: true,
-        });
-      }
 
       if (cmd === "مساعدة") {
         const HELP_PAGES = [
@@ -2831,229 +2786,171 @@ client.on("interactionCreate", async (interaction) => {
             fields: [
               { name: "/ping", value: "فحص سرعة البوت (latency)", inline: true },
               { name: "/hello", value: "تحية من البوت 👋", inline: true },
-              { name: "/serverinfo", value: "معلومات السيرفر", inline: true },
-              { name: "/userinfo [@عضو]", value: "معلومات عن أي عضو", inline: true },
-              { name: "/roll", value: "رمي نرد عشوائي 🎲", inline: true },
+              { name: "/roll [أوجه]", value: "رمي نرد بأوجه متغيرة 🎲", inline: true },
+              { name: "/serverinfo", value: "معلومات السيرفر الحالي", inline: true },
+              { name: "/userinfo [عضو]", value: "معلومات عضو", inline: true },
+              { name: "/القوانين", value: "عرض قوانين السيرفر 📜", inline: true },
+              { name: "/اقتراح [نص] [نوع]", value: "إرسال اقتراح أو مشكلة أو تعليق 📬", inline: true },
               { name: "/صورة [وصف]", value: "توليد صورة بالـ AI 🖼️", inline: true },
-              { name: "/القوانين", value: "قوانين السيرفر 📋", inline: true },
-              { name: "/اقتراح [نص]", value: "اقتراح أو مشكلة أو تعليق", inline: true },
-              { name: "/زنجي [رسالة]", value: "دردشة مع الـ AI 🤖", inline: true },
-              { name: "/مساعدة", value: "القائمة دي 😄", inline: true },
-              { name: "/احدث-المميزات", value: "آخر 5 تحديثات في البوت ✨", inline: true },
-              { name: "/حالة-البوت", value: "إحصائيات وأداء البوت 📊", inline: true },
             ],
           },
           {
-            title: "💰 الاقتصاد والكوينز",
+            title: "💰 الاقتصاد — /اقتصاد",
             color: 0xf1c40f,
             fields: [
-              { name: "/بروفايل [@عضو]", value: "اللفل والـ XP والكوينز والبنك", inline: true },
-              { name: "/محفظة", value: "رصيدك بالكوينز بسرعة 👛", inline: true },
-              { name: "/يومي", value: "مكافأة يومية (كل 24 ساعة) 🎁", inline: true },
-              { name: "/ليدربورد [coins/xp]", value: "أفضل 10 مستخدمين 🏆", inline: true },
-              { name: "/متجر", value: "شراء أدوار بالكوينز 🛒", inline: true },
-              { name: "/شراء [الرتبة]", value: "شراء رتبة محددة", inline: true },
-              { name: "/إعطاء @عضو [مبلغ]", value: "إعطاء كوينز (أدمن فقط) 💸", inline: true },
-              { name: "/متجر-قدرات", value: "شراء قدرات خاصة للألعاب ⚡", inline: true },
-              { name: "/قدراتي", value: "عرض القدرات اللي عندك الحالية", inline: true },
-              { name: "/تحدي-يومي", value: "التحديات الأسبوعية 🎯 (كل جمعة)", inline: true },
+              { name: "/اقتصاد بروفايل [عضو]", value: "عرض بروفايل المستوى والكوينز 📊", inline: true },
+              { name: "/اقتصاد محفظة", value: "عرض رصيدك من الكوينز 🪙", inline: true },
+              { name: "/اقتصاد يومي", value: "استلم المكافأة اليومية 200 كوينز 🎁", inline: true },
+              { name: "/اقتصاد ليدربورد [نوع]", value: "أفضل 10 أعضاء (كوينز / XP) 🏆", inline: true },
+              { name: "/اقتصاد إعطاء [عضو] [كمية]", value: "منح كوينز لعضو [إدارة] 💝", inline: true },
             ],
           },
           {
-            title: "🎮 الألعاب",
-            color: 0x9b59b6,
+            title: "🛒 المتجر — /متجر",
+            color: 0xffd700,
             fields: [
-              { name: "/الألعاب", value: "مركز كل الألعاب — اضغط وابدأ! 🕹️", inline: true },
-              { name: "/اكس-اوه [@خصم]", value: "تيك تاك تو — فاضي = ضد AI 🤖", inline: true },
-              { name: "/روليت", value: "روليت روسية 🔫 (من /الألعاب)", inline: true },
-              { name: "/مافيا", value: "لعبة المافيا 🕵️ (من /الألعاب)", inline: true },
-              { name: "/كود-نيمز", value: "كود نيمز — فريقين وكلمات سرية 🃏", inline: true },
-              { name: "/الهاتف-المكسور", value: "الهاتف المكسور المضحك 📞", inline: true },
-              { name: "/صنع-الميم", value: "صنع الميم + تصويت 😂", inline: true },
-              { name: "/استفتاء", value: "إنشاء استفتاء في الروم 🗳️", inline: true },
-              { name: "/بنك-الحظ-مصري", value: "عجلة الحظ المصرية 🎰", inline: true },
-              { name: "/حياة", value: "نظام اقتصادي مستمر 🌍 (وظائف + ممتلكات)", inline: true },
+              { name: "/متجر عرض", value: "عرض الرتب المتاحة للشراء", inline: true },
+              { name: "/متجر شراء [الرتبة]", value: "شراء رتبة: Golden/Silver/Bronze 🥇", inline: true },
+              { name: "/متجر قدرات", value: "عرض قدرات المتجر المتاحة 🔮", inline: true },
+              { name: "/متجر قدراتي", value: "عرض قدراتك المشتراة ✨", inline: true },
             ],
           },
           {
-            title: "🛡️ المودريشن",
+            title: "🛡️ المودريشن — /مودريشن",
             color: 0xe74c3c,
             fields: [
-              { name: "/تحذير @عضو [سبب]", value: "إعطاء تحذير لعضو ⚠️", inline: true },
-              { name: "/اسكات @عضو [دق] [سبب]", value: "إسكات مؤقت 🔇", inline: true },
-              { name: "/طرد @عضو [سبب]", value: "طرد عضو (مع تأكيد) 👢", inline: true },
-              { name: "/تبنيد @عضو [سبب]", value: "بان عضو (مع تأكيد) 🔨", inline: true },
-              { name: "/مسح [عدد]", value: "مسح رسائل (حتى 10,000) 🗑️", inline: true },
-              { name: "/مسح-الكل", value: "مسح الروم بالكامل ⚠️", inline: true },
-              { name: "/تحذيرات [@عضو]", value: "عرض سجل تحذيرات عضو 📋", inline: true },
-              { name: "/auto-mod [حالة]", value: "تشغيل/إيقاف نظام المراقبة 🤖", inline: true },
-              { name: "/رفع-بلوك @عضو", value: "رفع البلوك عن عضو", inline: true },
-              { name: "/قائمة-مبلوكين", value: "قائمة الأعضاء المبلوكين", inline: true },
+              { name: "/مودريشن تحذير [عضو] [السبب]", value: "توجيه تحذير رسمي لعضو ⚠️", inline: true },
+              { name: "/مودريشن اسكات [عضو] [مدة]", value: "إسكات عضو مؤقتاً 🔇", inline: true },
+              { name: "/مودريشن طرد [عضو]", value: "طرد عضو من السيرفر 👢", inline: true },
+              { name: "/مودريشن تبنيد [عضو]", value: "حظر عضو نهائياً 🔨", inline: true },
+              { name: "/مودريشن مسح [عدد]", value: "مسح رسائل من الشات 🧹", inline: true },
+              { name: "/مودريشن مسح-كل", value: "مسح كل رسايل الروم بالكامل ☢️", inline: true },
+              { name: "/مودريشن سجل [عضو]", value: "عرض سجل تحذيرات عضو 📋", inline: true },
+              { name: "/مودريشن رفع-بلوك [يوزر]", value: "رفع البلوك عن يوزر [أونر] 🔓", inline: true },
+              { name: "/مودريشن مبلوكين", value: "عرض اليوزرز المبلوكين [أونر] 🚫", inline: true },
             ],
           },
           {
-            title: "🎵 الموسيقى  ·  🖼️ المانجا",
-            color: 0x1abc9c,
+            title: "🎵 الموسيقى — /موسيقى",
+            color: 0x1db954,
             fields: [
-              { name: "─── 🎵 الموسيقى ───", value: "\u200b", inline: false },
-              { name: "/تشغيل [رابط/اسم]", value: "تشغيل أغنية من YouTube 🎶", inline: true },
-              { name: "/إيقاف", value: "إيقاف الموسيقى والخروج ⏹️", inline: true },
-              { name: "/تخطي", value: "تخطي الأغنية الحالية ⏭️", inline: true },
-              { name: "/قائمة-تشغيل", value: "عرض قائمة الأغاني 📃", inline: true },
-              { name: "/توقف-مؤقت", value: "إيقاف مؤقت ⏸️", inline: true },
-              { name: "/استئناف", value: "استكمال التشغيل ▶️", inline: true },
-              { name: "─── 🖼️ المانجا ───", value: "\u200b", inline: false },
-              { name: "/مانهوا-إنشاء [اسم]", value: "إنشاء قاموس مصطلحات مانهوا 📖", inline: true },
-              { name: "/مانهوا-إضافة-مصطلح", value: "إضافة مصطلح للقاموس ➕", inline: true },
-              { name: "/مانهوا-عرض-المصطلحات", value: "عرض مصطلحات مانهوا 📚", inline: true },
+              { name: "/موسيقى تشغيل [بحث]", value: "تشغيل أغنية من يوتيوب أو سبوتيفاي 🎶", inline: true },
+              { name: "/موسيقى إيقاف", value: "إيقاف الموسيقى وإخراج البوت ⏹️", inline: true },
+              { name: "/موسيقى تخطي", value: "تخطي الأغنية الحالية ⏭️", inline: true },
+              { name: "/موسيقى قائمة", value: "عرض قائمة الأغاني 📃", inline: true },
+              { name: "/موسيقى توقف", value: "إيقاف مؤقت ⏸️", inline: true },
+              { name: "/موسيقى استئناف", value: "استئناف التشغيل ▶️", inline: true },
             ],
           },
           {
-            title: "⚙️ الإدارة  ·  👑 الأونر",
-            color: 0x2c3e50,
+            title: "📖 المانهوا — /مانهوا",
+            color: 0x9b59b6,
             fields: [
-              { name: "─── ⚙️ إدارة السيرفر ───", value: "\u200b", inline: false },
-              { name: "/انشاء-رول [اسم] [نوع] [لون]", value: "إنشاء رول جديد 🏷️", inline: true },
-              { name: "/تعديل-الرول", value: "تعديل اسم أو لون أو صلاحيات رول", inline: true },
-              { name: "/ترحيب-قناة [قناة]", value: "تحديد قناة رسائل الترحيب 👋", inline: true },
-              { name: "/رتب-المستويات", value: "إدارة أدوار المستويات التلقائية", inline: true },
-              { name: "/قناة-اللوجز [قناة]", value: "تحديد قناة سجلات المودريشن", inline: true },
-              { name: "/تعديل-إعلان", value: "تعديل رسالة إعلان موجودة ✏️", inline: true },
-              { name: "/لوحة-إدارة", value: "لوحة تحكم سريعة للأدمن 🖥️", inline: true },
-              { name: "/لوحة-اقتراحات", value: "نشر/تجديد لوحة الاقتراحات 📌", inline: true },
-              { name: "─── 👑 الأونر فقط ───", value: "\u200b", inline: false },
-              { name: "/تغيير-طريقة-الكلام [أسلوب]", value: "شخصية البوت: محترم/حر/توكسيك 💬", inline: true },
-              { name: "/مفاتيح-جيميني", value: "إدارة مفاتيح Gemini API 🔑", inline: true },
-              { name: "/نسخة-احتياطية", value: "نسخة احتياطية يدوية للداتا 💾", inline: true },
-              { name: "/استرجاع [ملف]", value: "استرجاع نسخة احتياطية قديمة", inline: true },
-              { name: "/قناة-النسخ [قناة]", value: "قناة حفظ النسخ الاحتياطية", inline: true },
-              { name: "/رسالة-جماعية [نوع]", value: "إرسال رسالة جماعية 📢", inline: true },
-              { name: "/لوحة-dm", value: "لوحة تحكم عن بُعد عبر DM 🔒", inline: true },
+              { name: "/مانهوا إنشاء [الاسم]", value: "إنشاء قاموس مصطلحات لمانهوا 📚", inline: true },
+              { name: "/مانهوا إضافة [مانهوا] [إنجليزي] [عربي]", value: "إضافة مصطلح للقاموس ✏️", inline: true },
+              { name: "/مانهوا عرض [مانهوا]", value: "عرض القواميس المخزنة 🗂️", inline: true },
+            ],
+          },
+          {
+            title: "🎭 الرتب — /رول",
+            color: 0x8e44ad,
+            fields: [
+              { name: "/رول إنشاء [الاسم] [نوع] [لون]", value: "إنشاء رتبة بصلاحيات ذكية ✨", inline: true },
+              { name: "/رول تعديل [الرول] [نوع] [اسم] [لون]", value: "تعديل رتبة موجودة 🔧", inline: true },
+              { name: "/رول مستويات-عرض", value: "عرض رتب المستويات الحالية 🏆", inline: true },
+              { name: "/رول مستويات-إضافة [لفل] [رول]", value: "إضافة رتبة على مستوى [أونر] ➕", inline: true },
+              { name: "/رول مستويات-حذف [لفل]", value: "حذف رتبة مستوى [أونر] 🗑️", inline: true },
+              { name: "/رول مستويات-ريست", value: "ريست رتب المستويات للافتراضي [أونر] 🔄", inline: true },
+            ],
+          },
+          {
+            title: "⚙️ الإعدادات — /إعدادات",
+            color: 0x95a5a6,
+            fields: [
+              { name: "/إعدادات ترحيب [القناة]", value: "تعيين قناة رسائل الترحيب 👋", inline: true },
+              { name: "/إعدادات لوجز [قناة]", value: "تعيين قناة تسجيل الأوامر [أونر] 📋", inline: true },
+              { name: "/إعدادات auto-mod [حالة]", value: "تشغيل/إيقاف نظام المراقبة 🤖", inline: true },
+              { name: "/إعدادات لوحة", value: "إرسال لوحة تحكم الإدارة 🎛️", inline: true },
+              { name: "/إعدادات اقتراحات", value: "إرسال لوحة الاقتراحات مع زر 📬", inline: true },
+              { name: "/إعدادات إعلان [message_id]", value: "تعديل رسالة إعلان البوت [أونر] ✏️", inline: true },
+              { name: "/إعدادات اختبار [نوع]", value: "اختبار رسالة الترحيب أو الوداع 🎉", inline: true },
+            ],
+          },
+          {
+            title: "💾 النسخ الاحتياطية — /نسخة",
+            color: 0x2ecc71,
+            fields: [
+              { name: "/نسخة احتياطية", value: "تحميل نسخة احتياطية من بيانات السيرفر 💾", inline: true },
+              { name: "/نسخة استرجاع [ملف]", value: "استرجاع بيانات من نسخة احتياطية ♻️", inline: true },
+              { name: "/نسخة قناة [id]", value: "تعيين قناة النسخ الاحتياطية اليومية 📅", inline: true },
+            ],
+          },
+          {
+            title: "👑 أوامر الأونر — /أونر",
+            color: 0xf39c12,
+            fields: [
+              { name: "/أونر طريقة-كلام [أسلوب]", value: "تغيير طريقة كلام البوت (محترم/حر/توكسيك) 💬", inline: true },
+              { name: "/أونر رسالة [نوع] [نص]", value: "إرسال رسالة جماعية أو في قناة 📣", inline: true },
+              { name: "/أونر dm", value: "فتح لوحة تحكم الأونر في الـ DM 📲", inline: true },
+              { name: "/أونر جيميني-عرض", value: "عرض مفاتيح Gemini وحالتها 🔑", inline: true },
+              { name: "/أونر جيميني-إضافة [مفاتيح]", value: "إضافة مفاتيح Gemini جديدة ➕", inline: true },
+              { name: "/أونر جيميني-حذف [رقم]", value: "حذف مفتاح Gemini 🗑️", inline: true },
+              { name: "/أونر جيميني-تحديد [رقم]", value: "تحديد مفتاح Gemini للاستخدام 🎯", inline: true },
+              { name: "/أونر جيميني-تفريش", value: "تفريش المفاتيح المحروقة 🔄", inline: true },
+            ],
+          },
+          {
+            title: "🎮 الألعاب — /الألعاب",
+            color: 0xa020f0,
+            fields: [
+              { name: "/الألعاب", value: "مركز الألعاب — اللعب من هنا فقط 🎮", inline: true },
+              { name: "/حياة", value: "لعبة (بنك الحياة) 💚", inline: true },
+              { name: "/احدث-المميزات", value: "آخر المميزات الجديدة ✨", inline: true },
+              { name: "/حالة-البوت", value: "حالة البوت والـ AI (أونر) 📊", inline: true },
             ],
           },
         ];
 
-        const buildHelpEmbed = (page) => {
-          const p = HELP_PAGES[page];
+        const totalPages = HELP_PAGES.length;
+        const pageParam  = interaction.options?.getInteger("صفحة");
+        let   pageIndex  = pageParam != null ? Math.max(0, Math.min(pageParam - 1, totalPages - 1)) : 0;
+
+        function buildPageEmbed(idx) {
+          const p = HELP_PAGES[idx];
           return new EmbedBuilder()
             .setColor(p.color)
-            .setTitle(`📖 دليل زنجي بوت — ${p.title}`)
-            .setDescription(`**كل الأوامر بتشتغل بالسلاش** \`/\` — اختار الفئة اللي تحتاجها 👇`)
+            .setTitle(p.title)
             .addFields(...p.fields)
-            .setFooter({ text: `📄 صفحة ${page + 1} من ${HELP_PAGES.length}  •  زنجي بوت` })
+            .setFooter({ text: `صفحة ${idx + 1} من ${totalPages} — /مساعدة [صفحة]` })
             .setTimestamp();
-        };
+        }
 
-        const buildHelpButtons = (page) => {
-          const total = HELP_PAGES.length;
-          return [new ActionRowBuilder().addComponents(
+        function buildNavRow(idx) {
+          return new ActionRowBuilder().addComponents(
             new ButtonBuilder()
-              .setCustomId(`help_page_${page - 1}`)
-              .setLabel("◀️ السابق")
+              .setCustomId(`help_prev_${idx}`)
+              .setLabel("◀️ السابقة")
               .setStyle(ButtonStyle.Secondary)
-              .setDisabled(page === 0),
+              .setDisabled(idx === 0),
             new ButtonBuilder()
-              .setCustomId("help_page_info")
-              .setLabel(`${page + 1} / ${total}`)
+              .setCustomId(`help_next_${idx}`)
+              .setLabel("التالية ▶️")
               .setStyle(ButtonStyle.Primary)
-              .setDisabled(true),
-            new ButtonBuilder()
-              .setCustomId(`help_page_${page + 1}`)
-              .setLabel("التالي ▶️")
-              .setStyle(ButtonStyle.Secondary)
-              .setDisabled(page === total - 1),
-          )];
-        };
+              .setDisabled(idx === totalPages - 1),
+          );
+        }
 
         return interaction.reply({
-          embeds: [buildHelpEmbed(0)],
-          components: buildHelpButtons(0),
+          embeds: [buildPageEmbed(pageIndex)],
+          components: [buildNavRow(pageIndex)],
           ephemeral: true,
         });
-      }
-
-      if (cmd === "تحذيرات") {
-        const nameOrId = interaction.options.getString("عضو");
-        let targetMember = null;
-        let targetUser = user;
-        if (nameOrId) {
-          targetMember = await resolveMember(guild, nameOrId);
-          if (!targetMember) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
-          targetUser = targetMember.user;
-        }
-        const warns = db.getWarnings(targetUser.id);
-        if (warns.length === 0) {
-          return interaction.reply({
-            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("😇 سجل أبيض!")
-              .setDescription(`<@${targetUser.id}> ما عندهوش أي تحذيرات 🌟`)
-              .setThumbnail(targetUser.displayAvatarURL())],
-            ephemeral: true,
-          });
-        }
-        const warnFields = warns.slice(-10).reverse().map((w, i) => ({
-          name: `⚠️ تحذير #${warns.length - i}`,
-          value: `📋 **السبب:** ${w.reason ?? "غير محدد"}\n🛡️ **المشرف:** <@${w.modId ?? "مجهول"}>\n📅 **التاريخ:** <t:${Math.floor((w.timestamp ?? Date.now()) / 1000)}:R>`,
-          inline: false,
-        }));
-        return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("📋 سجل التحذيرات")
-            .setDescription(`<@${targetUser.id}> عنده **${warns.length}** تحذير${warns.length > 10 ? ` (بيتعرض آخر 10)` : ""}`)
-            .setThumbnail(targetUser.displayAvatarURL())
-            .addFields(...warnFields)
-            .setTimestamp()],
-          ephemeral: true,
-        });
-      }
-
-      if (cmd === "ليدربورد") {
-        const type = interaction.options.getString("نوع") ?? "coins";
-        const allUsers = db.getAllData().users;
-        const sorted = Object.entries(allUsers).sort((a, b) => b[1][type] - a[1][type]).slice(0, 10);
-        let txt = `🏆 **قائمة الترتيب الأعلى (حسب ${type}):**\n`;
-        sorted.forEach(([id, data], i) => txt += `**#${i+1}** <@${id}> ⬅️ ${data[type]}\n`);
-        return interaction.reply({ content: txt });
-      }
-
-      if (cmd === "ترحيب-قناة") {
-        const ch = interaction.options.getChannel("القناة");
-        db.setWelcomeChannel(guild.id, ch.id);
-        return interaction.reply({ content: `✅ تم تعيين قناة الترحيب لتكون: ${ch}` });
       }
 
       if (cmd === "اقتراح") {
         const text = interaction.options.getString("نص");
-        return await handleSuggestionModalSubmit(interaction, text);
-      }
-
-      if (cmd === "لوحة-إدارة") {
-        const embed = new EmbedBuilder().setColor(0x2c3e50).setTitle("🔒 لوحة التحكم").setDescription(`أعضاء السيرفر: ${guild.memberCount}`);
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("admin_clear_games").setLabel("🎮 تصفير الألعاب").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("refresh_suggestions_board").setLabel("🔄 تحديث لوحة الاقتراحات").setStyle(ButtonStyle.Primary)
-        );
-        return interaction.reply({ embeds: [embed], components: [row] });
-      }
-
-      if (cmd === "لوحة-اقتراحات") {
-        try {
-          const posted = await ensureSuggestionsPanel(client, true);
-          if (!posted) {
-            return interaction.reply({
-              content: "❌ لم أجد روم الاقتراحات! تأكد من صحة معرف القناة.",
-              ephemeral: true,
-            });
-          }
-          return interaction.reply({
-            content: "✅ تم إرسال لوحة الاقتراحات بنجاح في روم الاقتراحات!",
-            ephemeral: true,
-          });
-        } catch (err) {
-          logger.error("خطأ في إرسال لوحة الاقتراحات:", err);
-          return interaction.reply({
-            content: "معلش يسطا ثواني بس",
-            ephemeral: true,
-          });
-        }
+        const type = interaction.options.getString("نوع") || "idea";
+        return await handleSuggestionModalSubmit(interaction, text, type);
       }
 
       if (cmd === "صورة") {
@@ -3066,245 +2963,6 @@ client.on("interactionCreate", async (interaction) => {
           ephemeral: true
         });
       }
-
-      if (cmd === "نسخة-احتياطية") {
-        await interaction.deferReply({ ephemeral: true });
-        try {
-          const allData = db.getAllData();
-          const now = new Date();
-          const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-          const jsonBuffer = Buffer.from(JSON.stringify(allData, null, 2), "utf-8");
-          const attachment = new AttachmentBuilder(jsonBuffer, { name: `backup_${dateStr}.json` });
-          const userCount = Object.keys(allData.users || {}).length;
-          return interaction.editReply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(0x2ecc71)
-                .setTitle("💾 نسخة احتياطية جاهزة")
-                .addFields(
-                  { name: "📅 التاريخ", value: dateStr, inline: true },
-                  { name: "👥 عدد الأعضاء المحفوظين", value: `${userCount}`, inline: true }
-                )
-                .setFooter({ text: "احتفظ بالملف في مكان آمن ✅" })
-                .setTimestamp()
-            ],
-            files: [attachment]
-          });
-        } catch (err) {
-          logger.error("خطأ في النسخة الاحتياطية:", err);
-          return interaction.editReply({ content: "معلش يسطا ثواني بس" });
-        }
-      }
-
-      if (cmd === "استرجاع") {
-        await interaction.deferReply({ ephemeral: true });
-        try {
-          const attachment = interaction.options.getAttachment("ملف");
-          if (!attachment.name.endsWith(".json")) {
-            return interaction.editReply({ content: "❌ الملف لازم يكون `.json` — ارفع الملف اللي حملته من أمر `/نسخة-احتياطية`" });
-          }
-          const response = await fetch(attachment.url);
-          const text = await response.text();
-          let parsed;
-          try {
-            parsed = JSON.parse(text);
-          } catch {
-            return interaction.editReply({ content: "❌ الملف تالف أو مش JSON صح!" });
-          }
-          if (!parsed.users) {
-            return interaction.editReply({ content: "❌ الملف ده مش نسخة احتياطية صحيحة — مفيش بيانات أعضاء فيه!" });
-          }
-          const oldCount = Object.keys(db.getAllData().users || {}).length;
-          db.data = parsed;
-          db.save();
-          const newCount = Object.keys(parsed.users || {}).length;
-          return interaction.editReply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(0x2ecc71)
-                .setTitle("✅ تم الاسترجاع بنجاح")
-                .setDescription(`تم استبدال بيانات السيرفر بالنسخة الاحتياطية المرفوعة.`)
-                .addFields(
-                  { name: "👥 أعضاء قبل", value: `${oldCount}`, inline: true },
-                  { name: "👥 أعضاء بعد", value: `${newCount}`, inline: true },
-                  { name: "👤 نفّذ العملية", value: `${user}`, inline: false }
-                )
-                .setFooter({ text: "⚠️ البيانات القديمة اتاستبدلت نهائياً" })
-                .setTimestamp()
-            ]
-          });
-        } catch (err) {
-          logger.error("خطأ في الاسترجاع:", err);
-          return interaction.editReply({ content: "معلش يسطا ثواني بس" });
-        }
-      }
-
-      if (cmd === "تشغيل-اختبار") {
-        const type = interaction.options.getString("نوع");
-        const WELCOME_CHANNEL_ID = "1486100560494203183";
-        const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
-        if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", ephemeral: true });
-
-        await interaction.deferReply({ ephemeral: true });
-
-        if (type === "welcome") {
-          const imagePath = path.join(__dirname, 'welcome.png');
-          const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
-          const embed = new EmbedBuilder()
-            .setColor('#A020F0')
-            .setTitle('⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️')
-            .setDescription(
-              `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
-              `👤 **الـعـضـو الـجـديـد:** ${user}\n` +
-              `🆔 **الـمـعـرّف الـخـاص:** \`${user.id}\`\n` +
-              `📊 **أنـت الـفـرعـون رقـم:** \`${guild.memberCount}\` في مملكتنا!\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-              `🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`
-            )
-            .setImage('attachment://welcome.png')
-            .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️ [اختبار]' })
-            .setTimestamp();
-          await testChannel.send({ embeds: [embed], files: [attachment] });
-        } else {
-          const embed = new EmbedBuilder()
-            .setColor('#A020F0')
-            .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
-            .setDescription(
-              `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `👤 **الفرعون اللي ودعنا:** ${user}\n` +
-              `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
-              `📊 **بقينا** \`${guild.memberCount}\` **فرعون في المملكة.**\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-              `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
-            )
-            .setThumbnail(user.displayAvatarURL({ size: 256 }))
-            .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️ [اختبار]' })
-            .setTimestamp();
-          await testChannel.send({ embeds: [embed] });
-        }
-
-        return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
-      }
-
-      if (cmd === "قناة-اللوجز") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const ch = interaction.options.getChannel("قناة");
-        if (!db.data.settings) db.data.settings = {};
-        db.data.settings.ownerLogsChannelId = ch.id;
-        db.save();
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xe67e22)
-              .setTitle("📋 تم تعيين قناة اللوجز")
-              .setDescription(`كل أوامر الأونر هتتسجل في ${ch} من دلوقتي ✅`)
-              .setTimestamp()
-          ],
-          ephemeral: true
-        });
-      }
-
-      if (cmd === "رسالة-جماعية") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-
-        await interaction.deferReply({ ephemeral: true });
-
-        const نوع = interaction.options.getString("نوع");
-        const نص = interaction.options.getString("نص");
-
-        const embed = new EmbedBuilder()
-          .setColor(0xa020f0)
-          .setTitle("📣 رسالة من الإدارة")
-          .setDescription(نص)
-          .setFooter({ text: `⚜️ سيرفر الفراعنة — ${guild.name}` })
-          .setTimestamp();
-
-        if (نوع === "channel") {
-          const targetChannel = interaction.options.getChannel("قناة");
-          if (!targetChannel) {
-            return interaction.editReply({ content: "❌ حدد القناة اللي هتبعت فيها الرسالة!" });
-          }
-          await targetChannel.send({ embeds: [embed] });
-          return interaction.editReply({ content: `✅ اتبعتت الرسالة في ${targetChannel} بنجاح!` });
-        }
-
-        if (نوع === "dm") {
-          await guild.members.fetch();
-          const members = guild.members.cache.filter(m => !m.user.bot);
-          let sent = 0, failed = 0;
-
-          for (const [, member] of members) {
-            await member.send({ embeds: [embed] }).then(() => sent++).catch(() => failed++);
-            await new Promise(r => setTimeout(r, 500));
-          }
-
-          return interaction.editReply({
-            embeds: [
-              new EmbedBuilder()
-                .setColor(0x2ecc71)
-                .setTitle("✅ تم إرسال الرسالة الجماعية")
-                .addFields(
-                  { name: "📩 وصلت لـ", value: `${sent} عضو`, inline: true },
-                  { name: "❌ فشلت مع", value: `${failed} عضو`, inline: true }
-                )
-                .setFooter({ text: "الفشل عادةً بسبب إعدادات الخصوصية عند العضو" })
-                .setTimestamp()
-            ]
-          });
-        }
-      }
-
-      if (cmd === "قناة-النسخ") {
-        const channelId = interaction.options.getString("id").trim();
-        const ch = await guild.channels.fetch(channelId).catch(() => null);
-        if (!ch) {
-          return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, ephemeral: true });
-        }
-        if (!db.data.settings) db.data.settings = {};
-        db.data.settings.backupChannelId = ch.id;
-        db.save();
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0x3498db)
-              .setTitle("✅ تم تعيين قناة النسخ الاحتياطية")
-              .setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ <#${ch.id}> كل 24 ساعة 🔄`)
-              .addFields({ name: "📋 الـ ID المحفوظ", value: `\`${ch.id}\``, inline: true })
-              .setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" })
-              .setTimestamp()
-          ],
-          ephemeral: true
-        });
-      }
-
-      if (cmd === "لوحة-dm") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const g = guild || client.guilds.cache.first();
-        const panel = buildDMControlPanel(g);
-        if (isFromDM) {
-          return interaction.reply(panel);
-        }
-        return interaction.reply({ ...panel, ephemeral: true });
-      }
-
-    } catch (err) {
-      logger.error("خطأ في تنفيذ الأمر:", err);
-      return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
-    }
-  }
-
-  // التعامل مع الأزرار والمودال التفاعلية
-  if (interaction.isButton()) {
-    try {
 
       // ─── أزرار المساعدة (التنقل بين الصفحات) ────────────────────
       if (interaction.customId.startsWith("help_page_")) {
@@ -3877,6 +3535,45 @@ client.on("interactionCreate", async (interaction) => {
       }
       // ─────────────────────────────────────────────────────────────
 
+
+      if (interaction.customId.startsWith("help_prev_") || interaction.customId.startsWith("help_next_")) {
+        const parts  = interaction.customId.split("_");
+        const dir    = parts[1]; // "prev" or "next"
+        const curIdx = parseInt(parts[2], 10);
+        const newIdx = dir === "next" ? curIdx + 1 : curIdx - 1;
+
+        // Rebuild HELP_PAGES count (we just need total count)
+        const HELP_TOTAL = 11; // total help pages
+        if (newIdx < 0 || newIdx >= HELP_TOTAL) return interaction.deferUpdate().catch(() => {});
+
+        const HELP_PAGES = [
+          { title: "🌐 الأوامر العامة", color: 0x3498db, fields: [{ name: "/ping", value: "فحص سرعة البوت", inline: true }, { name: "/hello", value: "تحية من البوت 👋", inline: true }, { name: "/roll [أوجه]", value: "رمي نرد 🎲", inline: true }, { name: "/serverinfo", value: "معلومات السيرفر", inline: true }, { name: "/userinfo [عضو]", value: "معلومات عضو", inline: true }, { name: "/القوانين", value: "قوانين السيرفر 📜", inline: true }, { name: "/اقتراح [نص] [نوع]", value: "إرسال اقتراح أو مشكلة 📬", inline: true }, { name: "/صورة [وصف]", value: "توليد صورة AI 🖼️", inline: true }] },
+          { title: "💰 الاقتصاد — /اقتصاد", color: 0xf1c40f, fields: [{ name: "/اقتصاد بروفايل", value: "بروفايل المستوى والكوينز 📊", inline: true }, { name: "/اقتصاد محفظة", value: "رصيدك من الكوينز 🪙", inline: true }, { name: "/اقتصاد يومي", value: "المكافأة اليومية 200 كوينز 🎁", inline: true }, { name: "/اقتصاد ليدربورد", value: "أفضل 10 أعضاء 🏆", inline: true }, { name: "/اقتصاد إعطاء", value: "منح كوينز لعضو [إدارة] 💝", inline: true }] },
+          { title: "🛒 المتجر — /متجر", color: 0xffd700, fields: [{ name: "/متجر عرض", value: "الرتب المتاحة للشراء", inline: true }, { name: "/متجر شراء", value: "شراء رتبة 🥇", inline: true }, { name: "/متجر قدرات", value: "قدرات المتجر 🔮", inline: true }, { name: "/متجر قدراتي", value: "قدراتك المشتراة ✨", inline: true }] },
+          { title: "🛡️ المودريشن — /مودريشن", color: 0xe74c3c, fields: [{ name: "/مودريشن تحذير", value: "تحذير رسمي لعضو ⚠️", inline: true }, { name: "/مودريشن اسكات", value: "إسكات مؤقت 🔇", inline: true }, { name: "/مودريشن طرد", value: "طرد عضو 👢", inline: true }, { name: "/مودريشن تبنيد", value: "حظر نهائي 🔨", inline: true }, { name: "/مودريشن مسح", value: "مسح رسائل 🧹", inline: true }, { name: "/مودريشن مسح-كل", value: "مسح الروم بالكامل ☢️", inline: true }, { name: "/مودريشن سجل", value: "سجل التحذيرات 📋", inline: true }, { name: "/مودريشن رفع-بلوك", value: "رفع البلوك [أونر] 🔓", inline: true }, { name: "/مودريشن مبلوكين", value: "اليوزرز المبلوكين [أونر] 🚫", inline: true }] },
+          { title: "🎵 الموسيقى — /موسيقى", color: 0x1db954, fields: [{ name: "/موسيقى تشغيل", value: "تشغيل أغنية 🎶", inline: true }, { name: "/موسيقى إيقاف", value: "إيقاف الموسيقى ⏹️", inline: true }, { name: "/موسيقى تخطي", value: "تخطي الأغنية ⏭️", inline: true }, { name: "/موسيقى قائمة", value: "قائمة الأغاني 📃", inline: true }, { name: "/موسيقى توقف", value: "إيقاف مؤقت ⏸️", inline: true }, { name: "/موسيقى استئناف", value: "استئناف التشغيل ▶️", inline: true }] },
+          { title: "📖 المانهوا — /مانهوا", color: 0x9b59b6, fields: [{ name: "/مانهوا إنشاء", value: "إنشاء قاموس مصطلحات 📚", inline: true }, { name: "/مانهوا إضافة", value: "إضافة مصطلح ✏️", inline: true }, { name: "/مانهوا عرض", value: "عرض القواميس 🗂️", inline: true }] },
+          { title: "🎭 الرتب — /رول", color: 0x8e44ad, fields: [{ name: "/رول إنشاء", value: "إنشاء رتبة بصلاحيات ذكية ✨", inline: true }, { name: "/رول تعديل", value: "تعديل رتبة موجودة 🔧", inline: true }, { name: "/رول مستويات-عرض", value: "رتب المستويات 🏆", inline: true }, { name: "/رول مستويات-إضافة", value: "إضافة رتبة مستوى [أونر] ➕", inline: true }, { name: "/رول مستويات-حذف", value: "حذف رتبة مستوى [أونر] 🗑️", inline: true }, { name: "/رول مستويات-ريست", value: "ريست المستويات [أونر] 🔄", inline: true }] },
+          { title: "⚙️ الإعدادات — /إعدادات", color: 0x95a5a6, fields: [{ name: "/إعدادات ترحيب", value: "قناة الترحيب 👋", inline: true }, { name: "/إعدادات لوجز", value: "قناة اللوجز [أونر] 📋", inline: true }, { name: "/إعدادات auto-mod", value: "تشغيل/إيقاف المراقبة 🤖", inline: true }, { name: "/إعدادات لوحة", value: "لوحة تحكم الإدارة 🎛️", inline: true }, { name: "/إعدادات اقتراحات", value: "لوحة الاقتراحات 📬", inline: true }, { name: "/إعدادات إعلان", value: "تعديل إعلان البوت [أونر] ✏️", inline: true }, { name: "/إعدادات اختبار", value: "اختبار رسائل الترحيب 🎉", inline: true }] },
+          { title: "💾 النسخ الاحتياطية — /نسخة", color: 0x2ecc71, fields: [{ name: "/نسخة احتياطية", value: "تحميل نسخة احتياطية 💾", inline: true }, { name: "/نسخة استرجاع", value: "استرجاع من نسخة ♻️", inline: true }, { name: "/نسخة قناة", value: "قناة النسخ اليومية 📅", inline: true }] },
+          { title: "👑 أوامر الأونر — /أونر", color: 0xf39c12, fields: [{ name: "/أونر طريقة-كلام", value: "طريقة كلام البوت 💬", inline: true }, { name: "/أونر رسالة", value: "رسالة جماعية أو في قناة 📣", inline: true }, { name: "/أونر dm", value: "لوحة تحكم الأونر 📲", inline: true }, { name: "/أونر جيميني-عرض", value: "مفاتيح Gemini 🔑", inline: true }, { name: "/أونر جيميني-إضافة", value: "إضافة مفاتيح ➕", inline: true }, { name: "/أونر جيميني-حذف", value: "حذف مفتاح 🗑️", inline: true }] },
+          { title: "🎮 الألعاب — /الألعاب", color: 0xa020f0, fields: [{ name: "/الألعاب", value: "مركز الألعاب 🎮", inline: true }, { name: "/حياة", value: "لعبة بنك الحياة 💚", inline: true }, { name: "/احدث-المميزات", value: "آخر المميزات ✨", inline: true }] },
+        ];
+
+        function buildNavBtn(dir2, idx2, total) {
+          return new ButtonBuilder()
+            .setCustomId(`help_${dir2}_${idx2}`)
+            .setLabel(dir2 === "next" ? "التالية ▶️" : "◀️ السابقة")
+            .setStyle(dir2 === "next" ? ButtonStyle.Primary : ButtonStyle.Secondary)
+            .setDisabled(dir2 === "next" ? idx2 >= total - 1 : idx2 <= 0);
+        }
+
+        const p = HELP_PAGES[newIdx];
+        const embed2 = new EmbedBuilder().setColor(p.color).setTitle(p.title).addFields(...p.fields)
+          .setFooter({ text: `صفحة ${newIdx + 1} من ${HELP_TOTAL} — /مساعدة [صفحة]` }).setTimestamp();
+        const row2 = new ActionRowBuilder().addComponents(buildNavBtn("prev", newIdx, HELP_TOTAL), buildNavBtn("next", newIdx, HELP_TOTAL));
+        return interaction.update({ embeds: [embed2], components: [row2] });
+      }
       if (interaction.customId === SUGGESTION_BTN_ID) {
         return await showSuggestionModal(interaction);
       }
@@ -4274,15 +3971,15 @@ client.on("interactionCreate", async (interaction) => {
       // ✅ [تعديل 5] معالجة مودالات الأزرار الثلاثة
       if (interaction.customId === "modal_suggest_idea") {
         const text = interaction.fields.getTextInputValue("suggest_text");
-        return await handleSuggestionModalSubmit(interaction, text);
+        return await handleSuggestionModalSubmit(interaction, text, "idea");
       }
       if (interaction.customId === "modal_suggest_bug") {
         const text = interaction.fields.getTextInputValue("bug_text");
-        return await handleSuggestionModalSubmit(interaction, text);
+        return await handleSuggestionModalSubmit(interaction, text, "bug");
       }
       if (interaction.customId === "modal_suggest_other") {
         const text = interaction.fields.getTextInputValue("other_text");
-        return await handleSuggestionModalSubmit(interaction, text);
+        return await handleSuggestionModalSubmit(interaction, text, "other");
       }
 
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
