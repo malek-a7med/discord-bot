@@ -1488,26 +1488,34 @@ client.on("messageCreate", async (msg) => {
           try {
             const suggCh  = msg.channel;
             const suggMsg = await suggCh.messages.fetch(pending.publicMessageId).catch(() => null);
+
+            // ── رفع الصورة كـ reply للاقتراح عشان نجيب URL ثابت ──────
+            // (الرسالة بتفضل حية = الـ URL ما بيبطلش أبداً)
             let stableImageUrl = null;
+            if (imgBuffer) {
+              const hostMsg = await suggCh.send({
+                reply: { messageReference: pending.publicMessageId, failIfNotExists: false },
+                files: [new AttachmentBuilder(imgBuffer, { name: filename })],
+              }).catch(() => null);
+              if (hostMsg?.attachments?.size > 0) {
+                stableImageUrl = hostMsg.attachments.first()?.url;
+              }
+            }
+            const finalImageUrl = stableImageUrl || imageUrl;
+
+            // ── تحديث embed الاقتراح العام ────────────────────────────
             if (suggMsg) {
-              const embedImageUrl = imgBuffer ? `attachment://${filename}` : imageUrl;
-              const updatedEmbed  = buildSuggestionEmbed({
+              const updatedEmbed = buildSuggestionEmbed({
                 user: msg.author,
                 text: pending.text,
                 statusKey: "pending",
                 type: pending.type,
-                imageUrl: embedImageUrl,
+                imageUrl: finalImageUrl,
               });
-              const editOptions = { embeds: [updatedEmbed] };
-              if (imgBuffer) editOptions.files = [new AttachmentBuilder(imgBuffer, { name: filename })];
-              const editedMsg = await suggMsg.edit(editOptions).catch(() => null);
-              // نجيب الـ CDN URL الثابت من الرسالة بعد الرفع
-              if (editedMsg?.attachments?.size > 0) {
-                stableImageUrl = editedMsg.attachments.first()?.url;
-              }
+              await suggMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
             }
 
-            // ── تحديث رسالة الإدارة بالـ URL الثابت ──────────────
+            // ── تحديث رسالة الإدارة بنفس الـ URL الثابت ──────────────
             if (pending.adminMessageId) {
               const adminCh = await msg.client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
               if (adminCh?.isTextBased()) {
@@ -1515,8 +1523,6 @@ client.on("messageCreate", async (msg) => {
                 if (adminMsg) {
                   const oldEmbed  = adminMsg.embeds[0];
                   const refField  = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
-                  // نستخدم الـ URL الثابت من الرسالة العامة — ما نرفعش تاني
-                  const finalImageUrl = stableImageUrl || imageUrl;
                   const updatedAdminEmbed = buildSuggestionEmbed({
                     user: msg.author,
                     text: pending.text,
@@ -1579,22 +1585,30 @@ client.on("messageCreate", async (msg) => {
         try {
           const suggCh  = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
           const suggMsg = suggCh ? await suggCh.messages.fetch(dmPending.publicMessageId).catch(() => null) : null;
+
+          // ── رفع الصورة كـ reply للاقتراح عشان URL ثابت ─────────
           let dmStableImageUrl = null;
+          if (dmImgBuffer && suggCh) {
+            const hostMsg = await suggCh.send({
+              reply: { messageReference: dmPending.publicMessageId, failIfNotExists: false },
+              files: [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })],
+            }).catch(() => null);
+            if (hostMsg?.attachments?.size > 0) {
+              dmStableImageUrl = hostMsg.attachments.first()?.url;
+            }
+          }
+          const dmFinalImageUrl = dmStableImageUrl || dmImageUrl;
+
+          // ── تحديث embed الاقتراح العام ──────────────────────────
           if (suggMsg) {
-            const embedImageUrl = dmImgBuffer ? `attachment://${dmFilename}` : dmImageUrl;
-            const updatedEmbed  = buildSuggestionEmbed({
+            const updatedEmbed = buildSuggestionEmbed({
               user: msg.author,
               text: dmPending.text,
               statusKey: "pending",
               type: dmPending.type,
-              imageUrl: embedImageUrl,
+              imageUrl: dmFinalImageUrl,
             });
-            const editOptions = { embeds: [updatedEmbed] };
-            if (dmImgBuffer) editOptions.files = [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })];
-            const editedMsg = await suggMsg.edit(editOptions).catch(() => null);
-            if (editedMsg?.attachments?.size > 0) {
-              dmStableImageUrl = editedMsg.attachments.first()?.url;
-            }
+            await suggMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
           }
 
           if (dmPending.adminMessageId) {
@@ -1604,13 +1618,12 @@ client.on("messageCreate", async (msg) => {
               if (adminMsg) {
                 const oldEmbed  = adminMsg.embeds[0];
                 const refField  = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
-                const finalImageUrl = dmStableImageUrl || dmImageUrl;
                 const updatedAdminEmbed = buildSuggestionEmbed({
                   user: msg.author,
                   text: dmPending.text,
                   statusKey: "pending",
                   type: dmPending.type,
-                  imageUrl: finalImageUrl,
+                  imageUrl: dmFinalImageUrl,
                 });
                 if (refField) updatedAdminEmbed.addFields({ name: SUGGESTION_REF_FIELD, value: refField.value, inline: false });
                 await adminMsg.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
