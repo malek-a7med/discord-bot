@@ -1489,21 +1489,8 @@ client.on("messageCreate", async (msg) => {
             const suggCh  = msg.channel;
             const suggMsg = await suggCh.messages.fetch(pending.publicMessageId).catch(() => null);
 
-            // ── رفع الصورة في روم الإدارة فقط عشان نجيب URL ثابت ──────
-            // (الرسالة بتفضل حية = الـ URL ما بيبطلش أبداً)
-            let stableImageUrl = null;
-            if (imgBuffer) {
-              const adminChHost = await msg.client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
-              if (adminChHost?.isTextBased()) {
-                const hostMsg = await adminChHost.send({
-                  files: [new AttachmentBuilder(imgBuffer, { name: filename })],
-                }).catch(() => null);
-                if (hostMsg?.attachments?.size > 0) {
-                  stableImageUrl = hostMsg.attachments.first()?.url;
-                }
-              }
-            }
-            const finalImageUrl = stableImageUrl || imageUrl;
+            // ── استخدام الـ URL الأصلي مباشرة بدون إعادة رفع ──────────
+            const finalImageUrl = imageUrl;
 
             // ── تحديث embed الاقتراح العام ────────────────────────────
             if (suggMsg) {
@@ -1588,20 +1575,8 @@ client.on("messageCreate", async (msg) => {
           const suggCh  = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
           const suggMsg = suggCh ? await suggCh.messages.fetch(dmPending.publicMessageId).catch(() => null) : null;
 
-          // ── رفع الصورة في روم الإدارة فقط عشان URL ثابت ─────────
-          let dmStableImageUrl = null;
-          if (dmImgBuffer) {
-            const adminChHost = await client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
-            if (adminChHost?.isTextBased()) {
-              const hostMsg = await adminChHost.send({
-                files: [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })],
-              }).catch(() => null);
-              if (hostMsg?.attachments?.size > 0) {
-                dmStableImageUrl = hostMsg.attachments.first()?.url;
-              }
-            }
-          }
-          const dmFinalImageUrl = dmStableImageUrl || dmImageUrl;
+          // ── استخدام الـ URL الأصلي مباشرة بدون إعادة رفع ──────────
+          const dmFinalImageUrl = dmImageUrl;
 
           // ── تحديث embed الاقتراح العام ──────────────────────────
           if (suggMsg) {
