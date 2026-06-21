@@ -285,3 +285,12 @@ export async function handleBankLuckButton(interaction, db) {
     return doSpin(interaction, state);
   }
 }
+
+// ── إلغاء كل ألعاب الحظ لليوزر عبر كل القنوات ─────────────────
+export function cancelUserLuckGames(userId) {
+  let count = 0;
+  for (const [gId, s] of luckGames) {
+    if (s.creatorId === userId) { luckChannelMap.delete(s.channelId); luckGames.delete(gId); count++; }
+  }
+  return count;
+}

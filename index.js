@@ -27,12 +27,12 @@ import {
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
-import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleRPSButton, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
+import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleRPSButton, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS, cancelUserGames } from "./commands/games.js";
 import { bankLifeCommand, handleBankLifeCommand, handleBankLifeButton } from "./commands/bank-life.js";
-import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap } from "./commands/bank-luck.js";
+import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap, cancelUserLuckGames } from "./commands/bank-luck.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
 import { codenamesCommand, handleCodenamesCommand, handleCodenamesButton, handleCodenamesMessage, handleCodenamesSettingsModal, handleCodenamesClueModal, handleCodenamesInviteModal } from "./commands/codenames.js";
-import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, handleGarticInviteModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, handleMemeInviteModal, garticChannelMap, garticGames, memeChannelMap, memeGames } from "./commands/party-games.js";
+import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticModal, handleGarticInviteModal, memeCommand, handleMemeCommand, handleMemeButton, handleMemeModal, handleMemeInviteModal, garticChannelMap, garticGames, memeChannelMap, memeGames, cancelUserPartyGames } from "./commands/party-games.js";
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
@@ -3754,18 +3754,18 @@ client.on("interactionCreate", async (interaction) => {
         if (gid === "ghub_banklife")                    return await handleBankLifeButton(interaction, db);
         if (gid === "ghub_bankluck")                    return await bankLuckEgCommand.execute(interaction, db);
         if (gid === "ghub_cancel") {
-          const cid = interaction.channel.id;
-          if (channelGames.has(cid))       { channelGames.delete(cid); }
-          if (garticChannelMap.has(cid))   { const gId = garticChannelMap.get(cid); garticGames.delete(gId); garticChannelMap.delete(cid); }
-          if (memeChannelMap.has(cid))     { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
-          if (rpsChannelMap.has(cid))      { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
-          if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
-          // ✅ FIX: lifeChannelMap/lifeGames اتشالوا — لعبة الحياة الجديدة نظام
-          //   مستمر مالوش "جلسة في روم" تتلغى أصلاً
-          if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
-          if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
+          const uid = interaction.user.id;
+          const n1 = cancelUserGames(uid);
+          const n2 = cancelUserPartyGames(uid);
+          const n3 = cancelUserLuckGames(uid);
+          const total = n1 + n2 + n3;
           await interaction.message.delete().catch(() => {});
-          return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", flags: 64 });
+          return interaction.reply({
+            content: total > 0
+              ? `✅ تم إلغاء **${total}** لعبة كانت بدأتها في السيرفر!`
+              : "ℹ️ ما فيش ألعاب شغالة باسمك حالياً.",
+            flags: 64,
+          });
         }
       }
 
@@ -4519,16 +4519,18 @@ client.on("interactionCreate", async (interaction) => {
         if (cid === "ghub_banklife")                    return await handleBankLifeButton(interaction, db);
         if (cid === "ghub_bankluck")                    return await bankLuckEgCommand.execute(interaction, db);
         if (cid === "ghub_cancel") {
-          const chid = interaction.channel.id;
-          if (channelGames.has(chid))       { channelGames.delete(chid); }
-          if (garticChannelMap.has(chid))   { const gId = garticChannelMap.get(chid); garticGames.delete(gId); garticChannelMap.delete(chid); }
-          if (memeChannelMap.has(chid))     { const mId = memeChannelMap.get(chid);   memeGames.delete(mId);   memeChannelMap.delete(chid); }
-          if (rpsChannelMap.has(chid))      { const rId = rpsChannelMap.get(chid);    rpsGames.delete(rId);    rpsChannelMap.delete(chid); }
-          if (rpsBasicChannelMap.has(chid)) { const rId = rpsBasicChannelMap.get(chid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(chid); }
-          if (luckChannelMap.has(chid))     { const lId = luckChannelMap.get(chid);   luckGames.delete(lId);   luckChannelMap.delete(chid); }
-          if (quizChannelMap.has(chid))     quizChannelMap.delete(chid);
+          const uid = interaction.user.id;
+          const n1 = cancelUserGames(uid);
+          const n2 = cancelUserPartyGames(uid);
+          const n3 = cancelUserLuckGames(uid);
+          const total = n1 + n2 + n3;
           await interaction.message.delete().catch(() => {});
-          return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", flags: 64 });
+          return interaction.reply({
+            content: total > 0
+              ? `✅ تم إلغاء **${total}** لعبة كانت بدأتها في السيرفر!`
+              : "ℹ️ ما فيش ألعاب شغالة باسمك حالياً.",
+            flags: 64,
+          });
         }
       }
 

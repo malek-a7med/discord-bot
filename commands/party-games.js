@@ -919,3 +919,15 @@ export async function handleMemeInviteModal(interaction) {
       .setTimestamp()],
   });
 }
+
+// ── إلغاء كل ألعاب الحفلات لليوزر عبر كل القنوات ──────────────
+export function cancelUserPartyGames(userId) {
+  let count = 0;
+  for (const [gId, s] of garticGames) {
+    if (s.creatorId === userId) { garticChannelMap.delete(s.channelId); garticGames.delete(gId); count++; }
+  }
+  for (const [gId, s] of memeGames) {
+    if (s.creatorId === userId) { memeChannelMap.delete(s.channelId); memeGames.delete(gId); count++; }
+  }
+  return count;
+}

@@ -1612,3 +1612,45 @@ export async function handleGameButton(interaction, db) {
   if (id.startsWith("ttt_")) return handleTTTButton(interaction, db);
   if (id.startsWith("rps_")) return handleRPSButton(interaction);
 }
+
+// ── إلغاء كل ألعاب يوزر معين عبر كل القنوات ──────────────────
+export function cancelUserGames(userId) {
+  let count = 0;
+  for (const [gId, s] of rouletteGames) {
+    if (s.creatorId === userId) {
+      channelGames.delete(s.channelId);
+      rouletteGames.delete(gId);
+      count++;
+    }
+  }
+  for (const [gId, s] of mafiaGames) {
+    if (s.creatorId === userId) {
+      if (s.timer) clearTimeout(s.timer);
+      channelGames.delete(s.channelId);
+      mafiaGames.delete(gId);
+      count++;
+    }
+  }
+  for (const [gId, s] of tttGames) {
+    if (s.playerX === userId) {
+      channelGames.delete(s.channelId);
+      tttGames.delete(gId);
+      count++;
+    }
+  }
+  for (const [gId, s] of rpsGames) {
+    if (s.playerA === userId) {
+      rpsChannelMap.delete(s.channelId);
+      rpsGames.delete(gId);
+      count++;
+    }
+  }
+  for (const [gId, s] of rpsBasicGames) {
+    if (s.playerA === userId) {
+      rpsBasicChannelMap.delete(s.channelId);
+      rpsBasicGames.delete(gId);
+      count++;
+    }
+  }
+  return count;
+}
