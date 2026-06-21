@@ -14,6 +14,15 @@ const tttGames      = new Map(); // gameId → state
 export const channelGames  = new Map(); // channelId → gameId (لمنع لعبتين في روم واحد)
 const tttProcessing = new Set(); // gameId — قفل لمنع المعالجة المتزامنة في XO
 
+// ── helper: reply للأمر / update للزرار ───────────────────────
+async function replyOrUpdate(interaction, options) {
+  if (interaction.isButton?.()) {
+    await interaction.update(options);
+    return interaction.fetchReply().catch(() => null);
+  }
+  return interaction.reply({ ...options, fetchReply: true });
+}
+
 // ══════════════════════════════════════════════════════════════
 //  ✂️ حجر ورقة مقص
 // ══════════════════════════════════════════════════════════════
@@ -58,8 +67,8 @@ export async function handleRPSCommand(interaction) {
     new ButtonBuilder().setCustomId(`rps_decline_${gameId}`).setLabel("❌ رفض").setStyle(ButtonStyle.Danger),
   );
 
-  const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
-  state.messageId = msg.id;
+  const msg = await replyOrUpdate(interaction, { embeds: [embed], components: [row] });
+  if (msg) state.messageId = msg.id;
 
   setTimeout(() => {
     if (rpsGames.has(gameId) && rpsGames.get(gameId).phase === "waiting") {
@@ -180,8 +189,8 @@ export async function handleRouletteCommand(interaction, db) {
 
   const embed = buildRouletteEmbed(state, interaction.guild);
   const rows  = buildRoutleteLobbyRows(gameId);
-  const msg   = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
-  state.messageId = msg.id;
+  const msg   = await replyOrUpdate(interaction, { embeds: [embed], components: rows });
+  if (msg) state.messageId = msg.id;
 
   // إلغاء اللعبة تلقائياً بعد 5 دقايق لو ما بدأتش
   setTimeout(() => {
@@ -473,14 +482,20 @@ export async function handleMafiaCommand(interaction, db) {
 
   const embed = buildMafiaLobbyEmbed(state);
   const rows  = buildMafiaLobbyRows(gameId);
-  const msg   = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
-  state.messageId = msg.id;
+  const msg   = await replyOrUpdate(interaction, { embeds: [embed], components: rows });
+  if (msg) state.messageId = msg.id;
 
-  setTimeout(() => {
+  setTimeout(async () => {
     if (mafiaGames.has(gameId) && mafiaGames.get(gameId).phase === "lobby") {
       mafiaGames.delete(gameId);
       channelGames.delete(channelId);
-      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("🕵️ مافيا — انتهت المهلة").setDescription("انتهت مهلة الانتظار.")], components: [] }).catch(() => {});
+      const timeoutEmbed = new EmbedBuilder().setColor(0x555).setTitle("🕵️ مافيا — انتهت المهلة").setDescription("انتهت مهلة الانتظار.");
+      if (state.messageId) {
+        const ch = await interaction.client?.channels?.fetch(channelId).catch(() => null);
+        const m  = ch ? await ch.messages.fetch(state.messageId).catch(() => null) : null;
+        if (m) { m.edit({ embeds: [timeoutEmbed], components: [] }).catch(() => {}); return; }
+      }
+      interaction.editReply({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
     }
   }, 10 * 60 * 1000);
 }
@@ -977,7 +992,7 @@ export async function handleTTTCommand(interaction, db, forceAI = false) {
   if (vsAI) {
     const embed = buildTTTEmbed(state);
     const rows  = buildTTTRows(gameId, state);
-    await interaction.reply({ embeds: [embed], components: rows });
+    await replyOrUpdate(interaction, { embeds: [embed], components: rows });
     return;
   }
 
@@ -997,8 +1012,8 @@ export async function handleTTTCommand(interaction, db, forceAI = false) {
     new ButtonBuilder().setCustomId(`ttt_decline_${gameId}`).setLabel("❌ رفض").setStyle(ButtonStyle.Danger),
   )];
 
-  const msg = await interaction.reply({ embeds: [embed], components: rows, fetchReply: true });
-  state.messageId = msg.id;
+  const msg = await replyOrUpdate(interaction, { embeds: [embed], components: rows });
+  if (msg) state.messageId = msg.id;
 
   setTimeout(() => {
     if (tttGames.has(gameId) && tttGames.get(gameId).phase === "waiting") {

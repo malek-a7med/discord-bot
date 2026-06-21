@@ -186,12 +186,24 @@ export async function handleGarticCommand(interaction) {
   const state = createGarticState(channelId, interaction.user.id);
   garticGames.set(state.id, state);
   garticChannelMap.set(channelId, state.id);
-  const msg = await interaction.reply({ embeds: [buildGarticLobbyEmbed(state)], components: buildGarticLobbyRows(state.id), fetchReply: true });
-  state.messageId = msg.id;
-  setTimeout(() => {
+  let msg;
+  if (interaction.isButton?.()) {
+    await interaction.update({ embeds: [buildGarticLobbyEmbed(state)], components: buildGarticLobbyRows(state.id) });
+    msg = await interaction.fetchReply().catch(() => null);
+  } else {
+    msg = await interaction.reply({ embeds: [buildGarticLobbyEmbed(state)], components: buildGarticLobbyRows(state.id), fetchReply: true });
+  }
+  if (msg) state.messageId = msg.id;
+  setTimeout(async () => {
     if (garticGames.has(state.id) && garticGames.get(state.id).phase === "lobby") {
       garticGames.delete(state.id); garticChannelMap.delete(channelId);
-      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("📞 انتهت مهلة اللوبي")], components: [] }).catch(() => {});
+      const timeoutEmbed = new EmbedBuilder().setColor(0x555).setTitle("📞 انتهت مهلة اللوبي");
+      if (state.messageId) {
+        const ch = await interaction.client?.channels?.fetch(channelId).catch(() => null);
+        const m  = ch ? await ch.messages.fetch(state.messageId).catch(() => null) : null;
+        if (m) { m.edit({ embeds: [timeoutEmbed], components: [] }).catch(() => {}); return; }
+      }
+      interaction.editReply({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
     }
   }, 10 * 60 * 1000);
 }
@@ -634,8 +646,14 @@ export async function handleMemeCommand(interaction) {
   const state = createMemeState(channelId, interaction.user.id);
   memeGames.set(state.id, state);
   memeChannelMap.set(channelId, state.id);
-  const msg = await interaction.reply({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(state.id), fetchReply: true });
-  state.messageId = msg.id;
+  let msg;
+  if (interaction.isButton?.()) {
+    await interaction.update({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(state.id) });
+    msg = await interaction.fetchReply().catch(() => null);
+  } else {
+    msg = await interaction.reply({ embeds: [buildMemeLobbyEmbed(state)], components: buildMemeLobbyRows(state.id), fetchReply: true });
+  }
+  if (msg) state.messageId = msg.id;
 }
 
 export async function handleMemeButton(interaction, db) {

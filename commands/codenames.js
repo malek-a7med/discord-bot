@@ -185,12 +185,24 @@ export async function handleCodenamesCommand(interaction) {
   const state = createState(channelId, interaction.user.id);
   codenamesGames.set(state.id, state);
   cdnChannelGames.set(channelId, state.id);
-  const msg = await interaction.reply({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(state.id), fetchReply: true });
-  state.messageId = msg.id;
-  setTimeout(() => {
+  let msg;
+  if (interaction.isButton?.()) {
+    await interaction.update({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(state.id) });
+    msg = await interaction.fetchReply().catch(() => null);
+  } else {
+    msg = await interaction.reply({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(state.id), fetchReply: true });
+  }
+  if (msg) state.messageId = msg.id;
+  setTimeout(async () => {
     if (codenamesGames.has(state.id) && codenamesGames.get(state.id).phase === "lobby") {
       codenamesGames.delete(state.id); cdnChannelGames.delete(channelId);
-      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("🃏 كود نيمز — انتهت مهلة اللوبي")], components: [] }).catch(() => {});
+      const timeoutEmbed = new EmbedBuilder().setColor(0x555).setTitle("🃏 كود نيمز — انتهت مهلة اللوبي");
+      if (state.messageId) {
+        const ch = await interaction.client?.channels?.fetch(channelId).catch(() => null);
+        const m  = ch ? await ch.messages.fetch(state.messageId).catch(() => null) : null;
+        if (m) { m.edit({ embeds: [timeoutEmbed], components: [] }).catch(() => {}); return; }
+      }
+      interaction.editReply({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
     }
   }, 10 * 60 * 1000);
 }

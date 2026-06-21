@@ -158,7 +158,11 @@ export async function handleBankLuckCommand(interaction) {
   };
   luckGames.set(gameId, state);
   luckChannelMap.set(channelId, gameId);
-  await interaction.reply({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(gameId) });
+  if (interaction.isButton?.()) {
+    await interaction.update({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(gameId) });
+  } else {
+    await interaction.reply({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(gameId) });
+  }
 }
 
 async function startGame(interaction, state) {

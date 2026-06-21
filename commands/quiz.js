@@ -69,23 +69,28 @@ export async function startQuizGame(interaction) {
 
   quizChannelMap.set(channelId, state);
 
-  const msg = await interaction.reply({
-    embeds: [buildQuizEmbed(question)],
-    components: buildQuizRows(gameId),
-    fetchReply: true,
-  });
-  state.messageId = msg.id;
+  let msg;
+  if (interaction.isButton?.()) {
+    await interaction.update({ embeds: [buildQuizEmbed(question)], components: buildQuizRows(gameId) });
+    msg = await interaction.fetchReply().catch(() => null);
+  } else {
+    msg = await interaction.reply({ embeds: [buildQuizEmbed(question)], components: buildQuizRows(gameId), fetchReply: true });
+  }
+  if (msg) state.messageId = msg.id;
 
   state.timer = setTimeout(async () => {
     if (!quizChannelMap.has(channelId)) return;
     quizChannelMap.delete(channelId);
     const correctOpt = question.opts[question.ans];
-    await interaction.editReply({
-      embeds: [new EmbedBuilder().setColor(0x555555).setTitle("⏰ انتهى الوقت!")
-        .setDescription(`محدش جاوب في الوقت!\n\n✅ **الإجابة الصحيحة:** ${OPTION_LABELS[question.ans]}. **${correctOpt}**`)
-        .setTimestamp()],
-      components: buildQuizRows(gameId, true),
-    }).catch(() => {});
+    const timeoutEmbed = new EmbedBuilder().setColor(0x555555).setTitle("⏰ انتهى الوقت!")
+      .setDescription(`محدش جاوب في الوقت!\n\n✅ **الإجابة الصحيحة:** ${OPTION_LABELS[question.ans]}. **${correctOpt}**`)
+      .setTimestamp();
+    if (state.messageId) {
+      const ch = await interaction.client?.channels?.fetch(channelId).catch(() => null);
+      const m  = ch ? await ch.messages.fetch(state.messageId).catch(() => null) : null;
+      if (m) { await m.edit({ embeds: [timeoutEmbed], components: buildQuizRows(gameId, true) }).catch(() => {}); return; }
+    }
+    interaction.editReply({ embeds: [timeoutEmbed], components: buildQuizRows(gameId, true) }).catch(() => {});
   }, 30_000);
 }
 
