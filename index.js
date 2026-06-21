@@ -285,10 +285,6 @@ const LEGACY_COMMANDS = [
         .addUserOption(o => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
         .addStringOption(o => o.setName("السبب").setDescription("السبب"))
     )
-    .addSubcommand(sub =>
-      sub.setName("مسح").setDescription("مسح رسائل من الشات")
-        .addIntegerOption(o => o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000))
-    )
     .addSubcommand(sub => sub.setName("مسح-كل").setDescription("مسح كل رسايل الروم بالكامل [إدارة]"))
     .addSubcommand(sub =>
       sub.setName("سجل").setDescription("عرض سجل تحذيرات عضو")
@@ -299,6 +295,12 @@ const LEGACY_COMMANDS = [
         .addUserOption(o => o.setName("يوزر").setDescription("اليوزر اللي هترفع عنه البلوك").setRequired(true))
     )
     .addSubcommand(sub => sub.setName("مبلوكين").setDescription("عرض اليوزرز المبلوكين حالياً [أونر]")),
+  // ── مسح ──────────────────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("مسح")
+    .setDescription("🧹 مسح رسائل من الشات")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addIntegerOption(o => o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000)),
   // ── موسيقى ───────────────────────────────────────────────────────
   new SlashCommandBuilder()
     .setName("موسيقى")
@@ -2636,22 +2638,6 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        if (sub === "مسح") {
-          const num = interaction.options.getInteger("عدد");
-          await interaction.deferReply({ ephemeral: true });
-          let remaining = num, totalDeleted = 0;
-          while (remaining > 0) {
-            const batch = Math.min(remaining, 100);
-            const deleted = await channel.bulkDelete(batch, true).catch(() => ({ size: 0 }));
-            totalDeleted += deleted.size;
-            remaining -= batch;
-            if (deleted.size < batch) break;
-            await new Promise(r => setTimeout(r, 500));
-          }
-          sendModLog("clear", interaction.user, null, `مسح ${totalDeleted} رسالة`, { count: totalDeleted, channel: channel.id }).catch(() => {});
-          return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
-        }
-
         if (sub === "مسح-كل") {
           if (isFromDM) return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
           const confirmRow = new ActionRowBuilder().addComponents(
@@ -2714,6 +2700,24 @@ client.on("interactionCreate", async (interaction) => {
           if (blocked.length === 0) return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
           return interaction.reply({ content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`, ephemeral: true });
         }
+      }
+
+      if (cmd === "مسح") {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages))
+          return interaction.reply({ content: "❌ محتاج صلاحية **إدارة الرسائل** عشان تستخدم الأمر ده!", ephemeral: true });
+        const num = interaction.options.getInteger("عدد");
+        await interaction.deferReply({ ephemeral: true });
+        let remaining = num, totalDeleted = 0;
+        while (remaining > 0) {
+          const batch = Math.min(remaining, 100);
+          const deleted = await channel.bulkDelete(batch, true).catch(() => ({ size: 0 }));
+          totalDeleted += deleted.size;
+          remaining -= batch;
+          if (deleted.size < batch) break;
+          await new Promise(r => setTimeout(r, 500));
+        }
+        sendModLog("clear", interaction.user, null, `مسح ${totalDeleted} رسالة`, { count: totalDeleted, channel: channel.id }).catch(() => {});
+        return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
       }
 
       if (cmd === "موسيقى") {
