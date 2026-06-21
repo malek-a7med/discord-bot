@@ -674,7 +674,8 @@ const client = new Client({
 const activeGames = new Collection();
 // إجراءات التأديب المعلقة — تنتظر تأكيد المشرف
 const pendingModActions = new Map(); // actionId → { type, targetId, reason, duration, modId, guildId }
-const pendingSuggestionImages = new Map(); // userId → { publicMessageId, channelId, timer }
+const pendingSuggestionImages = new Map(); // userId → { publicMessageId, adminMessageId, channelId, timer, text, type }
+let panelResending = false; // قفل لمنع إرسال لوحة الاقتراحات مرتين في نفس الوقت
 let autoModEnabled = true; // تشغيل/إيقاف Auto-Mod
 // ✅ FIX: ModerationListener كانت معمولة new بس مش متربطة بأي event (كانت ميتة فعليًا).
 //   بنفعّل بس anti-raid (scanGuildJoin في guildMemberAdd) لأنها الميزة الوحيدة الناقصة فعلاً.
@@ -1134,25 +1135,31 @@ async function handleSuggestionModalSubmit(interaction, suggestionText, type = "
     inline: false,
   });
 
+  let adminMessageId = null;
   if (adminChannel?.isTextBased()) {
-    await adminChannel.send({
+    const sentAdminMsg = await adminChannel.send({
       embeds: [adminEmbed],
       components: [buildAdminActionRow(false), buildAdminSolvedRow(false)],
     });
+    adminMessageId = sentAdminMsg.id;
   } else {
     logger.warn("⚠️ روم إدارة الاقتراحات غير متاح");
   }
 
-  // ── إعادة نشر اللوحة بشكل ذكي — يمسح القديمة قبل ما ينشر جديدة ──
-  try {
-    const recentMsgs = await suggestionsChannel.messages.fetch({ limit: 50 });
-    const oldPanels  = recentMsgs.filter(m => messageHasSuggestionPanel(m, interaction.client.user.id));
-    for (const [, pm] of oldPanels) await pm.delete().catch(() => {});
-    await suggestionsChannel.send({
-      embeds: [buildSuggestionsPanelEmbed()],
-      components: [buildSuggestionsPanelRow()],
-    });
-  } catch { /* ignore */ }
+  // ── إعادة نشر اللوحة بشكل ذكي — قفل لمنع التكرار ──────────────
+  if (!panelResending) {
+    panelResending = true;
+    try {
+      const recentMsgs = await suggestionsChannel.messages.fetch({ limit: 50 });
+      const oldPanels  = recentMsgs.filter(m => messageHasSuggestionPanel(m, interaction.client.user.id));
+      for (const [, pm] of oldPanels) await pm.delete().catch(() => {});
+      await suggestionsChannel.send({
+        embeds: [buildSuggestionsPanelEmbed()],
+        components: [buildSuggestionsPanelRow()],
+      });
+    } catch { /* ignore */ }
+    finally { panelResending = false; }
+  }
 
   // ── فتح نافذة 90 ثانية لإضافة صورة اختيارية ────────────────────
   const pendingTimer = setTimeout(() => {
@@ -1160,6 +1167,7 @@ async function handleSuggestionModalSubmit(interaction, suggestionText, type = "
   }, 90_000);
   pendingSuggestionImages.set(interaction.user.id, {
     publicMessageId: publicMessage.id,
+    adminMessageId,
     channelId: SUGGESTIONS_CHANNEL_ID,
     text: trimmedText,
     type,
@@ -1452,22 +1460,22 @@ client.on("messageCreate", async (msg) => {
   processedMessages.add(msg.id);
   setTimeout(() => processedMessages.delete(msg.id), 60_000);
 
-  // ── روم الاقتراحات: صورة اختيارية أو احذف ────────────────────
+  // ── روم الاقتراحات: صور مسموحة — نصوص بس اللي تتمسح ──────────
   if (msg.guild && msg.channel.id === SUGGESTIONS_CHANNEL_ID) {
     const pending = pendingSuggestionImages.get(msg.author.id);
 
-    // ✅ المستخدم عنده اقتراح معلّق وبعت صورة (reply أو مش reply)
-    if (pending && msg.attachments.size > 0) {
-      // تحقق إن الرسالة reply على اقتراحه أو على أي رسالة
-      const referencedId = msg.reference?.messageId;
-      const isReplyToSuggestion = !referencedId || referencedId === pending.publicMessageId;
+    // ✅ الرسالة فيها صورة — السماح بالصور دايمًا في الروم ده
+    if (msg.attachments.size > 0) {
+      const imageUrl = msg.attachments.first()?.url;
 
-      if (isReplyToSuggestion) {
-        const imageUrl = msg.attachments.first()?.url;
-        await msg.delete().catch(() => {});
+      // لو المستخدم عنده اقتراح معلّق — ضيف الصورة عليه تلقائياً
+      if (pending && imageUrl) {
+        const referencedId = msg.reference?.messageId;
+        const isRelevant = !referencedId || referencedId === pending.publicMessageId;
 
-        if (imageUrl) {
-          // جيب رسالة الاقتراح وعدّلها بالصورة
+        if (isRelevant) {
+          await msg.delete().catch(() => {});
+
           try {
             const suggCh = msg.channel;
             const suggMsg = await suggCh.messages.fetch(pending.publicMessageId).catch(() => null);
@@ -1481,20 +1489,43 @@ client.on("messageCreate", async (msg) => {
               });
               await suggMsg.edit({ embeds: [updatedEmbed] }).catch(() => {});
             }
+
+            // ── تحديث رسالة الإدارة بالصورة أيضاً ──────────────
+            if (pending.adminMessageId) {
+              const adminCh = await msg.client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
+              if (adminCh?.isTextBased()) {
+                const adminMsg = await adminCh.messages.fetch(pending.adminMessageId).catch(() => null);
+                if (adminMsg) {
+                  const oldEmbed = adminMsg.embeds[0];
+                  const refField = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
+                  const updatedAdminEmbed = buildSuggestionEmbed({
+                    user: msg.author,
+                    text: pending.text,
+                    statusKey: "pending",
+                    type: pending.type,
+                    imageUrl,
+                  });
+                  if (refField) {
+                    updatedAdminEmbed.addFields({ name: SUGGESTION_REF_FIELD, value: refField.value, inline: false });
+                  }
+                  await adminMsg.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
+                }
+              }
+            }
           } catch { /* ignore */ }
 
-          // امسح الـ pending وأوقف الـ timer
           clearTimeout(pending.timer);
           pendingSuggestionImages.delete(msg.author.id);
-
-          // بعت DM للمستخدم تأكيد
           await msg.author.send("✅ تم إضافة صورتك للاقتراح بنجاح! 🖼️").catch(() => {});
+          return;
         }
-        return;
       }
+
+      // صورة عادية بدون pending — خليها تعدي (مسموح بالصور)
+      return;
     }
 
-    // مش عنده pending أو مش صورة — احذف وذكّره بالأزرار
+    // رسالة نصية بدون صورة — احذف وذكّره بالأزرار
     await msg.delete().catch(() => {});
     if (!pending) {
       await msg.author.send(

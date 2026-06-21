@@ -12,6 +12,7 @@ const rouletteGames = new Map(); // gameId → state
 const mafiaGames    = new Map(); // gameId → state
 const tttGames      = new Map(); // gameId → state
 export const channelGames  = new Map(); // channelId → gameId (لمنع لعبتين في روم واحد)
+const tttProcessing = new Set(); // gameId — قفل لمنع المعالجة المتزامنة في XO
 
 // ══════════════════════════════════════════════════════════════
 //  ✂️ حجر ورقة مقص
@@ -1172,19 +1173,45 @@ export async function handleTTTButton(interaction, db) {
     const idx    = parseInt(parts[parts.length - 1]);
     const state  = tttGames.get(gameId);
 
-    if (!state || state.winner) return interaction.reply({ content: "❌ اللعبة انتهت!", ephemeral: true });
+    if (!state || state.winner) {
+      return interaction.update({
+        embeds: [new EmbedBuilder().setColor(0x555).setTitle("❌⭕ اللعبة انتهت").setDescription("اللعبة اتنهت فعلاً! اضغط **لعبة جديدة** عشان تلعب تاني. 🔁")],
+        components: [],
+      }).catch(() => interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 }).catch(() => {}));
+    }
     if (state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة ما بدأتش!", ephemeral: true });
+
+    // ── قفل المعالجة المتزامنة ────────────────────────────────
+    if (tttProcessing.has(gameId)) {
+      return interaction.reply({ content: "⏳ لحظة — البوت بيعالج نقرة تانية دلوقتي!", flags: 64 });
+    }
+    tttProcessing.add(gameId);
 
     const currentPlayer = state.currentTurn === "X" ? state.playerX : state.playerO;
     if (interaction.user.id !== state.playerX && !state.isAI) {
-      if (interaction.user.id !== currentPlayer) return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
+      if (interaction.user.id !== currentPlayer) {
+        tttProcessing.delete(gameId);
+        return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
+      }
     } else if (state.isAI) {
-      if (interaction.user.id !== state.playerX) return interaction.reply({ content: "❌ دي لعبتك إنت بس!", ephemeral: true });
-      if (state.currentTurn !== "X") return interaction.reply({ content: "⏳ الذكاء الاصطناعي بيلعب دلوقتي!", ephemeral: true });
+      if (interaction.user.id !== state.playerX) {
+        tttProcessing.delete(gameId);
+        return interaction.reply({ content: "❌ دي لعبتك إنت بس!", ephemeral: true });
+      }
+      if (state.currentTurn !== "X") {
+        tttProcessing.delete(gameId);
+        return interaction.reply({ content: "⏳ الذكاء الاصطناعي بيلعب دلوقتي!", ephemeral: true });
+      }
     } else {
-      if (interaction.user.id !== currentPlayer) return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
+      if (interaction.user.id !== currentPlayer) {
+        tttProcessing.delete(gameId);
+        return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
+      }
     }
-    if (state.board[idx] !== "") return interaction.reply({ content: "❌ الخانة دي محجوزة!", ephemeral: true });
+    if (state.board[idx] !== "") {
+      tttProcessing.delete(gameId);
+      return interaction.reply({ content: "❌ الخانة دي محجوزة!", ephemeral: true });
+    }
 
     // ── حركة اللاعب ──────────────────────────────────────────
     state.board[idx] = state.currentTurn;
@@ -1194,6 +1221,7 @@ export async function handleTTTButton(interaction, db) {
       state.winner = winnerValue;
       tttGames.delete(gameId);
       channelGames.delete(state.channelId);
+      tttProcessing.delete(gameId);
     };
 
     if (result) {
@@ -1250,14 +1278,18 @@ export async function handleTTTButton(interaction, db) {
           return;
         }
         state.currentTurn = "X";
+        tttProcessing.delete(gameId);
         const finalEmbed = buildTTTEmbed(state);
         const finalRows  = buildTTTRows(gameId, state);
         const msg = await interaction.fetchReply().catch(() => null);
         if (msg) await msg.edit({ embeds: [finalEmbed], components: finalRows }).catch(() => {});
+      } else {
+        tttProcessing.delete(gameId);
       }
       return;
     }
 
+    tttProcessing.delete(gameId);
     const embed = buildTTTEmbed(state);
     const rows  = buildTTTRows(gameId, state);
     return interaction.update({ embeds: [embed], components: rows });
