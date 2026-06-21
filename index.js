@@ -1488,6 +1488,7 @@ client.on("messageCreate", async (msg) => {
           try {
             const suggCh  = msg.channel;
             const suggMsg = await suggCh.messages.fetch(pending.publicMessageId).catch(() => null);
+            let stableImageUrl = null;
             if (suggMsg) {
               const embedImageUrl = imgBuffer ? `attachment://${filename}` : imageUrl;
               const updatedEmbed  = buildSuggestionEmbed({
@@ -1499,10 +1500,14 @@ client.on("messageCreate", async (msg) => {
               });
               const editOptions = { embeds: [updatedEmbed] };
               if (imgBuffer) editOptions.files = [new AttachmentBuilder(imgBuffer, { name: filename })];
-              await suggMsg.edit(editOptions).catch(() => {});
+              const editedMsg = await suggMsg.edit(editOptions).catch(() => null);
+              // نجيب الـ CDN URL الثابت من الرسالة بعد الرفع
+              if (editedMsg?.attachments?.size > 0) {
+                stableImageUrl = editedMsg.attachments.first()?.url;
+              }
             }
 
-            // ── تحديث رسالة الإدارة بالصورة أيضاً ──────────────
+            // ── تحديث رسالة الإدارة بالـ URL الثابت ──────────────
             if (pending.adminMessageId) {
               const adminCh = await msg.client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
               if (adminCh?.isTextBased()) {
@@ -1510,20 +1515,19 @@ client.on("messageCreate", async (msg) => {
                 if (adminMsg) {
                   const oldEmbed  = adminMsg.embeds[0];
                   const refField  = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
-                  const embedImageUrl = imgBuffer ? `attachment://${filename}` : imageUrl;
+                  // نستخدم الـ URL الثابت من الرسالة العامة — ما نرفعش تاني
+                  const finalImageUrl = stableImageUrl || imageUrl;
                   const updatedAdminEmbed = buildSuggestionEmbed({
                     user: msg.author,
                     text: pending.text,
                     statusKey: "pending",
                     type: pending.type,
-                    imageUrl: embedImageUrl,
+                    imageUrl: finalImageUrl,
                   });
                   if (refField) {
                     updatedAdminEmbed.addFields({ name: SUGGESTION_REF_FIELD, value: refField.value, inline: false });
                   }
-                  const adminEditOptions = { embeds: [updatedAdminEmbed] };
-                  if (imgBuffer) adminEditOptions.files = [new AttachmentBuilder(imgBuffer, { name: filename })];
-                  await adminMsg.edit(adminEditOptions).catch(() => {});
+                  await adminMsg.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
                 }
               }
             }
@@ -1575,6 +1579,7 @@ client.on("messageCreate", async (msg) => {
         try {
           const suggCh  = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
           const suggMsg = suggCh ? await suggCh.messages.fetch(dmPending.publicMessageId).catch(() => null) : null;
+          let dmStableImageUrl = null;
           if (suggMsg) {
             const embedImageUrl = dmImgBuffer ? `attachment://${dmFilename}` : dmImageUrl;
             const updatedEmbed  = buildSuggestionEmbed({
@@ -1586,7 +1591,10 @@ client.on("messageCreate", async (msg) => {
             });
             const editOptions = { embeds: [updatedEmbed] };
             if (dmImgBuffer) editOptions.files = [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })];
-            await suggMsg.edit(editOptions).catch(() => {});
+            const editedMsg = await suggMsg.edit(editOptions).catch(() => null);
+            if (editedMsg?.attachments?.size > 0) {
+              dmStableImageUrl = editedMsg.attachments.first()?.url;
+            }
           }
 
           if (dmPending.adminMessageId) {
@@ -1596,18 +1604,16 @@ client.on("messageCreate", async (msg) => {
               if (adminMsg) {
                 const oldEmbed  = adminMsg.embeds[0];
                 const refField  = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
-                const embedImageUrl = dmImgBuffer ? `attachment://${dmFilename}` : dmImageUrl;
+                const finalImageUrl = dmStableImageUrl || dmImageUrl;
                 const updatedAdminEmbed = buildSuggestionEmbed({
                   user: msg.author,
                   text: dmPending.text,
                   statusKey: "pending",
                   type: dmPending.type,
-                  imageUrl: embedImageUrl,
+                  imageUrl: finalImageUrl,
                 });
                 if (refField) updatedAdminEmbed.addFields({ name: SUGGESTION_REF_FIELD, value: refField.value, inline: false });
-                const adminEditOptions = { embeds: [updatedAdminEmbed] };
-                if (dmImgBuffer) adminEditOptions.files = [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })];
-                await adminMsg.edit(adminEditOptions).catch(() => {});
+                await adminMsg.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
               }
             }
           }

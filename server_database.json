@@ -1,11 +1,11 @@
 {
   "users": {
     "954816748140503090": {
-      "xp": 1735,
+      "xp": 1740,
       "level": 5,
       "coins": 1e+41,
       "lastDaily": 1780602154196,
-      "_lastXpMsg": "1518110755889610853",
+      "_lastXpMsg": "1518120459181359177",
       "_lastAiMsg": "1516940874049781920",
       "bankCoins": 0,
       "lastBankInterest": 0
@@ -239,9 +239,7 @@
   "settings": {
     "backupChannelId": "1486495986263261385"
   },
-  "aiMessageClaims": {
-    "1518110447096827945": 1782016135804
-  },
+  "aiMessageClaims": {},
   "lifeProfiles": {
     "1485896430957625367": {
       "954816748140503090": {

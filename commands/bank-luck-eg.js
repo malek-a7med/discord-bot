@@ -132,7 +132,11 @@ async function showBankPanel(interaction, db) {
     new ButtonBuilder().setCustomId("bleg_info").setLabel("📜 قوانين اللعبة").setStyle(ButtonStyle.Secondary)
   );
 
-  await interaction.reply({ embeds: [embed], components: [row] });
+  if (interaction.isButton?.()) {
+    await interaction.update({ embeds: [embed], components: [row] });
+  } else {
+    await interaction.reply({ embeds: [embed], components: [row] });
+  }
 }
 
 async function showBetModal(interaction) {

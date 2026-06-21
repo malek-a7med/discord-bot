@@ -1433,8 +1433,8 @@ export async function handleRPSBasicCommand(interaction) {
     new ButtonBuilder().setCustomId(`rpsb_decline_${gameId}`).setLabel("❌ رفض").setStyle(ButtonStyle.Danger),
   );
 
-  const msg = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
-  state.messageId = msg.id;
+  const msg = await replyOrUpdate(interaction, { embeds: [embed], components: [row] });
+  if (msg) state.messageId = msg.id;
 
   setTimeout(() => {
     if (rpsBasicGames.has(gameId) && rpsBasicGames.get(gameId).phase === "waiting") {
