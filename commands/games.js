@@ -1215,6 +1215,9 @@ export async function handleTTTButton(interaction, db) {
     const state  = tttGames.get(gameId);
     if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
 
+    // لو اللعبة بدأت بالفعل — منع أي قبول أو رفض جديد
+    if (state.phase !== "waiting") return interaction.reply({ content: "❌ اللعبة بدأت بالفعل!", flags: 64 });
+
     // تحدي مفتوح — أي حد غير اللي بدأ يقدر يقبل
     if (state.isOpen) {
       if (id.startsWith("ttt_decline_")) {
@@ -1225,6 +1228,7 @@ export async function handleTTTButton(interaction, db) {
       }
       if (interaction.user.id === state.playerX) return interaction.reply({ content: "❌ ما تقدرش تلعب ضد نفسك!", flags: 64 });
       state.playerO = interaction.user.id;
+      state.isOpen  = false;
     } else {
       // تحدي محدد لشخص معين
       if (interaction.user.id !== state.playerO) return interaction.reply({ content: "❌ الدعوة مش إلك!", flags: 64 });
