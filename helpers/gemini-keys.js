@@ -115,6 +115,10 @@ class RotatingGeminiModel {
     const genAI = new GoogleGenerativeAI(key);
     const opts  = { model: this.modelName };
     if (this.systemInstruction) opts.systemInstruction = this.systemInstruction;
+    // ── تعطيل الـ thinking mode عشان الرد يكون فوري (gemini-2.5-flash بيفكر كتير بالديفولت) ──
+    if (this.modelName === "gemini-2.5-flash") {
+      opts.generationConfig = { thinkingConfig: { thinkingBudget: 0 } };
+    }
     return genAI.getGenerativeModel(opts);
   }
 
