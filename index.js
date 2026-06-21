@@ -3786,6 +3786,62 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 
+  // ─── أزرار لوحة الاقتراحات (خارج isChatInputCommand بشكل صحيح) ──
+  if (interaction.isMessageComponent()) {
+    const cid = interaction.customId;
+
+    if (cid === "suggest_idea" || cid === SUGGESTION_BTN_ID || cid === "open_suggestion_modal") {
+      const modal = new ModalBuilder()
+        .setCustomId("modal_suggest_idea")
+        .setTitle("💡 تقديم اقتراح جديد");
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("suggest_text")
+            .setLabel("اكتب اقتراحك هنا بالتفصيل:")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(2000)
+        )
+      );
+      return await interaction.showModal(modal);
+    }
+
+    if (cid === "suggest_bug") {
+      const modal = new ModalBuilder()
+        .setCustomId("modal_suggest_bug")
+        .setTitle("🔴 الإبلاغ عن مشكلة");
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("bug_text")
+            .setLabel("اوصف المشكلة بالتفصيل:")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(2000)
+        )
+      );
+      return await interaction.showModal(modal);
+    }
+
+    if (cid === "suggest_other") {
+      const modal = new ModalBuilder()
+        .setCustomId("modal_suggest_other")
+        .setTitle("💬 تعليق عام");
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("other_text")
+            .setLabel("اكتب تعليقك هنا:")
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(true)
+            .setMaxLength(2000)
+        )
+      );
+      return await interaction.showModal(modal);
+    }
+  }
+
   // ─── Context Menu: تعديل رسالة ────────────────────────────────
   if (interaction.isMessageContextMenuCommand() && interaction.commandName === "✏️ تعديل رسالة") {
     if (!config.isOwner(interaction.user.id)) {
