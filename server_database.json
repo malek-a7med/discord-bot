@@ -1,19 +1,21 @@
 {
   "users": {
     "954816748140503090": {
-      "xp": 1660,
+      "xp": 1725,
       "level": 5,
-      "coins": 240,
+      "coins": 1e+41,
       "lastDaily": 1780602154196,
-      "_lastXpMsg": "1517701845165015165",
-      "_lastAiMsg": "1516940874049781920"
+      "_lastXpMsg": "1518108778069753896",
+      "_lastAiMsg": "1516940874049781920",
+      "bankCoins": 0,
+      "lastBankInterest": 0
     },
     "1448840687763325018": {
-      "xp": 2010,
+      "xp": 2050,
       "level": 6,
       "coins": 100,
       "lastDaily": null,
-      "_lastXpMsg": "1517758093143048373",
+      "_lastXpMsg": "1518106709829353564",
       "bankCoins": 0,
       "lastBankInterest": 0
     },
@@ -25,13 +27,13 @@
       "_lastXpMsg": "1517319330176569545"
     },
     "844490366614110218": {
-      "xp": 320,
-      "level": 2,
-      "coins": 0,
+      "xp": 10525,
+      "level": 14,
+      "coins": 900000,
       "lastDaily": null,
       "bankCoins": 0,
       "lastBankInterest": 0,
-      "_lastXpMsg": "1517757463062122496"
+      "_lastXpMsg": "1518108464134492182"
     },
     "1474551986413109298": {
       "xp": 660,
@@ -237,5 +239,25 @@
   "settings": {
     "backupChannelId": "1486495986263261385"
   },
-  "aiMessageClaims": {}
+  "aiMessageClaims": {},
+  "lifeProfiles": {
+    "1485896430957625367": {
+      "954816748140503090": {
+        "coins": 0,
+        "jobLevel": 0,
+        "jobSince": null,
+        "assets": {
+          "house": false,
+          "car": false,
+          "company": false
+        },
+        "debt": 0,
+        "debtSince": null,
+        "debtWarned": false,
+        "health": 100,
+        "lastTick": 1782015462616,
+        "createdAt": 1782015462615
+      }
+    }
+  }
 }
