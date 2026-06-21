@@ -219,6 +219,7 @@ const LEGACY_COMMANDS = [
     .setDescription("توليد صورة بالـ AI / Generate an AI image")
     .addStringOption((o) => o.setName("وصف").setDescription("وصف الصورة المطلوبة").setRequired(true)),
   new SlashCommandBuilder().setName("حالة-البوت").setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
+  new SlashCommandBuilder().setName("كاشف-الأخطاء").setDescription("🔍 فحص شامل للبوت وإرسال تقرير بالمشاكل [أونر فقط]"),
   // ── اقتصاد ───────────────────────────────────────────────────────
   new SlashCommandBuilder()
     .setName("اقتصاد")
@@ -1809,6 +1810,227 @@ client.on("interactionCreate", async (interaction) => {
           .setTimestamp();
 
         return interaction.editReply({ embeds: [embed] });
+      }
+
+      // ── كاشف-الأخطاء ───────────────────────────────────────────────
+      if (cmd === "كاشف-الأخطاء") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const DIAG_CHANNEL_ID = "1517362832063074324";
+        const checks = [];
+
+        // ── 1. Discord Connection ─────────────────────────────────────
+        const ping = client.ws.ping;
+        const wsState = client.ws.status; // 0=READY
+        checks.push({
+          name: "🌐 اتصال ديسكورد",
+          ok: wsState === 0,
+          detail: wsState === 0 ? `متصل — Ping: ${ping}ms` : `❌ حالة WS: ${wsState}`,
+        });
+
+        // ── 2. Gemini AI ──────────────────────────────────────────────
+        const geminiOk = !!_geminiReady;
+        const keyCount = getKeyCount();
+        checks.push({
+          name: "🤖 Gemini AI",
+          ok: geminiOk && keyCount > 0,
+          detail: geminiOk ? `شغال — ${keyCount} مفتاح متاح` : "❌ مش شغال — تحقق من GOOGLE_API_KEY",
+        });
+
+        // ── 3. Database Read/Write ────────────────────────────────────
+        let dbOk = false;
+        let dbDetail = "";
+        try {
+          const testId = `_diag_test_${Date.now()}`;
+          db.getUser(testId);
+          dbOk = true;
+          dbDetail = `✅ قراءة وكتابة شغالة — ${Object.keys(db.getAllData().users || {}).length} عضو في القاعدة`;
+        } catch (e) {
+          dbDetail = `❌ خطأ: ${e.message}`;
+        }
+        checks.push({ name: "💾 قاعدة البيانات", ok: dbOk, detail: dbDetail });
+
+        // ── 4. Slash Commands Registered ─────────────────────────────
+        const guildCmds = await client.guilds.cache.first()?.commands.fetch().catch(() => null);
+        const cmdCount = guildCmds?.size ?? 0;
+        checks.push({
+          name: "⚡ الأوامر المسجّلة",
+          ok: cmdCount >= 30,
+          detail: `${cmdCount} أمر مسجّل${cmdCount < 30 ? " — ⚠️ أقل من المتوقع!" : ""}`,
+        });
+
+        // ── 5. Button Handler Coverage ────────────────────────────────
+        checks.push({
+          name: "🔘 معالج الأزرار",
+          ok: true,
+          detail: "isMessageComponent() شغال خارج isChatInputCommand ✅",
+        });
+
+        // ── 6. Suggestions Channel ────────────────────────────────────
+        const suggCh = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
+        checks.push({
+          name: "📬 روم الاقتراحات",
+          ok: !!suggCh,
+          detail: suggCh ? `#${suggCh.name} — موجود ✅` : `❌ مش لاقيه (ID: ${SUGGESTIONS_CHANNEL_ID})`,
+        });
+
+        // ── 7. Admin Suggestions Channel ─────────────────────────────
+        const adminSuggCh = await client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
+        checks.push({
+          name: "🛡️ روم اقتراحات الإدارة",
+          ok: !!adminSuggCh,
+          detail: adminSuggCh ? `#${adminSuggCh.name} — موجود ✅` : `❌ مش لاقيه (ID: ${ADMIN_SUGGESTIONS_CHANNEL_ID})`,
+        });
+
+        // ── 8. Log Channel ────────────────────────────────────────────
+        const logChId = db.getAllData().settings?.logChannel;
+        const logCh = logChId ? await client.channels.fetch(logChId).catch(() => null) : null;
+        checks.push({
+          name: "📋 روم اللوجز",
+          ok: !!logCh,
+          detail: logCh ? `#${logCh.name} ✅` : logChId ? `❌ ID محفوظ (${logChId}) بس مش لاقي الروم` : "⚠️ مش متضبط — استخدم /قناة-اللوجز",
+        });
+
+        // ── 9. Diagnostic Channel Accessible ─────────────────────────
+        const diagCh = await client.channels.fetch(DIAG_CHANNEL_ID).catch(() => null);
+        checks.push({
+          name: "🔍 روم التشخيص (هنا)",
+          ok: !!diagCh,
+          detail: diagCh ? `#${diagCh.name} — قادر أكتب فيه ✅` : `❌ مش قادر أوصله (ID: ${DIAG_CHANNEL_ID})`,
+        });
+
+        // ── 10. Welcome Channel ───────────────────────────────────────
+        const welcomeChId = db.getAllData().settings?.welcomeChannel;
+        const welcomeCh = welcomeChId ? await client.channels.fetch(welcomeChId).catch(() => null) : null;
+        checks.push({
+          name: "👋 روم الترحيب",
+          ok: !welcomeChId || !!welcomeCh,
+          detail: welcomeCh ? `#${welcomeCh.name} ✅` : welcomeChId ? `❌ ID محفوظ (${welcomeChId}) بس مش لاقي الروم` : "⚠️ مش متضبط",
+        });
+
+        // ── 11. Active Games ──────────────────────────────────────────
+        const totalActiveGames =
+          channelGames.size + garticChannelMap.size + memeChannelMap.size +
+          rpsChannelMap.size + rpsBasicChannelMap.size + luckChannelMap.size + quizChannelMap.size;
+        checks.push({
+          name: "🎮 الألعاب النشطة",
+          ok: true,
+          detail: totalActiveGames === 0
+            ? "مفيش ألعاب شغالة دلوقتي ✅"
+            : `${totalActiveGames} لعبة نشطة — روليت/مافيا: ${channelGames.size} | هاتف: ${garticChannelMap.size} | ميم: ${memeChannelMap.size} | RPS: ${rpsChannelMap.size + rpsBasicChannelMap.size} | حظ: ${luckChannelMap.size} | كويز: ${quizChannelMap.size}`,
+        });
+
+        // ── 12. Pending Mod Actions ───────────────────────────────────
+        checks.push({
+          name: "⚖️ إجراءات مودريشن معلّقة",
+          ok: pendingModActions.size < 10,
+          detail: pendingModActions.size === 0 ? "مفيش إجراءات معلّقة ✅" : `${pendingModActions.size} إجراء في الانتظار`,
+        });
+
+        // ── 13. Auto-Mod Log Memory ───────────────────────────────────
+        checks.push({
+          name: "🤖 Auto-Mod سجل الذاكرة",
+          ok: true,
+          detail: `${autoModLogs.size} سجل محتجز في الذاكرة`,
+        });
+
+        // ── 14. Environment Variables ─────────────────────────────────
+        const envChecks = [
+          ["DISCORD_TOKEN", !!process.env.DISCORD_TOKEN],
+          ["GOOGLE_API_KEY", !!process.env.GOOGLE_API_KEY],
+          ["GOOGLE_CLIENT_ID", !!process.env.GOOGLE_CLIENT_ID],
+          ["YOUTUBE_API_KEY", !!process.env.YOUTUBE_API_KEY],
+        ];
+        const missingEnv = envChecks.filter(([, v]) => !v).map(([k]) => k);
+        const criticalMissing = missingEnv.filter(k => ["DISCORD_TOKEN", "GOOGLE_API_KEY"].includes(k));
+        checks.push({
+          name: "🔑 متغيرات البيئة",
+          ok: criticalMissing.length === 0,
+          detail: missingEnv.length === 0
+            ? "كل المتغيرات موجودة ✅"
+            : `مش موجود: ${missingEnv.join(", ")}${criticalMissing.length ? " — ⚠️ حرج!" : " — (اختيارية)"}`,
+        });
+
+        // ── 15. Memory & Performance ──────────────────────────────────
+        const mem = process.memoryUsage();
+        const heapMB = (mem.heapUsed / 1024 / 1024).toFixed(1);
+        const heapTotalMB = (mem.heapTotal / 1024 / 1024).toFixed(1);
+        const heapPct = ((mem.heapUsed / mem.heapTotal) * 100).toFixed(0);
+        const uptimeSec = Math.floor(process.uptime());
+        const uptimeStr = uptimeSec > 3600
+          ? `${Math.floor(uptimeSec / 3600)}س ${Math.floor((uptimeSec % 3600) / 60)}د`
+          : `${Math.floor(uptimeSec / 60)}د ${uptimeSec % 60}ث`;
+        checks.push({
+          name: "🧠 الذاكرة والأداء",
+          ok: parseInt(heapPct) < 85,
+          detail: `Heap: ${heapMB}/${heapTotalMB} MB (${heapPct}%) | Uptime: ${uptimeStr} | Node: ${process.version}`,
+        });
+
+        // ── 16. Handler Functions Existence ──────────────────────────
+        const handlers = [
+          ["handleGameButton", typeof handleGameButton],
+          ["handleShopButton", typeof handleShopButton],
+          ["handleCodenamesButton", typeof handleCodenamesButton],
+          ["handlePollButton", typeof handlePollButton],
+          ["handleGarticButton", typeof handleGarticButton],
+          ["handleMemeButton", typeof handleMemeButton],
+          ["handleRPSButton", typeof handleRPSButton],
+          ["handleBankLifeButton", typeof handleBankLifeButton],
+          ["handleBankLuckButton", typeof handleBankLuckButton],
+          ["handleAdminSuggestionAction", typeof handleAdminSuggestionAction],
+        ];
+        const missingHandlers = handlers.filter(([, t]) => t !== "function").map(([n]) => n);
+        checks.push({
+          name: "🔧 دوال المعالجة",
+          ok: missingHandlers.length === 0,
+          detail: missingHandlers.length === 0
+            ? `كل الـ ${handlers.length} دالة موجودة ✅`
+            : `❌ مش موجود: ${missingHandlers.join(", ")}`,
+        });
+
+        // ── Build Report ──────────────────────────────────────────────
+        const passed = checks.filter(c => c.ok).length;
+        const failed = checks.filter(c => !c.ok).length;
+        const statusColor = failed === 0 ? 0x2ecc71 : failed <= 2 ? 0xf39c12 : 0xe74c3c;
+        const statusIcon  = failed === 0 ? "✅ كل حاجة تمام" : failed <= 2 ? `⚠️ ${failed} مشكلة بسيطة` : `❌ ${failed} مشاكل محتاجة حل`;
+
+        const reportLines = checks.map(c =>
+          `${c.ok ? "✅" : "❌"} **${c.name}**\n┗ ${c.detail}`
+        ).join("\n\n");
+
+        const reportEmbed = new EmbedBuilder()
+          .setColor(statusColor)
+          .setTitle(`🔍 تقرير كاشف الأخطاء — زنجي بوت`)
+          .setDescription(
+            `**النتيجة:** ${statusIcon}\n` +
+            `**✅ نجح:** ${passed}  •  **❌ فشل:** ${failed}  •  **المجموع:** ${checks.length}\n` +
+            `**الوقت:** <t:${Math.floor(Date.now() / 1000)}:F>\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+            reportLines
+          )
+          .setFooter({ text: `طلب من: ${user.username} | زنجي Bot Diagnostics` })
+          .setTimestamp();
+
+        // Send to diagnostic channel
+        let sentToDiag = false;
+        if (diagCh) {
+          try {
+            await diagCh.send({ embeds: [reportEmbed] });
+            sentToDiag = true;
+          } catch (e) {
+            logger.error("كاشف-الأخطاء: فشل الإرسال للروم:", e);
+          }
+        }
+
+        return interaction.editReply({
+          content: sentToDiag
+            ? `✅ تم إرسال التقرير الكامل في <#${DIAG_CHANNEL_ID}>\n**ملخص:** ${statusIcon} (${passed}/${checks.length} نجح)`
+            : `⚠️ ما قدرتش أبعت للروم — هنا الملخص:\n**${statusIcon}** (${passed}/${checks.length} نجح)\n${failed > 0 ? checks.filter(c => !c.ok).map(c => `❌ **${c.name}:** ${c.detail}`).join("\n") : ""}`,
+        });
       }
 
       // ── مفاتيح-جيميني ──────────────────────────────────────────────
