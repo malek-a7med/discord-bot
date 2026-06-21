@@ -20,11 +20,13 @@
       "lastBankInterest": 0
     },
     "1173757411857809458": {
-      "xp": 225,
+      "xp": 230,
       "level": 2,
       "coins": 0,
       "lastDaily": null,
-      "_lastXpMsg": "1517319330176569545"
+      "_lastXpMsg": "1518163207322079232",
+      "bankCoins": 0,
+      "lastBankInterest": 0
     },
     "844490366614110218": {
       "xp": 10540,
