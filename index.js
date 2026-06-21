@@ -1536,7 +1536,8 @@ client.on("messageCreate", async (msg) => {
         }
       }
 
-      // صورة عادية بدون pending — خليها تعدي (مسموح بالصور)
+      // صورة بدون pending صح — احذفها بصمت
+      await msg.delete().catch(() => {});
       return;
     }
 
@@ -1558,6 +1559,69 @@ client.on("messageCreate", async (msg) => {
 
   // الـ DM — بره السيرفر
   if (!msg.guild) {
+    // ── صورة في الخاص من حد عنده pending suggestion ──────────────
+    if (msg.attachments.size > 0) {
+      const dmPending = pendingSuggestionImages.get(msg.author.id);
+      if (dmPending) {
+        const dmImageUrl    = msg.attachments.first()?.url;
+        const dmAttachInfo  = msg.attachments.first();
+        const dmFilename    = dmAttachInfo?.name || "suggestion_image.png";
+        let   dmImgBuffer   = null;
+        try {
+          const resp = await fetch(dmImageUrl);
+          if (resp.ok) dmImgBuffer = Buffer.from(await resp.arrayBuffer());
+        } catch { /* ignore */ }
+
+        try {
+          const suggCh  = await client.channels.fetch(SUGGESTIONS_CHANNEL_ID).catch(() => null);
+          const suggMsg = suggCh ? await suggCh.messages.fetch(dmPending.publicMessageId).catch(() => null) : null;
+          if (suggMsg) {
+            const embedImageUrl = dmImgBuffer ? `attachment://${dmFilename}` : dmImageUrl;
+            const updatedEmbed  = buildSuggestionEmbed({
+              user: msg.author,
+              text: dmPending.text,
+              statusKey: "pending",
+              type: dmPending.type,
+              imageUrl: embedImageUrl,
+            });
+            const editOptions = { embeds: [updatedEmbed] };
+            if (dmImgBuffer) editOptions.files = [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })];
+            await suggMsg.edit(editOptions).catch(() => {});
+          }
+
+          if (dmPending.adminMessageId) {
+            const adminCh = await client.channels.fetch(ADMIN_SUGGESTIONS_CHANNEL_ID).catch(() => null);
+            if (adminCh?.isTextBased()) {
+              const adminMsg = await adminCh.messages.fetch(dmPending.adminMessageId).catch(() => null);
+              if (adminMsg) {
+                const oldEmbed  = adminMsg.embeds[0];
+                const refField  = oldEmbed?.fields?.find(f => f.name === SUGGESTION_REF_FIELD);
+                const embedImageUrl = dmImgBuffer ? `attachment://${dmFilename}` : dmImageUrl;
+                const updatedAdminEmbed = buildSuggestionEmbed({
+                  user: msg.author,
+                  text: dmPending.text,
+                  statusKey: "pending",
+                  type: dmPending.type,
+                  imageUrl: embedImageUrl,
+                });
+                if (refField) updatedAdminEmbed.addFields({ name: SUGGESTION_REF_FIELD, value: refField.value, inline: false });
+                const adminEditOptions = { embeds: [updatedAdminEmbed] };
+                if (dmImgBuffer) adminEditOptions.files = [new AttachmentBuilder(dmImgBuffer, { name: dmFilename })];
+                await adminMsg.edit(adminEditOptions).catch(() => {});
+              }
+            }
+          }
+        } catch { /* ignore */ }
+
+        clearTimeout(dmPending.timer);
+        pendingSuggestionImages.delete(msg.author.id);
+        await msg.channel.send("✅ تم إضافة صورتك للاقتراح بنجاح! 🖼️").catch(() => {});
+        return;
+      }
+      // صورة في الخاص من غير pending — تجاهل
+      return;
+    }
+
     const isOwner = config.isOwner(msg.author.id);
     const guild   = client.guilds.cache.first();
 
