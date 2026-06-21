@@ -1139,7 +1139,7 @@ async function handleSuggestionModalSubmit(interaction, suggestionText, type = "
     type,
   }).addFields({
     name: SUGGESTION_REF_FIELD,
-    value: `${publicMessage.id}|${interaction.user.id}|${trimmedText.slice(0, 200)}`,
+    value: `${publicMessage.id}|${interaction.user.id}`,
     inline: false,
   });
 

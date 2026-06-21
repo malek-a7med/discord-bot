@@ -84,12 +84,15 @@
       "_lastXpMsg": "1517284005676978207"
     },
     "1223215033400430643": {
-      "xp": 100,
+      "xp": 105,
       "level": 1,
       "coins": 0,
       "lastDaily": null,
       "warnings": [],
-      "timeouts": []
+      "timeouts": [],
+      "bankCoins": 0,
+      "lastBankInterest": 0,
+      "_lastXpMsg": "1518132906826928148"
     },
     "1287488619111780607": {
       "xp": 210,
