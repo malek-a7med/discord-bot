@@ -79,6 +79,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+// ── Lock File: منع تشغيل أكتر من نسخة واحدة في نفس الوقت ────────
+const LOCK_FILE = "/tmp/zangi_bot.lock";
+
 // ─── Reaction Roles ───────────────────────────────────────────────
 const REACTION_ROLES_PATH = "./data/reaction-roles.json";
 let reactionRoles = {}; // { messageId: { emoji, roleId, guildId } }
@@ -89,19 +92,22 @@ try {
 function saveReactionRoles() {
   try { fs.writeFileSync(REACTION_ROLES_PATH, JSON.stringify(reactionRoles, null, 2)); } catch {}
 }
-
-// ── Lock File: منع تشغيل أكتر من نسخة واحدة في نفس الوقت ────────
-// ✅ FIX: النظام القديم كان بيعمل process.kill(oldPid) وده مش بيشتغل
-//   cross-container على Replit (الحاويات معزولة) — وده كان السبب
-//   الجذري لمشكلة الرسايل المكررة. النظام الجديد بيستخدم heartbeat
-//   timestamp بدل kill، فبيشتغل صح حتى لو الحاوية القديمة معزولة.
-import { acquireInstanceLock } from "./helpers/single-instance.js";
-const _lockResult = acquireInstanceLock();
-if (!_lockResult.acquired) {
-  console.error(`❌ [Lock] ${_lockResult.reason} (PID: ${_lockResult.existingPid}) — بنخرج عشان منعملش رسايل مكررة.`);
-  process.exit(0);
-}
-console.log(`🔒 [Lock] احنا النسخة الشرعية (instanceId=${_lockResult.instanceId}${_lockResult.fresh ? "" : ", تولينا نسخة قديمة ماتت"})`);
+(function enforceSingleInstance() {
+  if (fs.existsSync(LOCK_FILE)) {
+    try {
+      const oldPid = parseInt(fs.readFileSync(LOCK_FILE, "utf8").trim(), 10);
+      if (oldPid && !isNaN(oldPid) && oldPid !== process.pid) {
+        process.kill(oldPid, "SIGTERM");
+        console.log(`🔫 [Lock] أوقفت النسخة القديمة (PID: ${oldPid})`);
+      }
+    } catch { /* النسخة القديمة ماتت فعلاً */ }
+  }
+  fs.writeFileSync(LOCK_FILE, String(process.pid));
+  const cleanup = () => { try { fs.unlinkSync(LOCK_FILE); } catch {} };
+  process.on("exit", cleanup);
+  process.on("SIGINT",  () => { cleanup(); process.exit(0); });
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+})();
 
 // ✅ [جديد] Express import بطريقة ES Module الصحيحة
 import express from "express";
@@ -217,57 +223,49 @@ const LEGACY_COMMANDS = [
     .setDescription("User information / معلومات عضو")
     .addUserOption((o) => o.setName("user").setDescription("User / العضو")),
   new SlashCommandBuilder().setName("القوانين").setDescription("عرض قوانين السيرفر / Server rules"),
-  // ✅ دمج: بروفايل/محفظة/متجر/شراء/إعطاء/يومي بقوا subcommands تحت /اقتصاد
   new SlashCommandBuilder()
-    .setName("اقتصاد")
-    .setDescription("💰 كل أوامر الكوينز والمتجر في مكان واحد")
-    .addSubcommand(sub =>
-      sub.setName("بروفايل").setDescription("عرض بروفايلك (المستوى والكوينز) / Your profile")
-        .addUserOption((o) => o.setName("عضو").setDescription("اختر عضو / Choose member"))
-    )
-    .addSubcommand(sub =>
-      sub.setName("محفظة").setDescription("عرض رصيدك من الكوينز / Your wallet")
-    )
-    .addSubcommand(sub =>
-      sub.setName("متجر").setDescription("عرض الرتب المتاحة للشراء / Shop roles")
-    )
-    .addSubcommand(sub =>
-      sub.setName("شراء").setDescription("شراء رتبة من المتجر / Buy a role")
-        .addStringOption((o) =>
-          o.setName("الرتبة").setDescription("اختر الرتبة").setRequired(true)
-            .addChoices(
-              { name: "Golden🥇 — 5000 كوينز", value: "golden" },
-              { name: "Silver🥈 — 2500 كوينز", value: "silver" },
-              { name: "Bronze🥉 — 1000 كوينز", value: "bronze" }
-            )
+    .setName("بروفايل")
+    .setDescription("عرض بروفايلك (المستوى والكوينز) / Your profile")
+    .addUserOption((o) => o.setName("عضو").setDescription("اختر عضو / Choose member")),
+  new SlashCommandBuilder().setName("محفظة").setDescription("عرض رصيدك من الكوينز / Your wallet"),
+  new SlashCommandBuilder().setName("متجر").setDescription("عرض الرتب المتاحة للشراء / Shop roles"),
+  new SlashCommandBuilder()
+    .setName("شراء")
+    .setDescription("شراء رتبة من المتجر / Buy a role")
+    .addStringOption((o) =>
+      o
+        .setName("الرتبة")
+        .setDescription("اختر الرتبة")
+        .setRequired(true)
+        .addChoices(
+          { name: "Golden🥇 — 5000 كوينز", value: "golden" },
+          { name: "Silver🥈 — 2500 كوينز", value: "silver" },
+          { name: "Bronze🥉 — 1000 كوينز", value: "bronze" }
         )
-    )
-    .addSubcommand(sub =>
-      sub.setName("إعطاء").setDescription("منح كوينز لعضو [إدارة] / Give coins [Admin]")
-        .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
-        .addIntegerOption((o) => o.setName("كمية").setDescription("الكمية").setRequired(true).setMinValue(1))
-    )
-    .addSubcommand(sub =>
-      sub.setName("يومي").setDescription("استلم مكافأتك اليومية / Daily reward")
     ),
-  // ✅ دمج: مانهوا-إنشاء/مانهوا-إضافة-مصطلح/مانهوا-عرض-المصطلحات بقوا subcommands تحت /مانهوا
   new SlashCommandBuilder()
-    .setName("مانهوا")
-    .setDescription("📖 إدارة قواميس مصطلحات المانهوا")
-    .addSubcommand(sub =>
-      sub.setName("إنشاء").setDescription("إنشاء قاموس مصطلحات لمانهوا / Create manhwa dictionary")
-        .addStringOption((o) => o.setName("الاسم").setDescription("اسم المانهوا").setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName("إضافة-مصطلح").setDescription("إضافة مصطلح للقاموس / Add term to dictionary")
-        .addStringOption((o) => o.setName("المانهوا").setDescription("اسم المانهوا").setRequired(true))
-        .addStringOption((o) => o.setName("الإنجليزي").setDescription("الكلمة بالإنجليزية").setRequired(true))
-        .addStringOption((o) => o.setName("العربي").setDescription("الترجمة العربية").setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName("عرض-مصطلحات").setDescription("عرض القواامس المخزنة / List dictionaries")
-        .addStringOption((o) => o.setName("المانهوا").setDescription("اسم مانهوا محددة (اختياري)"))
+    .setName("إعطاء")
+    .setDescription("منح كوينز لعضو [إدارة] / Give coins [Admin]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
+    .addIntegerOption((o) =>
+      o.setName("كمية").setDescription("الكمية").setRequired(true).setMinValue(1)
     ),
+  new SlashCommandBuilder().setName("يومي").setDescription("استلم مكافأتك اليومية / Daily reward"),
+  new SlashCommandBuilder()
+    .setName("مانهوا-إنشاء")
+    .setDescription("إنشاء قاموس مصطلحات لمانهوا / Create manhwa dictionary")
+    .addStringOption((o) => o.setName("الاسم").setDescription("اسم المانهوا").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("مانهوا-إضافة-مصطلح")
+    .setDescription("إضافة مصطلح للقاموس / Add term to dictionary")
+    .addStringOption((o) => o.setName("المانهوا").setDescription("اسم المانهوا").setRequired(true))
+    .addStringOption((o) => o.setName("الإنجليزي").setDescription("الكلمة بالإنجليزية").setRequired(true))
+    .addStringOption((o) => o.setName("العربي").setDescription("الترجمة العربية").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("مانهوا-عرض-المصطلحات")
+    .setDescription("عرض القواامس المخزنة / List dictionaries")
+    .addStringOption((o) => o.setName("المانهوا").setDescription("اسم مانهوا محددة (اختياري)")),
   new SlashCommandBuilder()
     .setName("مسح")
     .setDescription("مسح رسائل من الشات [مشرف] / Clear messages")
@@ -289,101 +287,100 @@ const LEGACY_COMMANDS = [
     .addIntegerOption((o) =>
       o.setName("موضع").setDescription("رقم الرسالة من الأخر (1=الأخيرة، 2=قبل الأخيرة...)").setMinValue(1).setMaxValue(20)
     ),
-  // ✅ دمج: انشاء-رول/تعديل-الرول بقوا subcommands تحت /رتبة
   new SlashCommandBuilder()
-    .setName("رتبة")
-    .setDescription("🏷️ إنشاء وتعديل رتب السيرفر [إدارة]")
+    .setName("انشاء-رول")
+    .setDescription("إنشاء رتبة جديدة بصلاحيات ذكية [إدارة] / Create role with smart permissions")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-    .addSubcommand(sub =>
-      sub.setName("انشاء").setDescription("إنشاء رتبة جديدة بصلاحيات ذكية / Create role with smart permissions")
-        .addStringOption((o) => o.setName("الاسم").setDescription("اسم الرتبة الجديدة").setRequired(true))
-        .addStringOption((o) =>
-          o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً")
-            .addChoices(
-              { name: "🔴 إدارة (Administrator)",       value: "admin"      },
-              { name: "🟠 مشرف (Moderator)",            value: "mod"        },
-              { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
-              { name: "🟡 VIP",                         value: "vip"        },
-              { name: "💜 بوستر (Server Booster)",      value: "booster"    },
-              { name: "🔵 موثّق (Verified)",            value: "verified"   },
-              { name: "🥇 ذهبية (Golden)",              value: "golden"     },
-              { name: "🥈 فضية (Silver)",               value: "silver"     },
-              { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
-              { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
-              { name: "🟢 موسيقى / Music",              value: "music"      },
-              { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
-              { name: "💗 فن وتصميم / Art",             value: "art"        },
-              { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
-              { name: "🟧 منشئ محتوى / Content",        value: "content"    },
-              { name: "⚫ بوت / Bot",                   value: "bot"        },
-              { name: "⚪ عضو عادي / Normal",           value: "normal"     },
-              { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
-              { name: "🔘 بدون صلاحيات",               value: "none"       },
-            )
+    .addStringOption((o) => o.setName("الاسم").setDescription("اسم الرتبة الجديدة").setRequired(true))
+    .addStringOption((o) =>
+      o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً")
+        .addChoices(
+          { name: "🔴 إدارة (Administrator)",       value: "admin"      },
+          { name: "🟠 مشرف (Moderator)",            value: "mod"        },
+          { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
+          { name: "🟡 VIP",                         value: "vip"        },
+          { name: "💜 بوستر (Server Booster)",      value: "booster"    },
+          { name: "🔵 موثّق (Verified)",            value: "verified"   },
+          { name: "🥇 ذهبية (Golden)",              value: "golden"     },
+          { name: "🥈 فضية (Silver)",               value: "silver"     },
+          { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
+          { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
+          { name: "🟢 موسيقى / Music",              value: "music"      },
+          { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
+          { name: "💗 فن وتصميم / Art",             value: "art"        },
+          { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
+          { name: "🟧 منشئ محتوى / Content",        value: "content"    },
+          { name: "⚫ بوت / Bot",                   value: "bot"        },
+          { name: "⚪ عضو عادي / Normal",           value: "normal"     },
+          { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
+          { name: "🔘 بدون صلاحيات",               value: "none"       },
         )
-        .addStringOption((o) => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم مثل red)"))
-        .addBooleanOption((o) => o.setName("ظهور-منفصل").setDescription("يظهر الرول منفصلاً في قائمة الأعضاء"))
     )
-    .addSubcommand(sub =>
-      sub.setName("تعديل").setDescription("تعديل رتبة موجودة (صلاحيات + اسم + لون)")
-        .addRoleOption((o) => o.setName("الرول").setDescription("الرتبة المراد تعديلها").setRequired(true))
-        .addStringOption((o) =>
-          o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً (اختياري)")
-            .addChoices(
-              { name: "🔴 إدارة (Administrator)",       value: "admin"      },
-              { name: "🟠 مشرف (Moderator)",            value: "mod"        },
-              { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
-              { name: "🟡 VIP",                         value: "vip"        },
-              { name: "💜 بوستر (Server Booster)",      value: "booster"    },
-              { name: "🔵 موثّق (Verified)",            value: "verified"   },
-              { name: "🥇 ذهبية (Golden)",              value: "golden"     },
-              { name: "🥈 فضية (Silver)",               value: "silver"     },
-              { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
-              { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
-              { name: "🟢 موسيقى / Music",              value: "music"      },
-              { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
-              { name: "💗 فن وتصميم / Art",             value: "art"        },
-              { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
-              { name: "🟧 منشئ محتوى / Content",        value: "content"    },
-              { name: "⚫ بوت / Bot",                   value: "bot"        },
-              { name: "⚪ عضو عادي / Normal",           value: "normal"     },
-              { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
-              { name: "🔘 مسح كل الصلاحيات",           value: "none"       },
-            )
-        )
-        .addStringOption((o) => o.setName("اسم").setDescription("الاسم الجديد للرتبة (اختياري)"))
-        .addStringOption((o) => o.setName("لون").setDescription("اللون الجديد (hex مثل #FF5733 أو اسم مثل red) (اختياري)"))
-    ),
-  // ✅ دمج: تحذير/اسكات/طرد/تبنيد/تحذيرات بقوا subcommands تحت /عقوبة
+    .addStringOption((o) => o.setName("لون").setDescription("اللون (hex مثل #FF5733 أو اسم مثل red)"))
+    .addBooleanOption((o) => o.setName("ظهور-منفصل").setDescription("يظهر الرول منفصلاً في قائمة الأعضاء")),
   new SlashCommandBuilder()
-    .setName("عقوبة")
-    .setDescription("⚖️ كل أوامر العقاب التأديبي في مكان واحد [مشرف]")
-    .addSubcommand(sub =>
-      sub.setName("تحذير").setDescription("توجيه تحذير رسمي / Warn a member")
-        .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-        .addStringOption((o) => o.setName("السبب").setDescription("السبب").setRequired(true))
+    .setName("تعديل-الرول")
+    .setDescription("تعديل رتبة موجودة (صلاحيات + اسم + لون) [إدارة]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addRoleOption((o) => o.setName("الرول").setDescription("الرتبة المراد تعديلها").setRequired(true))
+    .addStringOption((o) =>
+      o.setName("نوع").setDescription("نوع الرتبة — هيحدد الصلاحيات تلقائياً (اختياري)")
+        .addChoices(
+          { name: "🔴 إدارة (Administrator)",       value: "admin"      },
+          { name: "🟠 مشرف (Moderator)",            value: "mod"        },
+          { name: "🟤 مساعد مشرف (Helper)",         value: "helper"     },
+          { name: "🟡 VIP",                         value: "vip"        },
+          { name: "💜 بوستر (Server Booster)",      value: "booster"    },
+          { name: "🔵 موثّق (Verified)",            value: "verified"   },
+          { name: "🥇 ذهبية (Golden)",              value: "golden"     },
+          { name: "🥈 فضية (Silver)",               value: "silver"     },
+          { name: "🥉 برونزية (Bronze)",            value: "bronze"     },
+          { name: "💎 بلاتينية (Platinum)",         value: "platinum"   },
+          { name: "🟢 موسيقى / Music",              value: "music"      },
+          { name: "🟣 جيمنج / Gaming",              value: "gaming"     },
+          { name: "💗 فن وتصميم / Art",             value: "art"        },
+          { name: "🩵 منظّم فعاليات / Event",       value: "event"      },
+          { name: "🟧 منشئ محتوى / Content",        value: "content"    },
+          { name: "⚫ بوت / Bot",                   value: "bot"        },
+          { name: "⚪ عضو عادي / Normal",           value: "normal"     },
+          { name: "🔇 مقيّد (قراءة فقط)",           value: "restricted" },
+          { name: "🔘 مسح كل الصلاحيات",           value: "none"       },
+        )
     )
-    .addSubcommand(sub =>
-      sub.setName("اسكات").setDescription("إسكات عضو مؤقتاً / Timeout a member")
-        .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-        .addIntegerOption((o) => o.setName("مدة").setDescription("المدة بالدقائق (1-1440)").setRequired(true).setMinValue(1).setMaxValue(1440))
-        .addStringOption((o) => o.setName("السبب").setDescription("السبب"))
+    .addStringOption((o) => o.setName("اسم").setDescription("الاسم الجديد للرتبة (اختياري)"))
+    .addStringOption((o) => o.setName("لون").setDescription("اللون الجديد (hex مثل #FF5733 أو اسم مثل red) (اختياري)")),
+  new SlashCommandBuilder()
+    .setName("تحذير")
+    .setDescription("توجيه تحذير رسمي [مشرف] / Warn a member")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+    .addStringOption((o) => o.setName("السبب").setDescription("السبب").setRequired(true)),
+  new SlashCommandBuilder()
+    .setName("اسكات")
+    .setDescription("إسكات عضو مؤقتاً [مشرف] / Timeout a member")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+    .addIntegerOption((o) =>
+      o.setName("مدة").setDescription("المدة بالدقائق (1-1440)").setRequired(true).setMinValue(1).setMaxValue(1440)
     )
-    .addSubcommand(sub =>
-      sub.setName("طرد").setDescription("طرد عضو / Kick a member")
-        .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-        .addStringOption((o) => o.setName("السبب").setDescription("السبب"))
-    )
-    .addSubcommand(sub =>
-      sub.setName("تبنيد").setDescription("حظر عضو نهائياً / Ban a member")
-        .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
-        .addStringOption((o) => o.setName("السبب").setDescription("السبب"))
-    )
-    .addSubcommand(sub =>
-      sub.setName("عرض").setDescription("عرض تحذيرات عضو / View warnings")
-        .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID (اتركه فاضي عشان تشوف تحذيراتك)"))
-    ),
+    .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
+  new SlashCommandBuilder()
+    .setName("طرد")
+    .setDescription("طرد عضو [مشرف] / Kick a member")
+    .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+    .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
+  new SlashCommandBuilder()
+    .setName("تبنيد")
+    .setDescription("حظر عضو نهائياً [مشرف] / Ban a member")
+    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+    .addUserOption((o) => o.setName("عضو").setDescription("اختار العضو").setRequired(true))
+    .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
   new SlashCommandBuilder().setName("مساعدة").setDescription("قائمة جميع الأوامر / Help"),
+  new SlashCommandBuilder()
+    .setName("تحذيرات")
+    .setDescription("عرض تحذيرات عضو / View warnings")
+    .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID (اتركه فاضي عشان تشوف تحذيراتك)")),
   new SlashCommandBuilder()
     .setName("ليدربورد")
     .setDescription("أفضل 10 أعضاء في السيرفر / Top 10 leaderboard")
@@ -401,29 +398,15 @@ const LEGACY_COMMANDS = [
     .setDescription("تعيين قناة رسائل الترحيب [إدارة] / Set welcome channel")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption((o) => o.setName("القناة").setDescription("القناة المخصصة للترحيب").setRequired(true)),
-  // ✅ دمج: تشغيل/إيقاف/تخطي/قائمة-تشغيل/توقف-مؤقت/استئناف بقوا subcommands تحت /موسيقى
   new SlashCommandBuilder()
-    .setName("موسيقى")
-    .setDescription("🎵 كل أوامر تشغيل الموسيقى في مكان واحد")
-    .addSubcommand(sub =>
-      sub.setName("تشغيل").setDescription("تشغيل أغنية من يوتيوب أو سبوتيفاي / Play a song")
-        .addStringOption((o) => o.setName("بحث").setDescription("رابط أو اسم الأغنية").setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName("إيقاف").setDescription("إيقاف الموسيقى وإخراج البوت / Stop music and leave")
-    )
-    .addSubcommand(sub =>
-      sub.setName("تخطي").setDescription("تخطي الأغنية الحالية / Skip current song")
-    )
-    .addSubcommand(sub =>
-      sub.setName("قائمة-تشغيل").setDescription("عرض قائمة الأغاني الحالية / Show music queue")
-    )
-    .addSubcommand(sub =>
-      sub.setName("توقف-مؤقت").setDescription("إيقاف مؤقت / Pause music")
-    )
-    .addSubcommand(sub =>
-      sub.setName("استئناف").setDescription("استئناف التشغيل / Resume music")
-    ),
+    .setName("تشغيل")
+    .setDescription("تشغيل أغنية من يوتيوب أو سبوتيفاي / Play a song")
+    .addStringOption((o) => o.setName("بحث").setDescription("رابط أو اسم الأغنية").setRequired(true)),
+  new SlashCommandBuilder().setName("إيقاف").setDescription("إيقاف الموسيقى وإخراج البوت / Stop music and leave"),
+  new SlashCommandBuilder().setName("تخطي").setDescription("تخطي الأغنية الحالية / Skip current song"),
+  new SlashCommandBuilder().setName("قائمة-تشغيل").setDescription("عرض قائمة الأغاني الحالية / Show music queue"),
+  new SlashCommandBuilder().setName("توقف-مؤقت").setDescription("إيقاف مؤقت / Pause music"),
+  new SlashCommandBuilder().setName("استئناف").setDescription("استئناف التشغيل / Resume music"),
   new SlashCommandBuilder()
     .setName("اقتراح")
     .setDescription("إرسال اقتراح للسيرفر / Submit a suggestion")
@@ -440,42 +423,42 @@ const LEGACY_COMMANDS = [
     .setName("صورة")
     .setDescription("توليد صورة بالـ AI / Generate an AI image")
     .addStringOption((o) => o.setName("وصف").setDescription("وصف الصورة المطلوبة").setRequired(true)),
-  // ✅ دمج: نسخة-احتياطية/استرجاع/قناة-النسخ بقوا subcommands تحت /نسخ-احتياطي
   new SlashCommandBuilder()
-    .setName("نسخ-احتياطي")
-    .setDescription("💾 كل أوامر النسخ الاحتياطي للبيانات [إدارة]")
+    .setName("نسخة-احتياطية")
+    .setDescription("تحميل نسخة احتياطية من بيانات السيرفر [إدارة] / Download server database backup")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  new SlashCommandBuilder()
+    .setName("استرجاع")
+    .setDescription("استرجاع بيانات السيرفر من نسخة احتياطية [إدارة] / Restore database from backup")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addSubcommand(sub =>
-      sub.setName("انشاء").setDescription("تحميل نسخة احتياطية من بيانات السيرفر / Download server database backup")
-    )
-    .addSubcommand(sub =>
-      sub.setName("استرجاع").setDescription("استرجاع بيانات السيرفر من نسخة احتياطية / Restore database from backup")
-        .addAttachmentOption((o) => o.setName("ملف").setDescription("ملف الـ JSON اللي حملته من أمر نسخ-احتياطي انشاء").setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName("تحديد-قناة").setDescription("تعيين قناة النسخ الاحتياطية اليومية / Set daily backup channel")
-        .addStringOption((o) => o.setName("id").setDescription("الـ ID بتاع القناة — انسخه من Discord").setRequired(true))
+    .addAttachmentOption((o) =>
+      o.setName("ملف").setDescription("ملف الـ JSON اللي حملته من أمر نسخة-احتياطية").setRequired(true)
     ),
-  // ✅ دمج: حالة-البوت/تشغيل-اختبار/قناة-اللوجز بقوا subcommands تحت /بوت
   new SlashCommandBuilder()
-    .setName("بوت")
-    .setDescription("🤖 أوامر إدارة البوت [أونر/إدارة]")
-    .addSubcommand(sub =>
-      sub.setName("حالة").setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]")
-    )
-    .addSubcommand(sub =>
-      sub.setName("اختبار").setDescription("اختبار رسالة الترحيب أو الوداع [إدارة]")
-        .addStringOption((o) =>
-          o.setName("نوع").setDescription("اختار نوع الرسالة").setRequired(true)
-            .addChoices(
-              { name: "🎉 رسالة ترحيب", value: "welcome" },
-              { name: "🥀 رسالة وداع",  value: "goodbye" }
-            )
+    .setName("قناة-النسخ")
+    .setDescription("تعيين قناة النسخ الاحتياطية اليومية [إدارة] / Set daily backup channel")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((o) =>
+      o.setName("id").setDescription("الـ ID بتاع القناة — انسخه من Discord").setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName("تشغيل-اختبار")
+    .setDescription("اختبار رسالة الترحيب أو الوداع [إدارة] / Test welcome or goodbye message")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption((o) =>
+      o.setName("نوع")
+        .setDescription("اختار نوع الرسالة")
+        .setRequired(true)
+        .addChoices(
+          { name: "🎉 رسالة ترحيب", value: "welcome" },
+          { name: "🥀 رسالة وداع",  value: "goodbye" }
         )
-    )
-    .addSubcommand(sub =>
-      sub.setName("قناة-لوجز").setDescription("تعيين قناة تسجيل أوامر الأونر [أونر فقط]")
-        .addChannelOption((o) => o.setName("قناة").setDescription("القناة المخصصة للوجز").setRequired(true))
+    ),
+  new SlashCommandBuilder()
+    .setName("قناة-اللوجز")
+    .setDescription("تعيين قناة تسجيل أوامر الأونر [أونر فقط]")
+    .addChannelOption((o) =>
+      o.setName("قناة").setDescription("القناة المخصصة للوجز").setRequired(true)
     ),
   new SlashCommandBuilder()
     .setName("رسالة-جماعية")
@@ -498,6 +481,9 @@ const LEGACY_COMMANDS = [
   new SlashCommandBuilder()
     .setName("لوحة-dm")
     .setDescription("فتح لوحة تحكم الأونر في الـ DM [أونر فقط]"),
+  new SlashCommandBuilder()
+    .setName("حالة-البوت")
+    .setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]"),
   new SlashCommandBuilder()
     .setName("مفاتيح-جيميني")
     .setDescription("إدارة مفاتيح Gemini API [أونر فقط]")
@@ -531,23 +517,16 @@ const LEGACY_COMMANDS = [
         )
     ),
   new SlashCommandBuilder()
-    .setName("رول-ريأكشن")
-    .setDescription("📌 ابعت رسالة — اللي يعمل ريأكشن عليها ياخد رول تلقائي")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-    .addRoleOption(o => o.setName("رول").setDescription("الرول اللي هيتدي للناس").setRequired(true))
-    .addStringOption(o => o.setName("إيموجي").setDescription("الإيموجي اللي لازم يعملوا عليه ريأكشن").setRequired(true))
-    .addStringOption(o => o.setName("رسالة").setDescription("نص الرسالة (اختياري)").setRequired(false)),
-  // ✅ دمج: رفع-بلوك/قائمة-مبلوكين بقوا subcommands تحت /بلوك
-  new SlashCommandBuilder()
-    .setName("بلوك")
-    .setDescription("🚫 إدارة بلوك السبام [أونر فقط]")
-    .addSubcommand(sub =>
-      sub.setName("رفع").setDescription("ارفع البلوك عن يوزر قبل ما الوقت يخلص")
-        .addUserOption(opt => opt.setName("يوزر").setDescription("اليوزر اللي هترفع عنه البلوك").setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName("قائمة").setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي")
+    .setName("رفع-بلوك")
+    .setDescription("ارفع البلوك عن يوزر قبل ما الوقت يخلص [أونر فقط]")
+    .addUserOption(opt =>
+      opt.setName("يوزر")
+        .setDescription("اليوزر اللي هترفع عنه البلوك")
+        .setRequired(true)
     ),
+  new SlashCommandBuilder()
+    .setName("قائمة-مبلوكين")
+    .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
   // ── رتب المستويات ──────────────────────────────────────────
   new SlashCommandBuilder()
     .setName("رتب-المستويات")
@@ -590,6 +569,13 @@ const LEGACY_COMMANDS = [
       o.setName("حالة").setDescription("تشغيل أو إيقاف").setRequired(true)
         .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
     ),
+  new SlashCommandBuilder()
+    .setName("رول-ريأكشن")
+    .setDescription("📌 ابعت رسالة — اللي يعمل ريأكشن عليها ياخد رول تلقائي")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addRoleOption(o => o.setName("رول").setDescription("الرول اللي هيتدي للناس").setRequired(true))
+    .addStringOption(o => o.setName("إيموجي").setDescription("الإيموجي اللي لازم يعملوا عليه ريأكشن").setRequired(true))
+    .addStringOption(o => o.setName("رسالة").setDescription("نص الرسالة (اختياري)").setRequired(false)),
   pollCommand,
   bankLifeCommand,
   bankLuckEgCommand.data,
@@ -613,18 +599,19 @@ function validateLatestFeatures(allCommands) {
     const skipList = [
       "ping","hello","roll","serverinfo","userinfo",
       "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","✏️ تعديل رسالة",
-      "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد",
-      "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
-      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
-      "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة","عقوبة",
-      "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف","موسيقى",
+      "بروفايل","محفظة","متجر","شراء","إعطاء","يومي",
+      "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات",
+      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول",
+      "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة",
+      "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف",
       "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
-      "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز","نسخ-احتياطي","بوت",
+      "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
-      "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات","رول-ريأكشن","بلوك",
+      "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات",
       "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","حياة","بنك-الحظ-مصري",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
+      "رول-ريأكشن",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -1876,44 +1863,44 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     try {
-      // ✅ دمج: /بلوك رفع|قائمة
-      if (cmd === "بلوك") {
+      // ─── قائمة المبلوكين ─────────────────────────────────────────
+      if (cmd === "قائمة-مبلوكين") {
         if (!config.isOwner(user.id)) {
           return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         }
-        const blockSub = interaction.options.getSubcommand();
-
-        if (blockSub === "قائمة") {
-          const now = Date.now();
-          const blocked = [...spamData.entries()]
-            .filter(([, s]) => s.blockedUntil > now)
-            .map(([uid, s]) => {
-              const mins = Math.ceil((s.blockedUntil - now) / 60_000);
-              return `<@${uid}> — فاضل **${mins} دقيقة**`;
-            });
-          if (blocked.length === 0) {
-            return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
-          }
-          return interaction.reply({
-            content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`,
-            ephemeral: true,
+        const now = Date.now();
+        const blocked = [...spamData.entries()]
+          .filter(([, s]) => s.blockedUntil > now)
+          .map(([uid, s]) => {
+            const mins = Math.ceil((s.blockedUntil - now) / 60_000);
+            return `<@${uid}> — فاضل **${mins} دقيقة**`;
           });
+        if (blocked.length === 0) {
+          return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
         }
-
-        if (blockSub === "رفع") {
-          const target = interaction.options.getUser("يوزر");
-          const entry  = spamData.get(target.id);
-          if (!entry || entry.blockedUntil <= Date.now()) {
-            return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, ephemeral: true });
-          }
-          entry.blockedUntil = 0;
-          entry.timestamps   = [];
-          return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, ephemeral: true });
-        }
+        return interaction.reply({
+          content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`,
+          ephemeral: true,
+        });
       }
 
-      // ─── حالة البوت (بقت subcommand تحت /بوت) ────────────────────
-      if (cmd === "بوت" && interaction.options.getSubcommand() === "حالة") {
+      // ─── رفع البلوك ──────────────────────────────────────────────
+      if (cmd === "رفع-بلوك") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const target = interaction.options.getUser("يوزر");
+        const entry  = spamData.get(target.id);
+        if (!entry || entry.blockedUntil <= Date.now()) {
+          return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, ephemeral: true });
+        }
+        entry.blockedUntil = 0;
+        entry.timestamps   = [];
+        return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, ephemeral: true });
+      }
+
+      // ─── حالة البوت ─────────────────────────────────────────────
+      if (cmd === "حالة-البوت") {
         if (!config.isOwner(user.id)) {
           return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         }
@@ -2031,20 +2018,6 @@ client.on("interactionCreate", async (interaction) => {
           if (!ok) return interaction.editReply(`❌ رقم المفتاح مش صح — استخدم /مفاتيح-جيميني عرض عشان تشوف الأرقام`);
           return interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🎯 تم تحديد المفتاح").setDescription(`✅ البوت هيستخدم المفتاح رقم **${num}** من دلوقتي.\nالمفاتيح المحروقة اتمسحت ومستعدة.`).setTimestamp()] });
         }
-      }
-
-      // ─── رول-ريأكشن ───────────────────────────────────────────────
-      if (cmd === "رول-ريأكشن") {
-        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles))
-          return interaction.reply({ content: "❌ محتاج صلاحية **إدارة الأدوار** عشان تستخدم الأمر ده!", ephemeral: true });
-        const role    = interaction.options.getRole("رول");
-        const emoji   = interaction.options.getString("إيموجي").trim();
-        const msgText = interaction.options.getString("رسالة") || `👇 اعمل ريأكشن بـ ${emoji} عشان تاخد رول **${role.name}**!`;
-        const sentMsg = await channel.send(msgText);
-        await sentMsg.react(emoji).catch(() => {});
-        reactionRoles[sentMsg.id] = { emoji, roleId: role.id, guildId: interaction.guildId };
-        saveReactionRoles();
-        return interaction.reply({ content: `✅ تم! الرسالة اتبعتت — اللي يعمل ريأكشن بـ ${emoji} هياخد رول **${role.name}** تلقائياً.`, ephemeral: true });
       }
 
       // ─── رتب المستويات ────────────────────────────────────────────
@@ -2195,14 +2168,11 @@ client.on("interactionCreate", async (interaction) => {
 
       // Music Commands (New System)
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      // ✅ دمج: أوامر الموسيقى العربية بقت subcommands تحت /موسيقى (تشغيل/إيقاف/تخطي/قائمة-تشغيل/توقف-مؤقت/استئناف)
-      //   بنفس منطق الـ DM proxy المستخدم مع الأوامر الإنجليزية (play/skip/stop/queue/pause/resume)
-      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume","موسيقى"];
+      // ✅ FIX: ضممنا أوامر الموسيقى العربية (تشغيل/إيقاف/تخطي/قائمة-تشغيل/توقف-مؤقت/استئناف)
+      //   لنفس الـ array عشان تستخدم بالظبط نفس منطق الـ DM proxy المستخدم مع الأوامر الإنجليزية
+      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume",
+                          "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف"];
       if (MUSIC_CMDS.includes(cmd)) {
-        // لو الأمر هو /موسيقى المدموج، نجيب الـ subcommand العربي كـ effectiveCmd
-        // عشان باقي المنطق (proxy، التحويل لـ handlePlay/handleSkip...) يفضل شغال زي ما هو بدون تغيير
-        const effectiveCmd = cmd === "موسيقى" ? interaction.options.getSubcommand() : cmd;
-
         let musicInteraction = interaction;
         if (isFromDM && guild) {
           const guildMember = await guild.members.fetch(user.id).catch(() => null);
@@ -2220,7 +2190,7 @@ client.on("interactionCreate", async (interaction) => {
         // ✅ FIX: أمر "تشغيل" العربي بيستخدم اسم الخيار "بحث" مش "query".
         //   نلف الـ interaction بـ proxy خفيف يحوّل getString('query') → getString('بحث')
         //   تلقائيًا، عشان handlePlay الأصلية تشتغل من غير أي تعديل في commands/music.js
-        if (effectiveCmd === "تشغيل") {
+        if (cmd === "تشغيل") {
           musicInteraction = new Proxy(musicInteraction, {
             get(target, prop) {
               if (prop === "options") {
@@ -2244,35 +2214,35 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        if (effectiveCmd === "play" || effectiveCmd === "تشغيل") {
+        if (cmd === "play" || cmd === "تشغيل") {
           const { handlePlay } = await import("./commands/music.js");
           return await handlePlay(musicInteraction);
         }
-        if (effectiveCmd === "skip" || effectiveCmd === "تخطي") {
+        if (cmd === "skip" || cmd === "تخطي") {
           const { handleSkip } = await import("./commands/music.js");
           return await handleSkip(musicInteraction);
         }
-        if (effectiveCmd === "stop" || effectiveCmd === "إيقاف") {
+        if (cmd === "stop" || cmd === "إيقاف") {
           const { handleStop } = await import("./commands/music.js");
           return await handleStop(musicInteraction);
         }
-        if (effectiveCmd === "queue" || effectiveCmd === "قائمة-تشغيل") {
+        if (cmd === "queue" || cmd === "قائمة-تشغيل") {
           const { handleQueue } = await import("./commands/music.js");
           return await handleQueue(musicInteraction);
         }
-        if (effectiveCmd === "pause" || effectiveCmd === "توقف-مؤقت") {
+        if (cmd === "pause" || cmd === "توقف-مؤقت") {
           const { handlePause } = await import("./commands/music.js");
           return await handlePause(musicInteraction);
         }
-        if (effectiveCmd === "resume" || effectiveCmd === "استئناف") {
+        if (cmd === "resume" || cmd === "استئناف") {
           const { handleResume } = await import("./commands/music.js");
           return await handleResume(musicInteraction);
         }
-        if (effectiveCmd === "nowplaying") {
+        if (cmd === "nowplaying") {
           const { handleNowPlaying } = await import("./commands/music.js");
           return await handleNowPlaying(musicInteraction);
         }
-        if (effectiveCmd === "volume") {
+        if (cmd === "volume") {
           const { handleVolume } = await import("./commands/music.js");
           return await handleVolume(musicInteraction);
         }
@@ -2513,100 +2483,98 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: "📜 **قوانين السيرفر:**\n1. الاحترام المتبادل.\n2. عدم نشر روابط خارجية وإعلانات سبام.\n3. التحدث فى الرومات المخصصة." });
       }
 
-      // ✅ دمج: /اقتصاد بروفايل|محفظة|متجر|شراء|إعطاء|يومي
-      if (cmd === "اقتصاد") {
-        const econSub = interaction.options.getSubcommand();
+      if (cmd === "بروفايل") {
+        const target = interaction.options.getUser("عضو") ?? user;
+        const uData = db.getUser(target.id);
+        return interaction.reply({ content: `✨ **بروفايل ${target.username}:**\n📊 المستوى: \`${uData.level}\`\n🪙 الكوينز: \`${uData.coins}\`\n⭐ الـ XP الحالي: \`${uData.xp}\`` });
+      }
 
-        if (econSub === "بروفايل") {
-          const target = interaction.options.getUser("عضو") ?? user;
-          const uData = db.getUser(target.id);
-          return interaction.reply({ content: `✨ **بروفايل ${target.username}:**\n📊 المستوى: \`${uData.level}\`\n🪙 الكوينز: \`${uData.coins}\`\n⭐ الـ XP الحالي: \`${uData.xp}\`` });
-        }
+      if (cmd === "محفظة") {
+        const uData = db.getUser(user.id);
+        return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
+      }
 
-        if (econSub === "محفظة") {
-          const uData = db.getUser(user.id);
-          return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
-        }
+      if (cmd === "متجر") {
+        const embed = new EmbedBuilder()
+          .setColor(0xffd700)
+          .setTitle("🛒 متجر رتب السيرفر")
+          .setDescription("🥇 Golden: 5000 كوينز\n🥈 Silver: 2500 كوينز\n🥉 Bronze: 1000 كوينز\n\nللشراء اكتب `/شراء الرتبة:(الاسم)`");
+        return interaction.reply({ embeds: [embed] });
+      }
 
-        if (econSub === "متجر") {
-          const embed = new EmbedBuilder()
-            .setColor(0xffd700)
-            .setTitle("🛒 متجر رتب السيرفر")
-            .setDescription("🥇 Golden: 5000 كوينز\n🥈 Silver: 2500 كوينز\n🥉 Bronze: 1000 كوينز\n\nللشراء اكتب `/اقتصاد شراء الرتبة:(الاسم)`");
-          return interaction.reply({ embeds: [embed] });
-        }
+      if (cmd === "شراء") {
+        const choice = interaction.options.getString("الرتبة");
+        const uData = db.getUser(user.id);
+        const prices = { golden: 5000, silver: 2500, bronze: 1000 };
+        if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية يا غالي!", ephemeral: true });
 
-        if (econSub === "شراء") {
-          const choice = interaction.options.getString("الرتبة");
-          const uData = db.getUser(user.id);
-          const prices = { golden: 5000, silver: 2500, bronze: 1000 };
-          if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية يا غالي!", ephemeral: true });
+        const role = guild.roles.cache.find(r => r.name.toLowerCase() === choice);
+        if (!role) return interaction.reply({ content: "❌ الرتبة مش متأسسة بنفس الاسم في السيرفر ده!", ephemeral: true });
 
-          const role = guild.roles.cache.find(r => r.name.toLowerCase() === choice);
-          if (!role) return interaction.reply({ content: "❌ الرتبة مش متأسسة بنفس الاسم في السيرفر ده!", ephemeral: true });
+        const member = await guild.members.fetch(user.id);
+        await member.roles.add(role);
+        db.updateUser(user.id, { coins: uData.coins - prices[choice] });
+        return interaction.reply({ content: `🎉 مبروك! اشتريت الرتبة بنجاح واتخصم ${prices[choice]} كوينز.` });
+      }
 
-          const member = await guild.members.fetch(user.id);
-          await member.roles.add(role);
-          db.updateUser(user.id, { coins: uData.coins - prices[choice] });
-          return interaction.reply({ content: `🎉 مبروك! اشتريت الرتبة بنجاح واتخصم ${prices[choice]} كوينز.` });
-        }
+      if (cmd === "إعطاء") {
+        const target = interaction.options.getUser("عضو");
+        const amount = interaction.options.getInteger("كمية");
+        const uData = db.getUser(target.id);
+        db.updateUser(target.id, { coins: uData.coins + amount });
+        return interaction.reply({ content: `🪙 تم منح **${amount}** كوينز لـ ${target} بنجاح.` });
+      }
 
-        if (econSub === "إعطاء") {
-          // ✅ ملحوظة: Discord مش بيسمح بـ default permissions مختلفة لكل subcommand،
-          //   فبنعمل فحص يدوي هنا للصلاحية بدل الاعتماد على setDefaultMemberPermissions
-          if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-            return interaction.reply({ content: "❌ الأمر ده للإدارة بس!", ephemeral: true });
-          }
-          const target = interaction.options.getUser("عضو");
-          const amount = interaction.options.getInteger("كمية");
-          const uData = db.getUser(target.id);
-          db.updateUser(target.id, { coins: uData.coins + amount });
-          return interaction.reply({ content: `🪙 تم منح **${amount}** كوينز لـ ${target} بنجاح.` });
-        }
+      if (cmd === "يومي") {
+        const uData = db.getUser(user.id);
+        const now = Date.now();
+        if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت المكافأة بتاعتك النهاردة خلاص يسطا تعالي بكره!", ephemeral: true });
+        db.updateUser(user.id, { coins: uData.coins + 200, lastDaily: now });
+        return interaction.reply({ content: "🎁 أخدت الـ **200 كوينز** اليومية بتاعتك بنجاح! نوّرت المحفظة." });
+      }
 
-        if (econSub === "يومي") {
-          const uData = db.getUser(user.id);
-          const now = Date.now();
-          if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت المكافأة بتاعتك النهاردة خلاص يسطا تعالي بكره!", ephemeral: true });
-          db.updateUser(user.id, { coins: uData.coins + 200, lastDaily: now });
-          return interaction.reply({ content: "🎁 أخدت الـ **200 كوينز** اليومية بتاعتك بنجاح! نوّرت المحفظة." });
+      if (cmd === "مانهوا-إنشاء") {
+        const name = interaction.options.getString("الاسم");
+        if (db.getManhwaDict(name) && Object.keys(db.getManhwaDict(name)).length > 0) return interaction.reply({ content: "❌ القاموس ده موجود بالفعل يسطا!", ephemeral: true });
+        db.addManhwaTerm(name, "_init", "_init");
+        return interaction.reply({ content: `✅ تم إنشاء قاموس مانهوا جديد باسم: **${name}**` });
+      }
+
+      if (cmd === "مانهوا-إضافة-مصطلح") {
+        const mName = interaction.options.getString("المانهوا");
+        const eng = interaction.options.getString("الإنجليزي");
+        const arb = interaction.options.getString("العربي");
+        if (!db.getManhwaDict(mName) || Object.keys(db.getManhwaDict(mName)).length === 0) return interaction.reply({ content: "❌ القاموس ده مش موجود، اعمله الأول!", ephemeral: true });
+        db.addManhwaTerm(mName, eng, arb);
+        return interaction.reply({ content: `✅ تم إضافة المصطلح بنجاح في قاموس **${mName}**.` });
+      }
+
+      if (cmd === "مانهوا-عرض-المصطلحات") {
+        const mName = interaction.options.getString("المانهوا");
+        if (mName) {
+          const dict = db.getManhwaDict(mName);
+          if (!dict || Object.keys(dict).length === 0) return interaction.reply({ content: "❌ مش موجود القاموس ده!", ephemeral: true });
+          let txt = `📖 **مصطلحات مانهوا [ ${mName} ]:**\n`;
+          Object.keys(dict).forEach(k => { if (k !== "_init") txt += `• \`${k}\` ➡️ \`${dict[k]}\` \n`; });
+          return interaction.reply({ content: txt });
+        } else {
+          const allDicts = db.getAllManhwaDicts();
+          const dictNames = Object.keys(allDicts).filter(k => Object.keys(allDicts[k]).length > 1);
+          return interaction.reply({ content: `📂 **القواامس المتوفرة:** ${dictNames.join(", ") || "مفيش"}` });
         }
       }
 
-      // ✅ دمج: /مانهوا إنشاء|إضافة-مصطلح|عرض-مصطلحات
-      if (cmd === "مانهوا") {
-        const mSub = interaction.options.getSubcommand();
-
-        if (mSub === "إنشاء") {
-          const name = interaction.options.getString("الاسم");
-          if (db.getManhwaDict(name) && Object.keys(db.getManhwaDict(name)).length > 0) return interaction.reply({ content: "❌ القاموس ده موجود بالفعل يسطا!", ephemeral: true });
-          db.addManhwaTerm(name, "_init", "_init");
-          return interaction.reply({ content: `✅ تم إنشاء قاموس مانهوا جديد باسم: **${name}**` });
-        }
-
-        if (mSub === "إضافة-مصطلح") {
-          const mName = interaction.options.getString("المانهوا");
-          const eng = interaction.options.getString("الإنجليزي");
-          const arb = interaction.options.getString("العربي");
-          if (!db.getManhwaDict(mName) || Object.keys(db.getManhwaDict(mName)).length === 0) return interaction.reply({ content: "❌ القاموس ده مش موجود، اعمله الأول!", ephemeral: true });
-          db.addManhwaTerm(mName, eng, arb);
-          return interaction.reply({ content: `✅ تم إضافة المصطلح بنجاح في قاموس **${mName}**.` });
-        }
-
-        if (mSub === "عرض-مصطلحات") {
-          const mName = interaction.options.getString("المانهوا");
-          if (mName) {
-            const dict = db.getManhwaDict(mName);
-            if (!dict || Object.keys(dict).length === 0) return interaction.reply({ content: "❌ مش موجود القاموس ده!", ephemeral: true });
-            let txt = `📖 **مصطلحات مانهوا [ ${mName} ]:**\n`;
-            Object.keys(dict).forEach(k => { if (k !== "_init") txt += `• \`${k}\` ➡️ \`${dict[k]}\` \n`; });
-            return interaction.reply({ content: txt });
-          } else {
-            const allDicts = db.getAllManhwaDicts();
-            const dictNames = Object.keys(allDicts).filter(k => Object.keys(allDicts[k]).length > 1);
-            return interaction.reply({ content: `📂 **القواامس المتوفرة:** ${dictNames.join(", ") || "مفيش"}` });
-          }
-        }
+      if (cmd === "رول-ريأكشن") {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles))
+          return interaction.reply({ content: "❌ محتاج صلاحية **إدارة الأدوار** عشان تستخدم الأمر ده!", ephemeral: true });
+        const role    = interaction.options.getRole("رول");
+        const emoji   = interaction.options.getString("إيموجي").trim();
+        const msgText = interaction.options.getString("رسالة") || `👇 اعمل ريأكشن بـ ${emoji} عشان تاخد رول **${role.name}**!`;
+        const sentMsg = await channel.send(msgText);
+        await sentMsg.react(emoji).catch(() => {});
+        reactionRoles[sentMsg.id] = { emoji, roleId: role.id, guildId: interaction.guildId };
+        saveReactionRoles();
+        return interaction.reply({ content: `✅ تم! الرسالة اتبعتت — اللي يعمل ريأكشن بـ ${emoji} هياخد رول **${role.name}** تلقائياً.`, ephemeral: true });
       }
 
       if (cmd === "مسح") {
@@ -2706,245 +2674,223 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── إنشاء رول بصلاحيات ذكية ────────────────────────────────
-      // ✅ دمج: /رتبة انشاء|تعديل
-      if (cmd === "رتبة") {
-        const roleSub = interaction.options.getSubcommand();
+      if (cmd === "انشاء-رول") {
+        await interaction.deferReply({ ephemeral: true });
+        const roleName  = interaction.options.getString("الاسم");
+        const roleType  = interaction.options.getString("نوع");
+        const roleColor = interaction.options.getString("لون");
+        const roleHoist = interaction.options.getBoolean("ظهور-منفصل");
 
-        if (roleSub === "انشاء") {
-          await interaction.deferReply({ ephemeral: true });
-          const roleName  = interaction.options.getString("الاسم");
-          const roleType  = interaction.options.getString("نوع");
-          const roleColor = interaction.options.getString("لون");
-          const roleHoist = interaction.options.getBoolean("ظهور-منفصل");
+        const preset  = roleType ? ROLE_PRESETS[roleType] : smartRolePerms(roleName);
+        const color   = roleColor ? parseRoleColor(roleColor) : (preset?.color ?? 0x99aab5);
+        const hoist   = roleHoist !== null ? roleHoist : (preset?.hoist ?? false);
+        const perms   = preset?.permissions ?? [];
 
-          const preset  = roleType ? ROLE_PRESETS[roleType] : smartRolePerms(roleName);
-          const color   = roleColor ? parseRoleColor(roleColor) : (preset?.color ?? 0x99aab5);
-          const hoist   = roleHoist !== null ? roleHoist : (preset?.hoist ?? false);
-          const perms   = preset?.permissions ?? [];
-
-          try {
-            const newRole = await guild.roles.create({ name: roleName, color, hoist, reason: `بأمر ${user.username}` });
-            if (perms.length) {
-              const valid = perms.filter(p => PermissionFlagsBits[p]);
-              if (valid.length) await newRole.setPermissions(valid.map(p => PermissionFlagsBits[p]));
-            }
-            const presetLabel = preset?.label ?? "تلقائي";
-            return interaction.editReply({ embeds: [
-              new EmbedBuilder().setColor(color)
-                .setTitle("✨ تم إنشاء الرتبة")
-                .addFields(
-                  { name: "🏷️ الاسم",       value: newRole.name,                                                  inline: true },
-                  { name: "🆔 الـ ID",       value: `\`${newRole.id}\``,                                          inline: true },
-                  { name: "📌 النوع",        value: presetLabel,                                                   inline: true },
-                  { name: "📌 ظهور منفصل",   value: hoist ? "✅" : "❌",                                          inline: true },
-                  { name: "🔐 الصلاحيات",   value: perms.length ? `\`${perms.join(", ")}\`` : "لا صلاحيات",      inline: false },
-                ).setTimestamp()
-            ]});
-          } catch (err) {
-            logger.error("خطأ في إنشاء الرول:", err);
-            return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
+        try {
+          const newRole = await guild.roles.create({ name: roleName, color, hoist, reason: `بأمر ${user.username}` });
+          if (perms.length) {
+            const valid = perms.filter(p => PermissionFlagsBits[p]);
+            if (valid.length) await newRole.setPermissions(valid.map(p => PermissionFlagsBits[p]));
           }
-        }
-
-        if (roleSub === "تعديل") {
-          await interaction.deferReply({ ephemeral: true });
-          const targetRole = interaction.options.getRole("الرول");
-          const roleType   = interaction.options.getString("نوع");
-          const newName    = interaction.options.getString("اسم");
-          const newColor   = interaction.options.getString("لون");
-
-          try {
-            let role = guild.roles.cache.get(targetRole.id);
-            if (!role) role = await guild.roles.fetch(targetRole.id).catch(() => null);
-            if (!role) return interaction.editReply({ content: "❌ مش لاقي الرول — تأكد إنه موجود!" });
-
-            const changes = [];
-            const editData = {};
-
-            if (roleType) {
-              const preset = ROLE_PRESETS[roleType];
-              if (!preset) return interaction.editReply({ content: "❌ نوع غير معروف!" });
-              const valid = preset.permissions.filter(p => PermissionFlagsBits[p]);
-              editData.permissions = valid.map(p => PermissionFlagsBits[p]);
-              changes.push({ name: "🔐 الصلاحيات", value: preset.permissions.length ? `\`${preset.permissions.join(", ")}\`` : "لا صلاحيات", inline: false });
-              changes.push({ name: "📋 النوع", value: preset.label, inline: true });
-            }
-
-            if (newName) {
-              editData.name = newName;
-              changes.push({ name: "🏷️ الاسم الجديد", value: newName, inline: true });
-            }
-
-            if (newColor) {
-              const parsedColor = parseRoleColor(newColor);
-              if (parsedColor === null) return interaction.editReply({ content: `❌ اللون **${newColor}** مش صح — استخدم hex مثل #FF5733 أو اسم إنجليزي مثل red` });
-              editData.color = parsedColor;
-              changes.push({ name: "🎨 اللون", value: newColor, inline: true });
-            }
-
-            if (!roleType && !newName && !newColor) {
-              return interaction.editReply({ content: "❌ لازم تحدد نوع أو اسم أو لون على الأقل!" });
-            }
-
-            await role.edit({ ...editData, reason: `بأمر ${user.username}` });
-
-            return interaction.editReply({ embeds: [
-              new EmbedBuilder().setColor(editData.color ?? 0x9b59b6)
-                .setTitle("✅ تم تعديل الرتبة")
-                .addFields(
-                  { name: "🏷️ الرتبة", value: role.name, inline: true },
-                  { name: "🆔 الـ ID", value: `\`${role.id}\``, inline: true },
-                  ...changes
-                ).setTimestamp()
-            ]});
-          } catch (err) {
-            logger.error("خطأ في تعديل الرول:", err);
-            return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
-          }
+          const presetLabel = preset?.label ?? "تلقائي";
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(color)
+              .setTitle("✨ تم إنشاء الرتبة")
+              .addFields(
+                { name: "🏷️ الاسم",       value: newRole.name,                                                  inline: true },
+                { name: "🆔 الـ ID",       value: `\`${newRole.id}\``,                                          inline: true },
+                { name: "📌 النوع",        value: presetLabel,                                                   inline: true },
+                { name: "📌 ظهور منفصل",   value: hoist ? "✅" : "❌",                                          inline: true },
+                { name: "🔐 الصلاحيات",   value: perms.length ? `\`${perms.join(", ")}\`` : "لا صلاحيات",      inline: false },
+              ).setTimestamp()
+          ]});
+        } catch (err) {
+          logger.error("خطأ في إنشاء الرول:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
         }
       }
 
-      // ✅ دمج: /عقوبة تحذير|اسكات|طرد|تبنيد|عرض — كل واحدة بفحص صلاحية خاص بيها
-      //   (شلنا setDefaultMemberPermissions من الأمر نفسه لأن كل subcommand كانت
-      //   بصلاحية مختلفة (ModerateMembers/KickMembers/BanMembers)، ومحتاجين فحص
-      //   دقيق بدل صلاحية موحّدة قد تحجب أو تفتح زيادة عن المطلوب)
-      if (cmd === "عقوبة") {
-        const modSub = interaction.options.getSubcommand();
+      // ─── تعديل رول (صلاحيات + اسم + لون) ────────────────────────
+      if (cmd === "تعديل-الرول") {
+        await interaction.deferReply({ ephemeral: true });
+        const targetRole = interaction.options.getRole("الرول");
+        const roleType   = interaction.options.getString("نوع");
+        const newName    = interaction.options.getString("اسم");
+        const newColor   = interaction.options.getString("لون");
 
-        if (modSub === "تحذير" || modSub === "اسكات") {
-          if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
-            return interaction.reply({ content: "❌ محتاج صلاحية Moderate Members عشان تستخدم الأمر ده!", ephemeral: true });
+        try {
+          let role = guild.roles.cache.get(targetRole.id);
+          if (!role) role = await guild.roles.fetch(targetRole.id).catch(() => null);
+          if (!role) return interaction.editReply({ content: "❌ مش لاقي الرول — تأكد إنه موجود!" });
+
+          const changes = [];
+          const editData = {};
+
+          // ── صلاحيات ──────────────────────────────────────────────
+          if (roleType) {
+            const preset = ROLE_PRESETS[roleType];
+            if (!preset) return interaction.editReply({ content: "❌ نوع غير معروف!" });
+            const valid = preset.permissions.filter(p => PermissionFlagsBits[p]);
+            editData.permissions = valid.map(p => PermissionFlagsBits[p]);
+            changes.push({ name: "🔐 الصلاحيات", value: preset.permissions.length ? `\`${preset.permissions.join(", ")}\`` : "لا صلاحيات", inline: false });
+            changes.push({ name: "📋 النوع", value: preset.label, inline: true });
           }
-        }
-        if (modSub === "طرد") {
-          if (!interaction.memberPermissions?.has(PermissionFlagsBits.KickMembers)) {
-            return interaction.reply({ content: "❌ محتاج صلاحية Kick Members عشان تستخدم الأمر ده!", ephemeral: true });
+
+          // ── اسم ──────────────────────────────────────────────────
+          if (newName) {
+            editData.name = newName;
+            changes.push({ name: "🏷️ الاسم الجديد", value: newName, inline: true });
           }
-        }
-        if (modSub === "تبنيد") {
-          if (!interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
-            return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تستخدم الأمر ده!", ephemeral: true });
+
+          // ── لون ──────────────────────────────────────────────────
+          if (newColor) {
+            const parsedColor = parseRoleColor(newColor);
+            if (parsedColor === null) return interaction.editReply({ content: `❌ اللون **${newColor}** مش صح — استخدم hex مثل #FF5733 أو اسم إنجليزي مثل red` });
+            editData.color = parsedColor;
+            changes.push({ name: "🎨 اللون", value: newColor, inline: true });
           }
-        }
 
-        if (modSub === "تحذير") {
-          const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-          const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-          const reason = interaction.options.getString("السبب");
-          const actionId = `modwarn_${Date.now()}_${user.id}`;
-          pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
-          setTimeout(() => pendingModActions.delete(actionId), 90_000);
-          return interaction.reply({
-            embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تأكيد التحذير")
-              .setDescription(`هتحذّر <@${target.id}>؟\n📋 **السبب:** ${reason}`)
-              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-            components: [new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التحذير").setStyle(ButtonStyle.Danger),
-              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-            )],
-            ephemeral: true,
-          });
-        }
-
-        if (modSub === "اسكات") {
-          const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-          const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-          const dur = interaction.options.getInteger("مدة");
-          const reason = interaction.options.getString("السبب") ?? "غير محدد";
-          const actionId = `modmute_${Date.now()}_${user.id}`;
-          pendingModActions.set(actionId, { type: "mute", targetId: target.id, reason, duration: dur, modId: user.id, guildId: guild.id });
-          setTimeout(() => pendingModActions.delete(actionId), 90_000);
-          return interaction.reply({
-            embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تأكيد الإسكات")
-              .setDescription(`هتسكّت <@${target.id}> لمدة **${dur} دقيقة**؟\n📋 **السبب:** ${reason}`)
-              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-            components: [new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الإسكات").setStyle(ButtonStyle.Danger),
-              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-            )],
-            ephemeral: true,
-          });
-        }
-
-        if (modSub === "طرد") {
-          const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-          const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-          const reason = interaction.options.getString("السبب") ?? "غير محدد";
-          const actionId = `modkick_${Date.now()}_${user.id}`;
-          pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
-          setTimeout(() => pendingModActions.delete(actionId), 90_000);
-          return interaction.reply({
-            embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تأكيد الطرد")
-              .setDescription(`هتطرد <@${target.id}> من السيرفر؟\n📋 **السبب:** ${reason}`)
-              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-            components: [new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الطرد").setStyle(ButtonStyle.Danger),
-              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-            )],
-            ephemeral: true,
-          });
-        }
-
-        if (modSub === "تبنيد") {
-          const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
-          const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
-          const reason = interaction.options.getString("السبب") ?? "غير محدد";
-          const actionId = `modban_${Date.now()}_${user.id}`;
-          pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
-          setTimeout(() => pendingModActions.delete(actionId), 90_000);
-          return interaction.reply({
-            embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تأكيد التبنيد")
-              .setDescription(`هتبند <@${target.id}> من السيرفر نهائياً؟\n📋 **السبب:** ${reason}`)
-              .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
-            components: [new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التبنيد").setStyle(ButtonStyle.Danger),
-              new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
-            )],
-            ephemeral: true,
-          });
-        }
-
-        if (modSub === "عرض") {
-          const nameOrId = interaction.options.getString("عضو");
-          let targetMember = null;
-          let targetUser = user;
-          if (nameOrId) {
-            targetMember = await resolveMember(guild, nameOrId);
-            if (!targetMember) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
-            targetUser = targetMember.user;
+          if (!roleType && !newName && !newColor) {
+            return interaction.editReply({ content: "❌ لازم تحدد نوع أو اسم أو لون على الأقل!" });
           }
-          const warns = db.getWarnings(targetUser.id);
-          if (warns.length === 0) {
-            return interaction.reply({
-              embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("😇 سجل أبيض!")
-                .setDescription(`<@${targetUser.id}> ما عندهوش أي تحذيرات 🌟`)
-                .setThumbnail(targetUser.displayAvatarURL())],
-              ephemeral: true,
-            });
-          }
-          const warnFields = warns.slice(-10).reverse().map((w, i) => ({
-            name: `⚠️ تحذير #${warns.length - i}`,
-            value: `📋 **السبب:** ${w.reason ?? "غير محدد"}\n🛡️ **المشرف:** <@${w.modId ?? "مجهول"}>\n📅 **التاريخ:** <t:${Math.floor((w.timestamp ?? Date.now()) / 1000)}:R>`,
-            inline: false,
-          }));
-          return interaction.reply({
-            embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle(`⚠️ تحذيرات ${targetUser.username} (${warns.length})`)
-              .addFields(warnFields).setThumbnail(targetUser.displayAvatarURL()).setTimestamp()],
-            ephemeral: true,
-          });
+
+          await role.edit({ ...editData, reason: `بأمر ${user.username}` });
+
+          return interaction.editReply({ embeds: [
+            new EmbedBuilder().setColor(editData.color ?? 0x9b59b6)
+              .setTitle("✅ تم تعديل الرتبة")
+              .addFields(
+                { name: "🏷️ الرتبة", value: role.name, inline: true },
+                { name: "🆔 الـ ID", value: `\`${role.id}\``, inline: true },
+                ...changes
+              ).setTimestamp()
+          ]});
+        } catch (err) {
+          logger.error("خطأ في تعديل الرول:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ: ${err.message}` });
         }
+      }
+
+      if (cmd === "تحذير") {
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+        const reason = interaction.options.getString("السبب");
+        const actionId = `modwarn_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("⚠️ تأكيد التحذير")
+            .setDescription(`هتحذّر <@${target.id}>؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التحذير").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
+      }
+
+      if (cmd === "اسكات") {
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+        const dur = interaction.options.getInteger("مدة");
+        const reason = interaction.options.getString("السبب") ?? "غير محدد";
+        const actionId = `modmute_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "mute", targetId: target.id, reason, duration: dur, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("🔇 تأكيد الإسكات")
+            .setDescription(`هتسكّت <@${target.id}> لمدة **${dur} دقيقة**؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الإسكات").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
+      }
+
+      if (cmd === "طرد") {
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+        const reason = interaction.options.getString("السبب") ?? "غير محدد";
+        const actionId = `modkick_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("👢 تأكيد الطرد")
+            .setDescription(`هتطرد <@${target.id}> من السيرفر؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الطرد").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
+      }
+
+      if (cmd === "تبنيد") {
+        const targetUser = interaction.options.getUser("عضو");
+        if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+        const target = await guild.members.fetch(targetUser.id).catch(() => null);
+        if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+        const reason = interaction.options.getString("السبب") ?? "غير محدد";
+        const actionId = `modban_${Date.now()}_${user.id}`;
+        pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
+        setTimeout(() => pendingModActions.delete(actionId), 90_000);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تأكيد التبنيد")
+            .setDescription(`هتبند <@${target.id}> من السيرفر نهائياً؟\n📋 **السبب:** ${reason}`)
+            .setFooter({ text: "الإجراء ده هينتهي بعد دقيقة ونص لو ما اتأكدش" }).setTimestamp()],
+          components: [new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التبنيد").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
+          )],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "مساعدة") {
-        return interaction.reply({ content: "🤖 **جميع الأوامر بتشتغل بـ السلاش (`/`):**\nعامة: `ping`, `hello`, `serverinfo`\nنظام مالي: `/اقتصاد` (بروفايل, محفظة, يومي...)\nليدربورد: `ليدربورد`\nميوزك: `/موسيقى` (تشغيل, إيقاف, تخطي...)\n🎁 متقدم: `clean_chapter`, `translate_chapter`\n🧹 تنظيف سريع: `تنظيف_صورة`, `تنظيف_رابط`, `استخراج_نص`" });
+        return interaction.reply({ content: "🤖 **جميع الأوامر بتشتغل بـ السلاش (`/`):**\nعامة: `ping`, `hello`, `serverinfo`\nنظام مالي: `بروفايل`, `محفظة`, `يومي`, `ليدربورد`\nميوزك: `play`, `skip`, `stop`, `queue`\n🎁 متقدم: `clean_chapter`, `translate_chapter`\n🧹 تنظيف سريع: `تنظيف_صورة`, `تنظيف_رابط`, `استخراج_نص`" });
+      }
+
+      if (cmd === "تحذيرات") {
+        const nameOrId = interaction.options.getString("عضو");
+        let targetMember = null;
+        let targetUser = user;
+        if (nameOrId) {
+          targetMember = await resolveMember(guild, nameOrId);
+          if (!targetMember) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+          targetUser = targetMember.user;
+        }
+        const warns = db.getWarnings(targetUser.id);
+        if (warns.length === 0) {
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("😇 سجل أبيض!")
+              .setDescription(`<@${targetUser.id}> ما عندهوش أي تحذيرات 🌟`)
+              .setThumbnail(targetUser.displayAvatarURL())],
+            ephemeral: true,
+          });
+        }
+        const warnFields = warns.slice(-10).reverse().map((w, i) => ({
+          name: `⚠️ تحذير #${warns.length - i}`,
+          value: `📋 **السبب:** ${w.reason ?? "غير محدد"}\n🛡️ **المشرف:** <@${w.modId ?? "مجهول"}>\n📅 **التاريخ:** <t:${Math.floor((w.timestamp ?? Date.now()) / 1000)}:R>`,
+          inline: false,
+        }));
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle("📋 سجل التحذيرات")
+            .setDescription(`<@${targetUser.id}> عنده **${warns.length}** تحذير${warns.length > 10 ? ` (بيتعرض آخر 10)` : ""}`)
+            .setThumbnail(targetUser.displayAvatarURL())
+            .addFields(...warnFields)
+            .setTimestamp()],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "ليدربورد") {
@@ -3357,16 +3303,12 @@ client.on("interactionCreate", async (interaction) => {
           if (memeChannelMap.has(cid))     { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
           if (rpsChannelMap.has(cid))      { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
           if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
-          // ✅ FIX: lifeChannelMap/lifeGames اتشالوا — لعبة الحياة الجديدة نظام
-          //   مستمر مالوش "جلسة في روم" تتلغى أصلاً
           if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
           if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
           await interaction.message.delete().catch(() => {});
           return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", flags: 64 });
         }
 
-        // ✅ إضافة: إقفال كل الألعاب الشغالة في كل الرومات دفعة واحدة [إدارة]
-        //   مفيد لو فيه ألعاب عالقة من قبل أو محتاج تنضيف شامل
         if (gid === "ghub_closeall") {
           if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !config.isOwner(interaction.user.id))
             return interaction.reply({ content: "❌ الزرار ده للإدارة بس!", ephemeral: true });
@@ -4652,7 +4594,7 @@ client.on("warn", (info) => {
 
 // ─── Auto-Close Games بعد 3 دقايق ────────────────────────────────
 const AUTO_CLOSE_MS = 3 * 60 * 1000;
-const _autoCloseInterval = setInterval(() => {
+setInterval(() => {
   const now = Date.now();
   const expired = (map) => [...map.entries()].filter(([, s]) => s._ts && (now - s._ts) > AUTO_CLOSE_MS).map(([id]) => id);
 
@@ -4668,7 +4610,6 @@ const _autoCloseInterval = setInterval(() => {
       channelGames.delete(cid);
   });
 }, 30_000);
-_autoCloseInterval.unref?.();
 
 // ─── Reaction Roles Events ────────────────────────────────────────
 client.on("messageReactionAdd", async (reaction, user) => {
