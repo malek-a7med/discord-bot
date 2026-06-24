@@ -2,19 +2,15 @@
 //  🃏 كود نيمز — Codenames Arabic Edition
 //  25 كلمة | فريقين (أحمر/أزرق) | قائد سري | لوحة 5×5 أزرار
 //  التلميح عن طريق زرار + مودال (مش كتابة في الشات)
-//  ✅ يدعم AI Spymaster (Gemini) — يقدر يمسك قيادة فريق بدل لاعب بشري
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder,
-  TextInputBuilder, TextInputStyle, StringSelectMenuBuilder,
+  TextInputBuilder, TextInputStyle,
 } from "discord.js";
-import { getChatModel } from "../helpers/gemini-keys.js";
 
 export const codenamesGames  = new Map();
 export const cdnChannelGames = new Map();
-
-const AI_SPYMASTER_ID = "AI_SPYMASTER"; // قيمة خاصة في حقل spymaster تشير إن الـ AI هو القائد
 
 const makeId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2,4)}`;
 
@@ -59,12 +55,6 @@ function createState(channelId, creatorId) {
     creatorId, allPlayers: [creatorId],
     roundTimeMinutes: null, // وقت الجولة بالدقايق (null = بلا حد)
     roundTimer: null,
-    // ✅ إعدادات الـ AI Spymaster:
-    //   "off"      → بدون AI خالص (الوضع الافتراضي القديم)
-    //   "fill"     → AI يتدخل بس لو فريق وقت "ابدأ اللعبة" مالوش قائد بشري
-    //   "always"   → AI يمسك القيادة من أول دقيقة (تفعيل فوري لفريق أو الاتنين)
-    aiMode: "off",
-    aiThinking: false, // قفل بسيط — يمنع طلبين Gemini في نفس اللحظة لنفس اللعبة
   };
 }
 
@@ -107,103 +97,15 @@ function buildSpymasterMap(state) {
   return grid;
 }
 
-// ── هل القائد الحالي لفريق معين هو الـ AI؟ ────────────────────
-function isAISpymaster(state, team) {
-  return state[team].spymaster === AI_SPYMASTER_ID;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  🤖 AI Spymaster — بيستخدم Gemini عشان يجيب تلميح ذكي
-//  ──────────────────────────────────────────────────────────────
-//  بيدي الـ AI خريطة الكلمات الكاملة (ألوان + كلمات الفريق بتاعه
-//  وكلمات الخصم والمحايدة والقاتلة)، وبيطلب منه يربط كلمة واحدة
-//  بأكتر عدد ممكن من كلمات فريقه، بعيد عن القاتلة والخصم.
-//  بيرجع { word, count } أو null لو فشل (وقتها بنرجع لتلميح احتياطي).
-// ══════════════════════════════════════════════════════════════
-async function getAISpymasterClue(state, team) {
-  const model = getChatModel();
-  if (!model) return fallbackClue(state, team);
-
-  const teamWords = [], enemyWords = [], neutralWords = [], assassinWords = [];
-  for (let i = 0; i < 25; i++) {
-    if (state.revealed[i]) continue; // الكلمات المكشوفة مالها لازمة في الحساب
-    const w = state.words[i], c = state.colors[i];
-    if (c === team) teamWords.push(w);
-    else if (c === "assassin") assassinWords.push(w);
-    else if (c === "neutral") neutralWords.push(w);
-    else enemyWords.push(w);
-  }
-
-  if (teamWords.length === 0) return null; // الفريق خلص كلماته بالفعل
-
-  const prompt =
-    `إنت قائد سري (Spymaster) في لعبة كود نيمز بالعربي. مهمتك تدّي تلميح لفريقك.\n\n` +
-    `كلمات فريقك (المفروض يخمنوها): ${teamWords.join("، ")}\n` +
-    `كلمات الفريق الخصم (لازم تتجنبها): ${enemyWords.join("، ")}\n` +
-    `كلمات محايدة (لازم تتجنبها): ${neutralWords.join("، ")}\n` +
-    `الكلمة القاتلة (خطر! ممنوع التلميح يقرّب منها خالص): ${assassinWords.join("، ")}\n\n` +
-    `طلوب منك: اختار كلمة تلميح واحدة (مش موجودة في أي قائمة فوق) ترتبط بأكبر عدد ممكن ` +
-    `من كلمات فريقك بس، وبعيدة تمامًا عن الكلمة القاتلة. ` +
-    `لو معندك تلميح آمن لأكتر من كلمة، اختار كلمة لكلمة واحدة بس وده تمام.\n\n` +
-    `رد بصيغة JSON فقط بدون أي نص إضافي: {"word": "كلمة_التلميح", "count": رقم, "targets": ["كلمة1","كلمة2"]}`;
-
-  try {
-    const result = await model.generateContent(prompt);
-    const raw = result.response.text().trim();
-    const match = raw.match(/\{[\s\S]*?\}/);
-    if (!match) return fallbackClue(state, team);
-
-    const parsed = JSON.parse(match[0]);
-    let word = String(parsed.word || "").trim();
-    let count = parseInt(parsed.count, 10);
-
-    // ✅ تحقق أمان: نفس قواعد التلميح البشري بالظبط — كلمة واحدة، مش على
-    //   اللوحة، وعدد منطقي. لو فشل أي شرط، نرجع لتلميح احتياطي بسيط
-    if (!word || word.includes(" ") || isNaN(count) || count < 1 || count > 9) {
-      return fallbackClue(state, team);
-    }
-    if (state.words.some(w => w === word)) {
-      return fallbackClue(state, team);
-    }
-    count = Math.min(count, teamWords.length);
-
-    return { word, count };
-  } catch (err) {
-    console.error("⚠️ [AI Spymaster] فشل الحصول على تلميح من Gemini:", err.message);
-    return fallbackClue(state, team);
-  }
-}
-
-// ── تلميح احتياطي بسيط لو فشل Gemini (عشان اللعبة ما توقفش) ───
-function fallbackClue(state, team) {
-  const remaining = [];
-  for (let i = 0; i < 25; i++) {
-    if (!state.revealed[i] && state.colors[i] === team) remaining.push(state.words[i]);
-  }
-  if (remaining.length === 0) return null;
-  // بنرجع أول كلمة متاحة كـ "تلميح" مباشر بعدد 1 — بسيط بس بيضمن استمرار اللعبة
-  const target = remaining[0];
-  // كلمة احتياطية عامة (مش من قاموس اللعبة) عشان تفي بشرط "كلمة مش على اللوحة"
-  const genericHints = ["إشارة", "دليل", "خيط", "رابط", "تلميح"];
-  const word = genericHints.find(w => !state.words.includes(w)) || "تلميح";
-  return { word, count: 1, _isFallback: true, _target: target };
-}
-
 function fmtTeam(state, team) {
   const lines = [];
-  if (state[team].spymaster === AI_SPYMASTER_ID) lines.push(`🤖 **AI Spymaster** (قائد)`);
-  else if (state[team].spymaster) lines.push(`👑 <@${state[team].spymaster}> (قائد)`);
+  if (state[team].spymaster) lines.push(`👑 <@${state[team].spymaster}> (قائد)`);
   state[team].agents.forEach(id => lines.push(`🎮 <@${id}>`));
   return lines.join("\n") || "*فارغ*";
 }
 
 function buildLobbyEmbed(state) {
   const timeText = state.roundTimeMinutes ? `⏱️ وقت الجولة: **${state.roundTimeMinutes} دقيقة**` : "⏱️ وقت الجولة: **بلا حد**";
-  const aiModeText = {
-    off:    "🚫 بدون AI — كل القادة بشر",
-    fill:   "🤖 AI عند النقص — يتدخل بس لو فريق مالوش قائد وقت البدء",
-    always: "🤖 AI من البداية — هيمسك قيادة أي فريق متاح",
-  }[state.aiMode] || "🚫 بدون AI";
   return new EmbedBuilder()
     .setColor(0x9b59b6).setTitle("🃏 كود نيمز — انتظار اللاعبين")
     .setDescription(
@@ -213,8 +115,8 @@ function buildLobbyEmbed(state) {
       `┣ اللاعبون يضغطوا على الكلمات للتخمين\n` +
       `┣ 🔴 أحمر = فريقك | 🔵 أزرق = فريقك | ⬜ محايدة = دورك انتهى | 💀 قاتل = تخسر فوراً!\n` +
       `┗ أول فريق يكشف كل كلماته يفوز!\n\n` +
-      `⚠️ **متطلبات:** قائد + لاعب واحد لكل فريق (أو AI بدل القائد)\n\n` +
-      `${timeText}\n🤖 **وضع AI Spymaster:** ${aiModeText}`
+      `⚠️ **متطلبات:** قائد + لاعب واحد لكل فريق\n\n` +
+      `${timeText}`
     )
     .addFields(
       { name: "🔴 الأحمر — 9 كلمات", value: fmtTeam(state,"red"), inline: true },
@@ -233,28 +135,11 @@ function buildLobbyRows(gameId) {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`cdn_settings_${gameId}`).setLabel("⚙️ إعدادات الوقت").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`cdn_aimenu_${gameId}`).setLabel("🤖 إعدادات AI").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`cdn_start_${gameId}`).setLabel("▶️ ابدأ اللعبة").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`cdn_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`cdn_cancel_${gameId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Danger),
     ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`cdn_realplay_${gameId}`).setLabel("🌐 لعب اللعبة الأصلية").setStyle(ButtonStyle.Secondary),
-    ),
   ];
-}
-
-// ── قائمة اختيار وضع الـ AI (select menu) ─────────────────────
-function buildAIModeRow(gameId, state) {
-  return [new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`cdn_aiset_${gameId}`)
-      .setPlaceholder("اختار وضع AI Spymaster")
-      .addOptions(
-        { label: "🚫 بدون AI", description: "كل القادة لازم يكونوا بشر", value: "off", default: state.aiMode === "off" },
-        { label: "🤖 AI عند النقص", description: "AI يتدخل بس لو فريق مالوش قائد وقت البدء", value: "fill", default: state.aiMode === "fill" },
-        { label: "🤖 AI من البداية", description: "AI يمسك قيادة أي فريق متاح فورًا", value: "always", default: state.aiMode === "always" },
-      )
-  )];
 }
 
 function buildGameEmbed(state) {
@@ -290,8 +175,9 @@ function buildSpymasterClueRow(gameId) {
 }
 
 // ── الأمر ─────────────────────────────────────────────────────
-// ✅ ملحوظة: مفيش SlashCommandBuilder منفصل هنا عمدًا — اللعبة بالكامل
-//   متاحة بس من زرار "🃏 كود نيمز" جوه /الألعاب (مش أمر slash مستقل)
+export const codenamesCommand = new SlashCommandBuilder()
+  .setName("كود-نيمز").setDescription("🃏 لعبة كود نيمز — فريقين يخمنوا الكلمات السرية");
+
 export async function handleCodenamesCommand(interaction) {
   const channelId = interaction.channel.id;
   if (cdnChannelGames.has(channelId))
@@ -299,12 +185,24 @@ export async function handleCodenamesCommand(interaction) {
   const state = createState(channelId, interaction.user.id);
   codenamesGames.set(state.id, state);
   cdnChannelGames.set(channelId, state.id);
-  const msg = await interaction.reply({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(state.id), fetchReply: true });
-  state.messageId = msg.id;
-  setTimeout(() => {
+  let msg;
+  if (interaction.isButton?.()) {
+    await interaction.update({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(state.id) });
+    msg = await interaction.fetchReply().catch(() => null);
+  } else {
+    msg = await interaction.reply({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(state.id), fetchReply: true });
+  }
+  if (msg) state.messageId = msg.id;
+  setTimeout(async () => {
     if (codenamesGames.has(state.id) && codenamesGames.get(state.id).phase === "lobby") {
       codenamesGames.delete(state.id); cdnChannelGames.delete(channelId);
-      interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("🃏 كود نيمز — انتهت مهلة اللوبي")], components: [] }).catch(() => {});
+      const timeoutEmbed = new EmbedBuilder().setColor(0x555).setTitle("🃏 كود نيمز — انتهت مهلة اللوبي");
+      if (state.messageId) {
+        const ch = await interaction.client?.channels?.fetch(channelId).catch(() => null);
+        const m  = ch ? await ch.messages.fetch(state.messageId).catch(() => null) : null;
+        if (m) { m.edit({ embeds: [timeoutEmbed], components: [] }).catch(() => {}); return; }
+      }
+      interaction.editReply({ embeds: [timeoutEmbed], components: [] }).catch(() => {});
     }
   }, 10 * 60 * 1000);
 }
@@ -344,17 +242,6 @@ export async function handleCodenamesButton(interaction) {
     state[team].spymaster = interaction.user.id;
     if (!state.allPlayers.includes(interaction.user.id)) state.allPlayers.push(interaction.user.id);
     return interaction.update({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(gameId) });
-  }
-
-  // ── قائمة وضع AI Spymaster ──────────────────────────────────
-  if (action === "aimenu") {
-    if (state.creatorId !== interaction.user.id)
-      return interaction.reply({ content: "❌ بس اللي بدأ اللعبة يقدر يغير إعدادات الـ AI!", flags: 64 });
-    return interaction.reply({
-      content: "🤖 اختار وضع AI Spymaster المناسب:",
-      components: buildAIModeRow(gameId, state),
-      flags: 64,
-    });
   }
 
   // ── إعدادات الوقت ──────────────────────────────────────────
@@ -428,15 +315,8 @@ export async function handleCodenamesButton(interaction) {
   if (action === "start") {
     if (state.creatorId !== interaction.user.id)
       return interaction.reply({ content: "❌ اللي عملها بس يبدأها!", flags: 64 });
-
-    // ✅ وضع "AI عند النقص": أي فريق وصل هنا بدون قائد بشري، الـ AI يمسكه فورًا
-    if (state.aiMode === "fill") {
-      if (!state.red.spymaster) state.red.spymaster = AI_SPYMASTER_ID;
-      if (!state.blue.spymaster) state.blue.spymaster = AI_SPYMASTER_ID;
-    }
-
     if (!state.red.spymaster || !state.blue.spymaster)
-      return interaction.reply({ content: "❌ كل فريق لازم عنده قائد (بشري أو فعّل AI من ⚙️ إعدادات AI)!", flags: 64 });
+      return interaction.reply({ content: "❌ كل فريق لازم عنده قائد!", flags: 64 });
     if (state.red.agents.length < 1 || state.blue.agents.length < 1)
       return interaction.reply({ content: "❌ كل فريق لازم عنده لاعب واحد على الأقل!", flags: 64 });
 
@@ -446,13 +326,7 @@ export async function handleCodenamesButton(interaction) {
     await sendActiveSpymasterControl(interaction.client, interaction.channel, state);
 
     const boardRows = buildBoardRows(gameId, state);
-    await interaction.update({ embeds: [buildGameEmbed(state)], components: boardRows });
-
-    // ✅ لو الفريق الأول (الأحمر بيبدأ دايمًا) قائده AI، خليه يعطي تلميحه فورًا
-    if (isAISpymaster(state, state.turn)) {
-      await runAITurn(interaction.client, interaction.channel, gameId, state);
-    }
-    return;
+    return interaction.update({ embeds: [buildGameEmbed(state)], components: boardRows });
   }
 
   // ── زرار "أعطِ تلميح" ──────────────────────────────────────
@@ -499,7 +373,7 @@ export async function handleCodenamesButton(interaction) {
       return interaction.reply({ content: "❌ مش دورك!", flags: 64 });
     if (state.roundTimer) clearTimeout(state.roundTimer);
     state.clue = null; state.turn = state.turn === "red" ? "blue" : "red";
-    startRoundTimer(interaction.client, interaction.channel, gameId, state);
+    startRoundTimer(interaction, gameId, state);
 
     // تحديث الـ control message (لأن الزرار جاي منه)
     await interaction.update({ embeds: [buildGameEmbed(state)], components: buildGameActionRow(gameId, state).components.length > 0 ? [buildGameActionRow(gameId, state)] : [] });
@@ -508,10 +382,6 @@ export async function handleCodenamesButton(interaction) {
     await interaction.channel.messages.fetch(state.messageId).then(m => m.edit({ embeds: [buildGameEmbed(state)], components: boardRows })).catch(() => {});
     // بعت DM للـ spymaster الجديد
     await sendActiveSpymasterControl(interaction.client, interaction.channel, state);
-    // ✅ لو القائد الجديد AI، خليه يلعب دوره فورًا
-    if (isAISpymaster(state, state.turn)) {
-      await runAITurn(interaction.client, interaction.channel, gameId, state);
-    }
     return;
   }
 
@@ -549,12 +419,8 @@ export async function handleCodenamesButton(interaction) {
       state.clue = null;
       state.turn = otherTeam;
       if (state.roundTimer) clearTimeout(state.roundTimer);
-      startRoundTimer(interaction.client, interaction.channel, gameId, state);
+      startRoundTimer(interaction, gameId, state);
       await sendActiveSpymasterControl(interaction.client, interaction.channel, state);
-      // ✅ لو الفريق الجديد قائده AI، خليه يلعب دوره فورًا (بعد الرد الحالي)
-      if (isAISpymaster(state, state.turn)) {
-        setImmediate(() => runAITurn(interaction.client, interaction.channel, gameId, state).catch(() => {}));
-      }
       const boardRows = buildBoardRows(gameId, state);
       return interaction.update({
         embeds: [new EmbedBuilder()
@@ -592,12 +458,8 @@ export async function handleCodenamesButton(interaction) {
       if (state.clue && state.clue.remaining <= 0) {
         state.clue = null; state.turn = otherTeam;
         if (state.roundTimer) clearTimeout(state.roundTimer);
-        startRoundTimer(interaction.client, interaction.channel, gameId, state);
+        startRoundTimer(interaction, gameId, state);
         await sendActiveSpymasterControl(interaction.client, interaction.channel, state);
-        // ✅ لو الفريق الجديد قائده AI، خليه يلعب دوره فورًا (بعد الرد الحالي)
-        if (isAISpymaster(state, state.turn)) {
-          setImmediate(() => runAITurn(interaction.client, interaction.channel, gameId, state).catch(() => {}));
-        }
       }
     } else {
       // كلمة الخصم
@@ -620,12 +482,8 @@ export async function handleCodenamesButton(interaction) {
       }
       state.clue = null; state.turn = otherTeam;
       if (state.roundTimer) clearTimeout(state.roundTimer);
-      startRoundTimer(interaction.client, interaction.channel, gameId, state);
+      startRoundTimer(interaction, gameId, state);
       await sendActiveSpymasterControl(interaction.client, interaction.channel, state);
-      // ✅ لو الفريق الجديد قائده AI، خليه يلعب دوره فورًا (بعد الرد الحالي)
-      if (isAISpymaster(state, state.turn)) {
-        setImmediate(() => runAITurn(interaction.client, interaction.channel, gameId, state).catch(() => {}));
-      }
     }
 
     const boardRows = buildBoardRows(gameId, state);
@@ -634,7 +492,7 @@ export async function handleCodenamesButton(interaction) {
 }
 
 // ── مؤقت الجولة ───────────────────────────────────────────────
-function startRoundTimer(client, channel, gameId, state) {
+function startRoundTimer(interaction, gameId, state) {
   if (!state.roundTimeMinutes) return;
   if (state.roundTimer) clearTimeout(state.roundTimer);
   state.roundTimer = setTimeout(async () => {
@@ -642,10 +500,10 @@ function startRoundTimer(client, channel, gameId, state) {
     const prevTurn = state.turn;
     state.clue = null;
     state.turn = state.turn === "red" ? "blue" : "red";
-    startRoundTimer(client, channel, gameId, state);
+    startRoundTimer(interaction, gameId, state);
     const boardRows = buildBoardRows(gameId, state);
     try {
-      await channel.messages.fetch(state.messageId).then(m =>
+      await interaction.channel.messages.fetch(state.messageId).then(m =>
         m.edit({ embeds: [
           new EmbedBuilder().setColor(0xe67e22).setTitle("⏱️ انتهى الوقت!")
             .setDescription(`انتهى وقت فريق ${prevTurn === "red" ? "🔴 الأحمر" : "🔵 الأزرق"} — الدور انتقل!`),
@@ -653,11 +511,7 @@ function startRoundTimer(client, channel, gameId, state) {
         ], components: boardRows })
       );
     } catch {}
-    await sendActiveSpymasterControl(client, channel, state);
-    // ✅ لو الفريق الجديد (بعد انتهاء الوقت) قائده AI، خليه يلعب دوره فورًا
-    if (isAISpymaster(state, state.turn)) {
-      await runAITurn(client, channel, gameId, state);
-    }
+    await sendActiveSpymasterControl(interaction.client, interaction.channel, state);
   }, state.roundTimeMinutes * 60 * 1000);
 }
 
@@ -678,74 +532,6 @@ async function sendActiveSpymasterControl(client, channel, state) {
   try {
     const u = await client.users.fetch(currentSpyId);
     await u.send({ embeds: [embed], components: buildSpymasterClueRow(gameId) });
-  } catch {}
-}
-
-// ══════════════════════════════════════════════════════════════
-//  🤖 تشغيل دور قائد AI تلقائيًا
-//  ──────────────────────────────────────────────────────────────
-//  بتُستدعى لما يكون دور الفريق الحالي قائده AI (state.turn's
-//  spymaster === AI_SPYMASTER_ID). بتجيب تلميح من Gemini (أو
-//  fallback لو فشل)، تحدّث state.clue، وتحدّث رسالة اللعبة في
-//  الروم بنفس الطريقة اللي بيحصل لو قائد بشري أعطى تلميح.
-//  ✅ حالة خاصة: لو Gemini فشل ورجع fallback (تلميح مولّد عام
-//  مش له علاقة حقيقية بالكلمات)، الـ AI بيكشف الكلمة المستهدفة
-//  لفريقه مباشرة بدل ما يدّي تلميح مش مفهوم — أحسن من ما يوقف
-//  اللعبة أو يدّي تلميح عشوائي يلخبط اللاعبين.
-// ══════════════════════════════════════════════════════════════
-async function runAITurn(client, channel, gameId, state) {
-  if (!codenamesGames.has(gameId)) return;
-  if (state.phase !== "playing") return;
-  if (state.clue) return; // في إشارة موجودة بالفعل، مفيش لازمة نعمل حاجة
-
-  const team = state.turn;
-  if (!isAISpymaster(state, team)) return;
-
-  const result = await getAISpymasterClue(state, team);
-
-  // الفريق خلص كلماته بالفعل أو مفيش تلميح أصلاً — تخطي الدور بهدوء
-  if (!result) {
-    state.turn = team === "red" ? "blue" : "red";
-    startRoundTimer(client, channel, gameId, state);
-    await refreshBoardMessage(client, state);
-    await sendActiveSpymasterControl(client, channel, state);
-    if (isAISpymaster(state, state.turn)) {
-      await runAITurn(client, channel, gameId, state);
-    }
-    return;
-  }
-
-  if (result._isFallback) {
-    // الـ AI مش لاقي تلميح ذكي — بيكشف الكلمة المستهدفة مباشرة لفريقه
-    state.clue = { word: result.word, count: 1, remaining: 1 };
-  } else {
-    state.clue = { word: result.word, count: result.count, remaining: result.count };
-  }
-
-  startRoundTimer(client, channel, gameId, state);
-  await refreshBoardMessage(client, state);
-
-  // ✅ نبعت رسالة بسيطة في الروم توضح إن القائد AI أعطى إشارة
-  //   (القائد البشري بيتم تنبيهه عبر sendActiveSpymasterControl، لكن
-  //   الـ AI مفيش له DM يستقبل فيه زرار، فبنعلن في الروم بدلاً من ذلك)
-  try {
-    await channel.send({
-      embeds: [new EmbedBuilder()
-        .setColor(team === "red" ? 0xe74c3c : 0x3498db)
-        .setTitle(`🤖 القائد AI (${team === "red" ? "🔴 الأحمر" : "🔵 الأزرق"}) أعطى إشارة!`)
-        .setDescription(`📢 **الإشارة:** \`${state.clue.word}\` — **${state.clue.count}** كلمات`)
-      ],
-    });
-  } catch {}
-}
-
-// ── تحديث رسالة اللوحة في الروم بأحدث حالة ────────────────────
-async function refreshBoardMessage(client, state) {
-  try {
-    const boardRows = buildBoardRows(state.id, state);
-    const ch = await client.channels.fetch(state.channelId);
-    const msg = await ch.messages.fetch(state.messageId);
-    await msg.edit({ embeds: [buildGameEmbed(state)], components: boardRows });
   } catch {}
 }
 
@@ -781,46 +567,6 @@ async function sendAgentDMs(client, state) {
       await u.send(`🔵 **إنت في الفريق الأزرق في كود نيمز!**\nاخمن الكلمات من الإشارة — اضغط على الكلمات في الروم!\n💡 كلمة صح ✅ | ⬜ محايدة = دورك انتهى | خصم = بيكسبوا نقطة | 💀 قاتل = تخسروا فوراً!`);
     } catch {}
   }
-}
-
-// ── معالج قائمة اختيار وضع AI Spymaster ────────────────────────
-export async function handleCodenamesAISelect(interaction) {
-  const gameId = interaction.customId.replace("cdn_aiset_", "");
-  const state = codenamesGames.get(gameId);
-  if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 });
-
-  if (state.creatorId !== interaction.user.id)
-    return interaction.reply({ content: "❌ بس اللي بدأ اللعبة يقدر يغير إعدادات الـ AI!", flags: 64 });
-
-  const mode = interaction.values[0]; // "off" | "fill" | "always"
-  state.aiMode = mode;
-
-  // ✅ "AI من البداية": لو حد من الفريقين مفتوح ومحدش مسكه قائد بشري،
-  //   الـ AI يمسكه فورًا. لو فريق ماسكه بشري بالفعل، نسيبه زي ما هو
-  //   (مانشيلش قائد بشري موجود بالفعل عشان نحط AI بدل منه)
-  if (mode === "always") {
-    if (!state.red.spymaster) state.red.spymaster = AI_SPYMASTER_ID;
-    if (!state.blue.spymaster) state.blue.spymaster = AI_SPYMASTER_ID;
-  } else if (mode === "off") {
-    // إلغاء أي AI كان متفعّل قبل كده، يرجع الفريق محتاج قائد بشري
-    if (state.red.spymaster === AI_SPYMASTER_ID) state.red.spymaster = null;
-    if (state.blue.spymaster === AI_SPYMASTER_ID) state.blue.spymaster = null;
-  } else if (mode === "fill") {
-    // لو كان متفعّل always قبل كده وفريق ماسكه AI بس مفيش بشر طلب الدور،
-    // نسيبه لحد ما يحصل "start" — هيتقرر هناك. هنا بس نشيل AI لو كان موجود
-    // فعليًا عشان نرجّع الفرصة للبشر يدخلوا (التدخل بيحصل وقت "ابدأ اللعبة" بس)
-    if (state.red.spymaster === AI_SPYMASTER_ID) state.red.spymaster = null;
-    if (state.blue.spymaster === AI_SPYMASTER_ID) state.blue.spymaster = null;
-  }
-
-  try {
-    const ch = await interaction.client.channels.fetch(state.channelId);
-    const msg = await ch.messages.fetch(state.messageId);
-    await msg.edit({ embeds: [buildLobbyEmbed(state)], components: buildLobbyRows(gameId) });
-  } catch {}
-
-  const modeLabel = { off: "🚫 بدون AI", fill: "🤖 AI عند النقص", always: "🤖 AI من البداية" }[mode];
-  return interaction.reply({ content: `✅ وضع AI Spymaster بقى: ${modeLabel}`, flags: 64 });
 }
 
 // ── معالجات المودالات ─────────────────────────────────────────
@@ -878,7 +624,7 @@ export async function handleCodenamesClueModal(interaction) {
 
   state.clue = { word, count, remaining: count };
   if (state.roundTimer) clearTimeout(state.roundTimer);
-  startRoundTimer(interaction.client, interaction.channel, gameId, state);
+  startRoundTimer(interaction, gameId, state);
 
   const boardRows = buildBoardRows(gameId, state);
   try {
