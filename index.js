@@ -81,6 +81,17 @@ import { fileURLToPath } from "url";
 
 // ── Lock File: منع تشغيل أكتر من نسخة واحدة في نفس الوقت ────────
 const LOCK_FILE = "/tmp/zangi_bot.lock";
+
+// ─── Reaction Roles ───────────────────────────────────────────────
+const REACTION_ROLES_PATH = "./data/reaction-roles.json";
+let reactionRoles = {}; // { messageId: { emoji, roleId, guildId } }
+try {
+  const raw = fs.readFileSync(REACTION_ROLES_PATH, "utf8");
+  reactionRoles = JSON.parse(raw);
+} catch { reactionRoles = {}; }
+function saveReactionRoles() {
+  try { fs.writeFileSync(REACTION_ROLES_PATH, JSON.stringify(reactionRoles, null, 2)); } catch {}
+}
 (function enforceSingleInstance() {
   if (fs.existsSync(LOCK_FILE)) {
     try {
@@ -558,6 +569,13 @@ const LEGACY_COMMANDS = [
       o.setName("حالة").setDescription("تشغيل أو إيقاف").setRequired(true)
         .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
     ),
+  new SlashCommandBuilder()
+    .setName("رول-ريأكشن")
+    .setDescription("📌 ابعت رسالة — اللي يعمل ريأكشن عليها ياخد رول تلقائي")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .addRoleOption(o => o.setName("رول").setDescription("الرول اللي هيتدي للناس").setRequired(true))
+    .addStringOption(o => o.setName("إيموجي").setDescription("الإيموجي اللي لازم يعملوا عليه ريأكشن").setRequired(true))
+    .addStringOption(o => o.setName("رسالة").setDescription("نص الرسالة (اختياري)").setRequired(false)),
   pollCommand,
   bankLifeCommand,
   bankLuckEgCommand.data,
@@ -593,6 +611,7 @@ function validateLatestFeatures(allCommands) {
       "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","حياة","بنك-الحظ-مصري",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
+      "رول-ريأكشن",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -739,8 +758,9 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.DirectMessages,
     GatewayIntentBits.DirectMessageReactions,
+    GatewayIntentBits.GuildMessageReactions,
   ],
-  partials: [Partials.Channel, Partials.Message],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
   failIfNotExists: false,
   rest: { timeout: 15_000, retries: 3 },
   sweepers: {
@@ -1405,10 +1425,10 @@ function buildUserPrompt(senderName, question, userId) {
   const hist = getUserHistory(userId);
   const histText = hist.map(m => `${m.role === "user" ? senderName : "زنجي"}: ${m.text}`).join("\n");
   const modeNote = botSpeechMode === "free"
-    ? "\nأسلوبك: لو حد شتمك أو استفزك، ترد عليه بنفس الشتيمة اللي قالها بالظبط — مش بتتهادن معاه. لو الكلام عادي ومحترم، ترد بشكل طبيعي ومحترم."
+    ? "\nأسلوبك باد بوي — لو الشخص اللي بيكلمك بعت شتيمة أو ألفاظ وحشة موجّهة ليك، ردّ عليه بنفس المستوى أو أقوى بدون تردد. لو الكلام عادي ومحترم، ردودك عادية ومحترمة تماماً — مش بتبدأ الشتيمة من نفسك."
     : botSpeechMode === "toxic"
-    ? "\nأسلوبك توكسيك — بتحط شتايم وألفاظ في أغلب كلامك بشكل طبيعي زي ما المصريين بيتكلموا في الشارع (يلعن، ابن ناعل، كسمك، مسلوق، وما شابه). ردودك جريئة ومفيهاش تحفظ."
-    : "\nأسلوبك محترم تماماً — مفيش أي شتايم أو ألفاظ في كلامك خالص، حتى لو حد بعث كلام وحش.";
+    ? "\nأسلوبك إكستريم 100% — كل كلامك فيه شتايم وألفاظ صح بشكل طبيعي جداً، حتى لو الموضوع عادي. منفتح جداً ومفيش أي خط أحمر في الكلام. (أمثلة: يلعن، ابن نيكة، كسمك، مسلوق، وما شابه — وأعنف منها كمان). ردودك جريئة ومفيهاش أي تحفظ خالص."
+    : "\nأسلوبك محترم تماماً 0% — مفيش أي شتايم أو ألفاظ في كلامك خالص، حتى لو حد بعث كلام وحش أو شتمك.";
   return `أنت زنجي — بوت ديسكورد مصري، بتتكلم بالعامية المصرية الطبيعية بس.${modeNote}
 ${histText ? `\nسياق المحادثة:\n${histText}\n` : ""}
 ${senderName}: ${question}
@@ -2106,9 +2126,9 @@ client.on("interactionCreate", async (interaction) => {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         const mode = interaction.options.getString("أسلوب");
         botSpeechMode = mode;
-        const modeLabel = mode === "free" ? "😈 حر — البوت بيكلم بحرية أكتر"
-          : mode === "toxic" ? "☠️ توكسيك — البوت حاد ومباشر وبيشتم لو شتموه"
-          : "🎩 محترم — رد لطيف ومودّب";
+        const modeLabel = mode === "free" ? "😈 باد بوي — البوت بيشتم بس لو شتموه هو"
+          : mode === "toxic" ? "☠️ إكستريم — كل كلامه شتايم ومنفتح جداً 100%"
+          : "🎩 محترم — 0% شتايم حتى لو شتموه";
         const modeColor = mode === "toxic" ? 0xe74c3c : mode === "free" ? 0x9b59b6 : 0x2ecc71;
         return interaction.reply({
           embeds: [new EmbedBuilder().setColor(modeColor).setTitle("💬 تم تغيير أسلوب الكلام")
@@ -2542,6 +2562,19 @@ client.on("interactionCreate", async (interaction) => {
           const dictNames = Object.keys(allDicts).filter(k => Object.keys(allDicts[k]).length > 1);
           return interaction.reply({ content: `📂 **القواامس المتوفرة:** ${dictNames.join(", ") || "مفيش"}` });
         }
+      }
+
+      if (cmd === "رول-ريأكشن") {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles))
+          return interaction.reply({ content: "❌ محتاج صلاحية **إدارة الأدوار** عشان تستخدم الأمر ده!", ephemeral: true });
+        const role    = interaction.options.getRole("رول");
+        const emoji   = interaction.options.getString("إيموجي").trim();
+        const msgText = interaction.options.getString("رسالة") || `👇 اعمل ريأكشن بـ ${emoji} عشان تاخد رول **${role.name}**!`;
+        const sentMsg = await channel.send(msgText);
+        await sentMsg.react(emoji).catch(() => {});
+        reactionRoles[sentMsg.id] = { emoji, roleId: role.id, guildId: interaction.guildId };
+        saveReactionRoles();
+        return interaction.reply({ content: `✅ تم! الرسالة اتبعتت — اللي يعمل ريأكشن بـ ${emoji} هياخد رول **${role.name}** تلقائياً.`, ephemeral: true });
       }
 
       if (cmd === "مسح") {
@@ -4542,6 +4575,35 @@ client.on("warn", (info) => {
   if (canSendError("client:warn:" + info.slice(0, 40))) {
     console.warn("⚠️ [Discord]", info);
   }
+});
+
+// ─── Reaction Roles Events ────────────────────────────────────────
+client.on("messageReactionAdd", async (reaction, user) => {
+  if (user.bot) return;
+  if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
+  const data = reactionRoles[reaction.message.id];
+  if (!data) return;
+  const emojiKey = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
+  if (emojiKey !== data.emoji && reaction.emoji.name !== data.emoji) return;
+  const guild = await client.guilds.fetch(data.guildId).catch(() => null);
+  if (!guild) return;
+  const member = await guild.members.fetch(user.id).catch(() => null);
+  if (!member) return;
+  await member.roles.add(data.roleId).catch(() => {});
+});
+
+client.on("messageReactionRemove", async (reaction, user) => {
+  if (user.bot) return;
+  if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
+  const data = reactionRoles[reaction.message.id];
+  if (!data) return;
+  const emojiKey = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
+  if (emojiKey !== data.emoji && reaction.emoji.name !== data.emoji) return;
+  const guild = await client.guilds.fetch(data.guildId).catch(() => null);
+  if (!guild) return;
+  const member = await guild.members.fetch(user.id).catch(() => null);
+  if (!member) return;
+  await member.roles.remove(data.roleId).catch(() => {});
 });
 
 client.login(process.env.DISCORD_TOKEN);
