@@ -132,40 +132,64 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner, gemin
 
   // ── تصعيد العقوبة ──────────────────────────────────────────
   let action = "warn";
-  if (warnCount >= 3) {
+
+  if (warnCount >= 5) {
+    // تحذير 5+ → باند تلقائي
+    if (member && member.bannable) {
+      try {
+        await member.ban({ reason: `Auto-Mod: تحذير ${warnCount} — ${reason}`, deleteMessageSeconds: 86400 });
+        action = "ban";
+      } catch { action = "owner_report"; }
+    } else {
+      action = "owner_report";
+    }
+    await notifyOwner(user.id, member, reason, warnCount).catch(() => {});
+  } else if (warnCount === 4) {
+    // تحذير 4 → طرد تلقائي
+    if (member && member.kickable) {
+      try {
+        await member.kick(`Auto-Mod: تحذير ${warnCount} — ${reason}`);
+        action = "kick";
+      } catch { action = "owner_report"; }
+    } else {
+      action = "owner_report";
+    }
+    await notifyOwner(user.id, member, reason, warnCount).catch(() => {});
+  } else if (warnCount === 3) {
+    // تحذير 3 → إسكات ساعتين
     if (member && member.manageable) {
       try {
         await member.timeout(TIMEOUT_DURATION_MS, `Auto-Mod: تحذير ${warnCount} — ${reason}`);
         action = "timeout";
       } catch { action = "warn"; }
     }
-    if (warnCount > 3) {
-      action = "owner_report";
-      await notifyOwner(user.id, member, reason, warnCount).catch(() => {});
-    }
   }
 
   const actionText =
+    action === "ban"          ? "🔨 **اتعمل باند تلقائياً!**" :
+    action === "kick"         ? "👢 **اتطرد تلقائياً من السيرفر!**" :
     action === "timeout"      ? "⏰ وأتأسكت لمدة **ساعتين**!" :
-    action === "owner_report" ? "⏰ أتأسكت وبلغت الإدارة!" :
-                                "لو كررت هتتعاقب أكتر!";
+    action === "owner_report" ? "🚨 بلغت الإدارة عشان تقرر!" :
+                                "⚠️ لو كررت هتتعاقب أكتر!";
 
   const warnMsg = await msg.channel
-    .send(`⚠️ ${user} | **تحذير ${warnCount}/3** — السبب: ${reason}\n${actionText}`)
+    .send(`⚠️ ${user} | **تحذير ${warnCount}** — السبب: ${reason}\n${actionText}`)
     .catch(() => null);
   if (warnMsg) setTimeout(() => warnMsg.delete().catch(() => {}), 8000);
 
-  user.send([
-    `⚠️ **تحذير تلقائي — زنجي Bot**`,
-    `السيرفر: **${msg.guild.name}**`,
-    `السبب: **${reason}**`,
-    `تحذيراتك: **${warnCount}/3**`,
-    action === "timeout"
-      ? "\n🔇 تم إسكاتك **ساعتين**. لو عدت تاني الإدارة هتقرر مصيرك."
-      : action === "owner_report"
-      ? "\n🚨 تجاوزت الحد! الإدارة هتقرر مصيرك."
-      : "\n📌 الرسالة اتحذفت. تحذير تاني → إسكات ساعتين، وتالت → قرار الإدارة.",
-  ].join("\n")).catch(() => {});
+  if (action !== "ban") {
+    user.send([
+      `⚠️ **تحذير تلقائي — زنجي Bot**`,
+      `السيرفر: **${msg.guild.name}**`,
+      `السبب: **${reason}**`,
+      `تحذيراتك: **${warnCount}**`,
+      action === "kick"
+        ? "\n👢 اتطردت من السيرفر. لو رجعت وكررت → باند نهائي."
+        : action === "timeout"
+        ? "\n🔇 تم إسكاتك **ساعتين**. تحذير 4 → طرد، وتحذير 5 → باند نهائي."
+        : "\n📌 الرسالة اتحذفت. تحذير 3 → إسكات ساعتين، 4 → طرد، 5 → باند نهائي.",
+    ].join("\n")).catch(() => {});
+  }
 
   return {
     triggered: true,
