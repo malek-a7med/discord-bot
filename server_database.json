@@ -1,11 +1,11 @@
 {
   "users": {
     "954816748140503090": {
-      "xp": 1840,
+      "xp": 1880,
       "level": 6,
       "coins": 1e+41,
       "lastDaily": 1780602154196,
-      "_lastXpMsg": "1519479153777447064",
+      "_lastXpMsg": "1519482485795323904",
       "_lastAiMsg": "1516940874049781920",
       "bankCoins": 0,
       "lastBankInterest": 0
@@ -38,11 +38,11 @@
       "_lastXpMsg": "1518110764383211673"
     },
     "1474551986413109298": {
-      "xp": 690,
-      "level": 3,
+      "xp": 890,
+      "level": 4,
       "coins": 0,
       "lastDaily": null,
-      "_lastXpMsg": "1519479124047958056",
+      "_lastXpMsg": "1519483200462651392",
       "warnings": [
         {
           "reason": "بناءً على طلب مالك",
@@ -64,13 +64,15 @@
       "_lastXpMsg": "1518015149670404096"
     },
     "594250288282730551": {
-      "xp": 65,
+      "xp": 70,
       "level": 1,
       "coins": 0,
       "lastDaily": null,
       "warnings": [],
       "timeouts": [],
-      "_lastXpMsg": "1517322817530630285"
+      "_lastXpMsg": "1519482672425209956",
+      "bankCoins": 0,
+      "lastBankInterest": 0
     },
     "1431030814442782770": {
       "xp": 475,
@@ -118,13 +120,15 @@
       "timeouts": []
     },
     "1479827771730428084": {
-      "xp": 160,
-      "level": 1,
+      "xp": 205,
+      "level": 2,
       "coins": 0,
       "lastDaily": null,
       "warnings": [],
       "timeouts": [],
-      "_lastXpMsg": "1517538708432093235"
+      "_lastXpMsg": "1519481738286465305",
+      "bankCoins": 0,
+      "lastBankInterest": 0
     },
     "1113110787792326756": {
       "xp": 15,
@@ -251,7 +255,9 @@
   "settings": {
     "backupChannelId": "1486495986263261385"
   },
-  "aiMessageClaims": {},
+  "aiMessageClaims": {
+    "1519482685209186374": 1782343302797
+  },
   "lifeProfiles": {
     "1485896430957625367": {
       "954816748140503090": {
