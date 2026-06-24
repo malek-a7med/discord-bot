@@ -27,7 +27,7 @@ import {
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
-import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleRPSButton, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS } from "./commands/games.js";
+import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleRPSButton, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS, rouletteGames, mafiaGames, tttGames } from "./commands/games.js";
 import { bankLifeCommand, handleBankLifeCommand, handleBankLifeButton } from "./commands/bank-life.js";
 import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap } from "./commands/bank-luck.js";
 import { shopCommand, myAbilitiesCommand, handleShopCommand, handleMyAbilitiesCommand, handleShopButton } from "./commands/game-shop.js";
@@ -3303,12 +3303,27 @@ client.on("interactionCreate", async (interaction) => {
           if (memeChannelMap.has(cid))     { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
           if (rpsChannelMap.has(cid))      { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
           if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
-          // ✅ FIX: lifeChannelMap/lifeGames اتشالوا — لعبة الحياة الجديدة نظام
-          //   مستمر مالوش "جلسة في روم" تتلغى أصلاً
           if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
           if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
           await interaction.message.delete().catch(() => {});
           return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", flags: 64 });
+        }
+
+        if (gid === "ghub_closeall") {
+          if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !config.isOwner(interaction.user.id))
+            return interaction.reply({ content: "❌ الزرار ده للإدارة بس!", ephemeral: true });
+          let count = 0;
+          channelGames.forEach((_, cid)    => { channelGames.delete(cid); count++; });
+          rouletteGames.forEach((_, gid2)  => { rouletteGames.delete(gid2); });
+          mafiaGames.forEach((_, gid2)     => { mafiaGames.delete(gid2); });
+          tttGames.forEach((_, gid2)       => { tttGames.delete(gid2); });
+          rpsChannelMap.forEach((rId, cid) => { rpsGames.delete(rId); rpsChannelMap.delete(cid); count++; });
+          rpsBasicChannelMap.forEach((rId, cid) => { rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); count++; });
+          garticChannelMap.forEach((gId, cid)   => { garticGames.delete(gId); garticChannelMap.delete(cid); count++; });
+          memeChannelMap.forEach((mId, cid)     => { memeGames.delete(mId);   memeChannelMap.delete(cid); count++; });
+          luckChannelMap.forEach((lId, cid)     => { luckGames.delete(lId);   luckChannelMap.delete(cid); count++; });
+          quizChannelMap.clear();
+          return interaction.reply({ content: `🛑 تم إقفال **${count}** لعبة من كل الرومات!`, ephemeral: true });
         }
       }
 
@@ -4576,6 +4591,25 @@ client.on("warn", (info) => {
     console.warn("⚠️ [Discord]", info);
   }
 });
+
+// ─── Auto-Close Games بعد 3 دقايق ────────────────────────────────
+const AUTO_CLOSE_MS = 3 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  const expired = (map) => [...map.entries()].filter(([, s]) => s._ts && (now - s._ts) > AUTO_CLOSE_MS).map(([id]) => id);
+
+  expired(rouletteGames).forEach(id => rouletteGames.delete(id));
+  expired(mafiaGames).forEach(id => mafiaGames.delete(id));
+  expired(tttGames).forEach(id => tttGames.delete(id));
+  expired(rpsGames).forEach(id => { const ch = [...rpsChannelMap.entries()].find(([,v])=>v===id)?.[0]; rpsGames.delete(id); if(ch) rpsChannelMap.delete(ch); });
+  expired(rpsBasicGames).forEach(id => { const ch = [...rpsBasicChannelMap.entries()].find(([,v])=>v===id)?.[0]; rpsBasicGames.delete(id); if(ch) rpsBasicChannelMap.delete(ch); });
+
+  // مسح channelGames لأي gameId مش موجود في أي Map
+  channelGames.forEach((gid2, cid) => {
+    if (!rouletteGames.has(gid2) && !mafiaGames.has(gid2) && !tttGames.has(gid2))
+      channelGames.delete(cid);
+  });
+}, 30_000);
 
 // ─── Reaction Roles Events ────────────────────────────────────────
 client.on("messageReactionAdd", async (reaction, user) => {

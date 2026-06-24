@@ -8,9 +8,9 @@ import {
 } from "discord.js";
 
 // ─── حالة الألعاب في الذاكرة ─────────────────────────────────
-const rouletteGames = new Map(); // gameId → state
-const mafiaGames    = new Map(); // gameId → state
-const tttGames      = new Map(); // gameId → state
+export const rouletteGames = new Map(); // gameId → state
+export const mafiaGames    = new Map(); // gameId → state
+export const tttGames      = new Map(); // gameId → state
 export const channelGames  = new Map(); // channelId → gameId (لمنع لعبتين في روم واحد)
 const tttProcessing = new Set(); // gameId — قفل لمنع المعالجة المتزامنة في XO
 
@@ -52,6 +52,7 @@ export async function handleRPSCommand(interaction) {
     isOpen: isButton || !opponent,
   };
   rpsGames.set(gameId, state);
+  state._ts = Date.now();
   rpsChannelMap.set(channelId, gameId);
 
   const embed = new EmbedBuilder()
@@ -185,6 +186,7 @@ export async function handleRouletteCommand(interaction, db) {
   };
 
   rouletteGames.set(gameId, state);
+  state._ts = Date.now();
   channelGames.set(channelId, gameId);
 
   const embed = buildRouletteEmbed(state, interaction.guild);
@@ -478,6 +480,7 @@ export async function handleMafiaCommand(interaction, db) {
   };
 
   mafiaGames.set(gameId, state);
+  state._ts = Date.now();
   channelGames.set(channelId, gameId);
 
   const embed = buildMafiaLobbyEmbed(state);
@@ -986,6 +989,7 @@ export async function handleTTTCommand(interaction, db, forceAI = false) {
   };
 
   tttGames.set(gameId, state);
+  state._ts = Date.now();
   channelGames.set(interaction.channel.id, gameId);
 
   // ── لعبة ضد AI — اختار الصعوبة الأول ───────────────────────
@@ -1510,6 +1514,7 @@ export async function handleRPSBasicCommand(interaction) {
     isOpen: isButton || !opponent,
   };
   rpsBasicGames.set(gameId, state);
+  state._ts = Date.now();
   rpsBasicChannelMap.set(channelId, gameId);
 
   const embed = new EmbedBuilder()

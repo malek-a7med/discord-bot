@@ -104,7 +104,8 @@ function buildHubRows() {
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId("ghub_bankluck").setLabel("🎰 بنك الحظ المصري").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء الروم").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId("ghub_closeall").setLabel("🛑 إقفال كل الألعاب").setStyle(ButtonStyle.Danger),
     ),
   ];
 }
