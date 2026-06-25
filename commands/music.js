@@ -76,12 +76,29 @@ async function spotifySearch(query) {
   });
 }
 
-// كشف نوع الرابط
+// كشف نوع الإدخال بدقة (رابط أغنية / بلاي ليست / البوم / بحث نصي)
 function detectSourceType(query) {
-  if (/open\.spotify\.com/i.test(query)) return 'spotify';
-  if (/youtube\.com|youtu\.be/i.test(query)) return 'youtube';
-  if (/soundcloud\.com/i.test(query)) return 'soundcloud';
+  const q = query.trim();
+
+  // Spotify
+  if (/open\.spotify\.com\/(playlist|album)/i.test(q)) return 'spotify_playlist';
+  if (/open\.spotify\.com\/track/i.test(q))            return 'spotify';
+  if (/open\.spotify\.com/i.test(q))                   return 'spotify';       // أي رابط سبوتيفاي تاني
+
+  // YouTube
+  if (/youtube\.com\/playlist|list=/i.test(q))         return 'youtube_playlist';
+  if (/youtube\.com|youtu\.be/i.test(q))               return 'youtube';
+
+  // SoundCloud
+  if (/soundcloud\.com\/.+\/sets\//i.test(q))          return 'soundcloud_playlist';
+  if (/soundcloud\.com/i.test(q))                      return 'soundcloud';
+
   return 'text';
+}
+
+// هل الـ sourceType رابط مباشر (مش بحث نصي)؟
+function isDirectUrl(sourceType) {
+  return sourceType !== 'text';
 }
 
 // نسخة واحدة من DisTube بيتم ربطها بالكلاينت عند init
@@ -94,7 +111,7 @@ export function initMusicSystem(client) {
   distube = new DisTube(client, {
     emitNewSongOnly: true,
     emitAddSongWhenCreatingQueue: false,
-    emitAddListWhenCreatingQueue: false,
+    emitAddListWhenCreatingQueue: true,
     plugins: [
       new SpotifyPlugin({
         api: {
@@ -375,24 +392,26 @@ export async function handlePlay(interaction) {
 
     // رسالة الانتظار حسب نوع المصدر
     const loadingMsgs = {
-      spotify:    '🎵 جاري التحميل من Spotify...',
-      youtube:    '▶️ جاري التحميل من YouTube...',
-      soundcloud: '🔊 جاري التحميل من SoundCloud...',
-      text:       '🎵 جاري البحث على Spotify...',
+      spotify_playlist: '🎵 جاري تحميل البلاي ليست من Spotify...',
+      spotify:          '🎵 جاري التحميل من Spotify...',
+      youtube_playlist: '▶️ جاري تحميل البلاي ليست من YouTube...',
+      youtube:          '▶️ جاري التحميل من YouTube...',
+      soundcloud_playlist: '🔊 جاري تحميل البلاي ليست من SoundCloud...',
+      soundcloud:       '🔊 جاري التحميل من SoundCloud...',
+      text:             '🎵 جاري البحث على Spotify...',
     };
-    await interaction.editReply({ content: loadingMsgs[sourceType] });
+    await interaction.editReply({ content: loadingMsgs[sourceType] || '🔍 جاري التحميل...' });
 
-    // محاولة التشغيل مع fallback للبحث النصي
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
 
-    if (sourceType !== 'text') {
-      // رابط مباشر — شغّله مباشرة
+    if (isDirectUrl(sourceType)) {
+      // ─── رابط مباشر: أغنية أو بلاي ليست أو ألبوم — DisTube بيتعامل مع الكل ───
       await distube.play(voiceChannel, query, playOptions);
     } else {
-      // بحث نصي — سبوتيفاي الأساس، ثم YouTube، ثم SoundCloud
+      // ─── بحث نصي — سبوتيفاي الأساس، fallback لـ YouTube ثم SoundCloud ───
       let played = false;
 
-      // 1️⃣ محاولة Spotify (بحث نصي → رابط Spotify → DisTube)
+      // 1️⃣ Spotify (بحث نصي → رابط Spotify → DisTube)
       try {
         const spotifyUrl = await spotifySearch(query);
         if (spotifyUrl) {
@@ -403,7 +422,7 @@ export async function handlePlay(interaction) {
         console.warn('⚠️ [Music] Spotify فشل، بيجرب YouTube...', spErr.message);
       }
 
-      // 2️⃣ fallback إلى YouTube
+      // 2️⃣ YouTube fallback
       if (!played) {
         try {
           await interaction.editReply({ content: '▶️ مش لاقيها على Spotify، بيجرب YouTube...' });
@@ -414,11 +433,11 @@ export async function handlePlay(interaction) {
         }
       }
 
-      // 3️⃣ fallback إلى SoundCloud
+      // 3️⃣ SoundCloud fallback
       if (!played) {
         try {
           await interaction.editReply({ content: '🔊 بيجرب SoundCloud...' });
-          await distube.play(voiceChannel, `scsearch:${query}`, { ...playOptions });
+          await distube.play(voiceChannel, `scsearch:${query}`, playOptions);
           played = true;
         } catch (scErr) {
           console.warn('⚠️ [Music] SoundCloud فشل:', scErr.message);
@@ -432,7 +451,6 @@ export async function handlePlay(interaction) {
       }
     }
 
-    // لو الرد مش اتعدّل بعد التشغيل، نخليه يختفي
     await interaction.editReply({ content: `✅ تم!` }).catch(() => {});
   } catch (e) {
     console.error('❌ [Music] handlePlay:', e.message);
