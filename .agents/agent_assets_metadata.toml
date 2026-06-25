@@ -18,3 +18,9 @@ id = "ih4j-OWvE-wb8HS9lt01i"
 uri = "file://ZANGI_BOT_GUIDE.md"
 type = "text"
 title = "شرح كامل — بوت زنجي"
+
+[[outputs]]
+id = "ABJRw0hhitfhVmOaZzzkK"
+uri = "file://تقرير-البوت.md"
+type = "text"
+title = "تقرير شامل — بوت زنجي"
