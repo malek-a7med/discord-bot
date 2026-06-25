@@ -3466,6 +3466,7 @@ client.on("interactionCreate", async (interaction) => {
         if (id === "music_stop")       return await handleStop(interaction);
         if (id === "music_nowplaying") return await handleNowPlaying(interaction);
         if (id === "music_repeat")     return await handleRepeat(interaction);
+        if (id === "music_lyrics")     return await handleLyrics(interaction);
         if (id === "music_vol_up" || id === "music_vol_down") {
           const dt = musicHandler.getDistube();
           const q = dt?.getQueue(interaction.guildId);

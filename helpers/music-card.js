@@ -189,6 +189,7 @@ function buildMusicRows(song) {
     new ButtonBuilder().setCustomId('music_resume').setLabel('▶️ كمل').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('music_skip').setLabel('⏭️ التالية').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_stop').setLabel('⏹️ اطلع').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('music_lyrics').setLabel('📝 كلمات').setStyle(ButtonStyle.Secondary),
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
