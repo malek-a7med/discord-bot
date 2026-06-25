@@ -9,72 +9,6 @@ import { YtDlpPlugin } from '@distube/yt-dlp';
 import { SoundCloudPlugin } from '@distube/soundcloud';
 import { SpotifyPlugin } from '@distube/spotify';
 import { sendMusicCard } from '../helpers/music-card.js';
-import https from 'https';
-
-// ─── Spotify API: بحث نصي عشان نجيب رابط الأغنية ──────────────
-let _spotifyToken = null;
-let _spotifyTokenExp = 0;
-
-async function getSpotifyToken() {
-  if (_spotifyToken && Date.now() < _spotifyTokenExp) return _spotifyToken;
-  const id = process.env.SPOTIFY_CLIENT_ID;
-  const secret = process.env.SPOTIFY_CLIENT_SECRET;
-  if (!id || !secret) return null;
-  const creds = Buffer.from(`${id}:${secret}`).toString('base64');
-  return new Promise((resolve) => {
-    const body = 'grant_type=client_credentials';
-    const req = https.request({
-      hostname: 'accounts.spotify.com',
-      path: '/api/token',
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${creds}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': body.length,
-      },
-    }, (res) => {
-      let data = '';
-      res.on('data', d => data += d);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          _spotifyToken = json.access_token;
-          _spotifyTokenExp = Date.now() + (json.expires_in - 60) * 1000;
-          resolve(_spotifyToken);
-        } catch { resolve(null); }
-      });
-    });
-    req.on('error', () => resolve(null));
-    req.write(body);
-    req.end();
-  });
-}
-
-async function spotifySearch(query) {
-  const token = await getSpotifyToken();
-  if (!token) return null;
-  const q = encodeURIComponent(query);
-  return new Promise((resolve) => {
-    const req = https.request({
-      hostname: 'api.spotify.com',
-      path: `/v1/search?q=${q}&type=track&limit=1`,
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` },
-    }, (res) => {
-      let data = '';
-      res.on('data', d => data += d);
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          const track = json?.tracks?.items?.[0];
-          resolve(track ? track.external_urls.spotify : null);
-        } catch { resolve(null); }
-      });
-    });
-    req.on('error', () => resolve(null));
-    req.end();
-  });
-}
 
 // كشف نوع الإدخال بدقة (رابط أغنية / بلاي ليست / البوم / بحث نصي)
 function detectSourceType(query) {
@@ -113,12 +47,7 @@ export function initMusicSystem(client) {
     emitAddSongWhenCreatingQueue: false,
     emitAddListWhenCreatingQueue: true,
     plugins: [
-      new SpotifyPlugin({
-        api: {
-          clientId: process.env.SPOTIFY_CLIENT_ID,
-          clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-        },
-      }),
+      new SpotifyPlugin(),
       new SoundCloudPlugin(),
       new YtDlpPlugin({ update: false }),
     ],
@@ -398,7 +327,7 @@ export async function handlePlay(interaction) {
       youtube:          '▶️ جاري التحميل من YouTube...',
       soundcloud_playlist: '🔊 جاري تحميل البلاي ليست من SoundCloud...',
       soundcloud:       '🔊 جاري التحميل من SoundCloud...',
-      text:             '🎵 جاري البحث على Spotify...',
+      text:             '🔍 جاري البحث...',
     };
     await interaction.editReply({ content: loadingMsgs[sourceType] || '🔍 جاري التحميل...' });
 
@@ -408,32 +337,18 @@ export async function handlePlay(interaction) {
       // ─── رابط مباشر: أغنية أو بلاي ليست أو ألبوم — DisTube بيتعامل مع الكل ───
       await distube.play(voiceChannel, query, playOptions);
     } else {
-      // ─── بحث نصي — سبوتيفاي الأساس، fallback لـ YouTube ثم SoundCloud ───
+      // ─── بحث نصي — YouTube أولاً (yt-dlp)، fallback لـ SoundCloud ───
       let played = false;
 
-      // 1️⃣ Spotify (بحث نصي → رابط Spotify → DisTube)
+      // 1️⃣ YouTube عبر yt-dlp
       try {
-        const spotifyUrl = await spotifySearch(query);
-        if (spotifyUrl) {
-          await distube.play(voiceChannel, spotifyUrl, playOptions);
-          played = true;
-        }
-      } catch (spErr) {
-        console.warn('⚠️ [Music] Spotify فشل، بيجرب YouTube...', spErr.message);
+        await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
+        played = true;
+      } catch (ytErr) {
+        console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
       }
 
-      // 2️⃣ YouTube fallback
-      if (!played) {
-        try {
-          await interaction.editReply({ content: '▶️ مش لاقيها على Spotify، بيجرب YouTube...' });
-          await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
-          played = true;
-        } catch (ytErr) {
-          console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
-        }
-      }
-
-      // 3️⃣ SoundCloud fallback
+      // 2️⃣ SoundCloud fallback
       if (!played) {
         try {
           await interaction.editReply({ content: '🔊 بيجرب SoundCloud...' });
@@ -487,22 +402,29 @@ export async function handleSkip(interaction) {
 export async function handleStop(interaction) {
   try {
     if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
-    const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
 
-    // لو الأمر جاي من زر الداش بورد — نمسح الرسالة نفسها
     const isButton = interaction.isButton?.();
+
+    // لازم نعمل acknowledge للـ interaction الأول قبل أي حاجة تانية
     if (isButton) {
-      await interaction.message?.delete().catch(() => {});
+      await interaction.deferUpdate().catch(() => {});
     }
 
-    // مسح رسالة الداش بورد المخزنة على القائمة (لو مش نفس الرسالة)
-    if (q.currentMessage && q.currentMessage.id !== interaction.message?.id) {
+    const q = distube.getQueue(interaction.guildId);
+
+    // امسح رسالة الداش بورد (اللي عليها الأزرار)
+    const dashMsg = isButton ? interaction.message : q?.currentMessage;
+    if (dashMsg) {
+      await dashMsg.delete().catch(() => {});
+    }
+
+    // لو في currentMessage تانية غير رسالة الزرار، امسحها هي كمان
+    if (q?.currentMessage && q.currentMessage.id !== dashMsg?.id) {
       await q.currentMessage.delete().catch(() => {});
     }
-    q.currentMessage = null;
+    if (q) q.currentMessage = null;
 
-    await distube.stop(interaction.guildId);
+    if (q) await distube.stop(interaction.guildId);
 
     if (!isButton) {
       await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });
