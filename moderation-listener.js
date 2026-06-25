@@ -20,6 +20,8 @@ class ModerationListener {
 
   async scanMessage(message) {
     try {
+      if (!this.isEnabled()) return;
+
       // Ignore bot messages
       if (message.author.bot) return;
 
@@ -221,6 +223,7 @@ class ModerationListener {
 
   async scanGuildJoin(member) {
     try {
+      if (!this.isEnabled()) return;
       const guildId = member.guild.id;
       const now = Date.now();
       const key = `${guildId}-raid`;
@@ -288,7 +291,12 @@ class ModerationListener {
     }
   }
 
+  setEnabled(val) {
+    this._enabled = !!val;
+  }
+
   isEnabled() {
+    if (this._enabled === false) return false;
     return !!config.OWNER_ID && !!config.ADMIN_CHANNEL_ID;
   }
 }

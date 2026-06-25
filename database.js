@@ -331,6 +331,35 @@ class Database {
     return this.data.lifeProfiles[guildId];
   }
 
+  // ─── قائمة الباند ────────────────────────────────────────────
+  addBan(userId, reason, moderatorId = 'SYSTEM') {
+    if (!this.data.banList) this.data.banList = {};
+    this.data.banList[userId] = {
+      userId,
+      reason,
+      moderatorId,
+      timestamp: Date.now(),
+    };
+    this.save();
+  }
+
+  removeBan(userId) {
+    if (!this.data.banList) return false;
+    if (!this.data.banList[userId]) return false;
+    delete this.data.banList[userId];
+    this.save();
+    return true;
+  }
+
+  getBanList() {
+    if (!this.data.banList) this.data.banList = {};
+    return this.data.banList;
+  }
+
+  isBanned(userId) {
+    return !!(this.data.banList && this.data.banList[userId]);
+  }
+
   clearOldData(maxAge = 86400000) {
     // Clear spam tracking after 24 hours
     const now = Date.now();

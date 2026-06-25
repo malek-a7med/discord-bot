@@ -139,6 +139,7 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner, gemin
       try {
         await member.ban({ reason: `Auto-Mod: تحذير ${warnCount} — ${reason}`, deleteMessageSeconds: 86400 });
         action = "ban";
+        db.addBan(user.id, `Auto-Mod: تحذير ${warnCount} — ${reason}`, "AUTO_MOD");
       } catch { action = "owner_report"; }
     } else {
       action = "owner_report";

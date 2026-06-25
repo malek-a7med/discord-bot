@@ -590,6 +590,10 @@ const LEGACY_COMMANDS = [
       o.setName("حالة").setDescription("تشغيل أو إيقاف").setRequired(true)
         .addChoices({ name: "✅ تشغيل", value: "on" }, { name: "❌ إيقاف", value: "off" })
     ),
+  new SlashCommandBuilder()
+    .setName("قائمة-الباند")
+    .setDescription("🔨 عرض قائمة الأعضاء المتبندين [مشرف]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
   pollCommand,
   bankLifeCommand,
   bankLuckEgCommand.data,
@@ -2169,16 +2173,45 @@ client.on("interactionCreate", async (interaction) => {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         const state = interaction.options.getString("حالة");
         autoModEnabled = state === "on";
+        moderation.setEnabled(autoModEnabled);
         return interaction.reply({
           embeds: [new EmbedBuilder()
             .setColor(autoModEnabled ? 0x2ecc71 : 0xe74c3c)
             .setTitle(autoModEnabled ? "✅ Auto-Mod شغال" : "❌ Auto-Mod متوقف")
             .setDescription(
               autoModEnabled
-                ? "نظام Auto-Mod **شغال** دلوقتي — الرسايل المخالفة هتتحذف تلقائياً."
-                : "نظام Auto-Mod **متوقف** — مفيش رسايل هتتحذف تلقائياً."
+                ? "نظام Auto-Mod **شغال** دلوقتي — الرسايل المخالفة هتتحذف تلقائياً.\n🔒 الأنتي سبام والأنتي لينك والأنتي رايد كلهم **شغالين**."
+                : "نظام Auto-Mod **متوقف** — مفيش حاجة هتتعمل تلقائياً.\n🔓 تم إيقاف: مسح الرسايل، الحظر التلقائي، الباند، الطرد، الأنتي سبام، الأنتي لينك، الأنتي رايد — كل حاجة وقفت."
             ).setTimestamp()],
           ephemeral: true
+        });
+      }
+
+      if (cmd === "قائمة-الباند") {
+        if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
+          return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تشوف القايمة دي!", ephemeral: true });
+        }
+        const banList = db.getBanList();
+        const entries = Object.values(banList);
+        if (entries.length === 0) {
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("📋 قائمة الباند")
+              .setDescription("✅ القائمة فاضية — مفيش حد متبند دلوقتي.")
+              .setTimestamp()],
+            ephemeral: true,
+          });
+        }
+        const fields = entries.slice(0, 20).map((entry, i) => ({
+          name: `🔨 #${i + 1} — <@${entry.userId}>`,
+          value: `📋 **السبب:** ${entry.reason ?? "غير محدد"}\n🛡️ **بواسطة:** <@${entry.moderatorId ?? "مجهول"}>\n📅 <t:${Math.floor((entry.timestamp ?? Date.now()) / 1000)}:R>`,
+          inline: false,
+        }));
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle(`🔨 قائمة الباند (${entries.length} عضو)`)
+            .setDescription(entries.length > 20 ? `⚠️ بيظهر أول 20 فقط من إجمالي ${entries.length}` : null)
+            .addFields(fields)
+            .setTimestamp()],
+          ephemeral: true,
         });
       }
 
@@ -3436,6 +3469,7 @@ client.on("interactionCreate", async (interaction) => {
 
           if (action.type === "ban") {
             await modGuild.members.ban(action.targetId, { reason: action.reason });
+            db.addBan(action.targetId, action.reason, interaction.user.id);
             sendModLog("ban", interaction.user, action.targetId, action.reason).catch(() => {});
             return interaction.update({ embeds: [new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 تم التبنيد").setDescription(`تم تبنيد <@${action.targetId}> من السيرفر نهائياً\n📋 **السبب:** ${action.reason}`).setTimestamp()], components: [] });
           }
@@ -4218,6 +4252,7 @@ client.on("interactionCreate", async (interaction) => {
             if (days > 0) banOptions.deleteMessageSeconds = days * 24 * 60 * 60;
 
             await interaction.guild.bans.create(ld.userId, banOptions);
+            db.addBan(ld.userId, reason, interaction.user.id);
             await interaction.editReply({
               embeds: [new EmbedBuilder()
                 .setColor(0xe74c3c)
@@ -4301,6 +4336,7 @@ client.on("interactionCreate", async (interaction) => {
         if (interaction.customId === "dmmod_ban") {
           const reason = interaction.fields.getTextInputValue("dm_reason");
           await g.bans.create(member.user.id, { reason });
+          db.addBan(member.user.id, reason, interaction.user.id);
           return interaction.editReply({
             embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🔨 تم الحظر")
               .setDescription(`**${member.user.username}** اتحظر نهائياً\nالسبب: ${reason}`).setTimestamp()]
