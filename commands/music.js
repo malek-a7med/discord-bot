@@ -453,12 +453,19 @@ export async function handlePlay(interaction) {
 
     await interaction.editReply({ content: `✅ تم!` }).catch(() => {});
   } catch (e) {
-    console.error('❌ [Music] handlePlay:', e.message);
-    const isNotFound = /no result|not found|unavailable|private|blocked/i.test(e.message);
-    const msg = isNotFound
-      ? `❌ مش لاقي الأغنية دي!\n💡 جرب ترفق رابط مباشر من Spotify أو YouTube أو SoundCloud`
-      : `❌ ${e.message || 'حصل خطأ!'}`;
-    try { await interaction.editReply({ content: msg }); } catch { await interaction.reply({ content: msg, ephemeral: true }).catch(() => {}); }
+    const errMsg = e?.message || String(e) || 'خطأ مجهول';
+    console.error('❌ [Music] handlePlay error:', errMsg, e?.stack?.split('\n')[1] || '');
+
+    let msg;
+    if (/private|unavailable|blocked|age.?restricted/i.test(errMsg)) {
+      msg = `🔒 الأغنية/البلاي ليست دي مش متاحة (private أو blocked)`;
+    } else if (/no result|not found/i.test(errMsg)) {
+      msg = `❌ مش لاقي الأغنية دي!\n💡 جرب رابط مباشر من Spotify أو YouTube`;
+    } else {
+      msg = `❌ حصل خطأ: \`${errMsg.slice(0, 300)}\``;
+    }
+    try { await interaction.editReply({ content: msg }); }
+    catch { await interaction.reply({ content: msg, ephemeral: true }).catch(() => {}); }
   }
 }
 
