@@ -47,7 +47,11 @@ export function initMusicSystem(client) {
     emitAddSongWhenCreatingQueue: false,
     emitAddListWhenCreatingQueue: true,
     plugins: [
-      new SpotifyPlugin(),
+      new SpotifyPlugin(
+        process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET
+          ? { api: { clientId: process.env.SPOTIFY_CLIENT_ID, clientSecret: process.env.SPOTIFY_CLIENT_SECRET } }
+          : {}
+      ),
       new SoundCloudPlugin(),
       new YtDlpPlugin({ update: false }),
     ],
@@ -337,18 +341,30 @@ export async function handlePlay(interaction) {
       // ─── رابط مباشر: أغنية أو بلاي ليست أو ألبوم — DisTube بيتعامل مع الكل ───
       await distube.play(voiceChannel, query, playOptions);
     } else {
-      // ─── بحث نصي — YouTube أولاً (yt-dlp)، fallback لـ SoundCloud ───
+      // ─── بحث نصي — Spotify أولاً، YouTube fallback، SoundCloud آخر ───
       let played = false;
 
-      // 1️⃣ YouTube عبر yt-dlp
-      try {
-        await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
-        played = true;
-      } catch (ytErr) {
-        console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
+      // 1️⃣ Spotify عبر SpotifyPlugin (spsearch:)
+      if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
+        try {
+          await distube.play(voiceChannel, `spsearch:${query}`, playOptions);
+          played = true;
+        } catch (spErr) {
+          console.warn('⚠️ [Music] Spotify فشل، بيجرب YouTube...', spErr.message);
+        }
       }
 
-      // 2️⃣ SoundCloud fallback
+      // 2️⃣ YouTube عبر yt-dlp
+      if (!played) {
+        try {
+          await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
+          played = true;
+        } catch (ytErr) {
+          console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
+        }
+      }
+
+      // 3️⃣ SoundCloud fallback أخير
       if (!played) {
         try {
           await interaction.editReply({ content: '🔊 بيجرب SoundCloud...' });

@@ -72,7 +72,6 @@ import {
   entersState,
   VoiceConnectionDisconnectReason,
 } from "@discordjs/voice";
-import playdl from "play-dl";
 import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, removeKey, setActiveKeyIndex, resetExhaustedKeys } from "./helpers/gemini-keys.js";
 import { getRanks, addRank, removeRank, resetRanks } from "./helpers/rank-roles.js";
 import fs from "fs";
