@@ -133,9 +133,39 @@ async function runYtDlp(args) {
   throw new Error(`yt-dlp مش متثبت أو مش قابل للتشغيل. شغّل: python3 -m pip install -U yt-dlp --user (${lastError?.message || 'ENOENT'})`);
 }
 
+async function resolveYoutubeUrlFromWeb(query) {
+  const searchUrl = new URL('https://www.youtube.com/results');
+  searchUrl.searchParams.set('search_query', query);
+
+  const res = await fetch(searchUrl, {
+    headers: {
+      'user-agent': 'Mozilla/5.0 (compatible; ZangiBot/1.0; +https://discord.com)',
+      'accept': 'text/html,application/xhtml+xml',
+      'accept-language': 'en-US,en;q=0.9,ar;q=0.8',
+    },
+  });
+  if (!res.ok) throw new Error(`YouTube search رجّع ${res.status}`);
+
+  const html = await res.text();
+  const matches = [...html.matchAll(/"videoId":"([a-zA-Z0-9_-]{11})"/g)]
+    .map(m => m[1])
+    .filter(Boolean);
+  const videoId = matches.find((id, i) => matches.indexOf(id) === i);
+  if (!videoId) throw new Error('YouTube search مرجعش فيديو واضح');
+
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
 async function resolveYoutubeUrl(query) {
   const safeQuery = String(query || '').replace(/\s+/g, ' ').trim();
   if (!safeQuery) throw new Error('مفيش كلمات بحث صالحة للتشغيل');
+
+  try {
+    return await resolveYoutubeUrlFromWeb(safeQuery);
+  } catch (webErr) {
+    console.warn('⚠️ [Music] YouTube web search فشل، هنجرب yt-dlp:', webErr.message);
+  }
+
   const output = await runYtDlp([
     '--no-playlist', '--default-search', 'ytsearch1',
     '--print', 'webpage_url',
