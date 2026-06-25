@@ -594,6 +594,16 @@ const LEGACY_COMMANDS = [
     .setName("قائمة-الباند")
     .setDescription("🔨 عرض قائمة الأعضاء المتبندين [مشرف]")
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+  new SlashCommandBuilder()
+    .setName("رفع-باند")
+    .setDescription("🔓 رفع الحظر عن عضو وإرجاعه للسيرفر [مشرف]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+    .addStringOption(o =>
+      o.setName("id").setDescription("الـ ID بتاع العضو").setRequired(true)
+    )
+    .addStringOption(o =>
+      o.setName("سبب").setDescription("سبب رفع الحظر (اختياري)")
+    ),
   pollCommand,
   bankLifeCommand,
   bankLuckEgCommand.data,
@@ -629,6 +639,7 @@ function validateLatestFeatures(allCommands) {
       "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","حياة","بنك-الحظ-مصري",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
+      "قائمة-الباند","رفع-باند",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -2212,6 +2223,44 @@ client.on("interactionCreate", async (interaction) => {
             .addFields(fields)
             .setTimestamp()],
           ephemeral: true,
+        });
+      }
+
+      if (cmd === "رفع-باند") {
+        if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
+          return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تستخدم الأمر ده!", ephemeral: true });
+        }
+        const targetId = interaction.options.getString("id")?.trim();
+        const reason   = interaction.options.getString("سبب") ?? "مش محدد";
+
+        if (!/^\d{17,20}$/.test(targetId)) {
+          return interaction.reply({ content: "❌ الـ ID مش صح! لازم يكون أرقام بس (17-20 رقم).", ephemeral: true });
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        try {
+          await guild.bans.remove(targetId, reason);
+        } catch (err) {
+          if (err.code === 10026) {
+            return interaction.editReply({ content: "❌ العضو ده مش متبند أصلاً على ديسكورد!" });
+          }
+          return interaction.editReply({ content: `❌ فشل رفع الباند: ${err.message}` });
+        }
+
+        const wasInList = db.removeBan(targetId);
+
+        return interaction.editReply({
+          embeds: [new EmbedBuilder()
+            .setColor(0x2ecc71)
+            .setTitle("🔓 تم رفع الحظر")
+            .addFields(
+              { name: "👤 العضو",      value: `<@${targetId}> (\`${targetId}\`)`, inline: true },
+              { name: "📋 السبب",      value: reason,                              inline: true },
+              { name: "🛡️ بواسطة",   value: `<@${user.id}>`,                     inline: true },
+              { name: "📋 القائمة",    value: wasInList ? "✅ اتشال من قائمة الباند" : "ℹ️ مكانش في قائمة الباند المحلية", inline: false },
+            )
+            .setTimestamp()],
         });
       }
 
