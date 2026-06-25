@@ -3473,6 +3473,27 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     try {
 
+      // ─── أزرار التحكم في الموسيقى ────────────────────────────────
+      if (interaction.customId.startsWith("music_")) {
+        const { handleSkip, handlePause, handleResume, handleStop, handleNowPlaying, musicHandler: mhInst } = await import("./commands/music.js");
+        const id = interaction.customId;
+        if (id === "music_pause")      return await handlePause(interaction);
+        if (id === "music_resume")     return await handleResume(interaction);
+        if (id === "music_skip")       return await handleSkip(interaction);
+        if (id === "music_stop")       return await handleStop(interaction);
+        if (id === "music_nowplaying") return await handleNowPlaying(interaction);
+        if (id === "music_vol_up" || id === "music_vol_down") {
+          await interaction.deferReply({ ephemeral: true });
+          const queue = mhInst?.getQueue?.(interaction.guildId);
+          if (!queue) return interaction.editReply({ content: '❌ مفيش موسيقى شغالة!' });
+          const current = Math.round((queue.volume || 0.5) * 100);
+          const next = id === "music_vol_up" ? Math.min(current + 10, 100) : Math.max(current - 10, 0);
+          mhInst.setVolume(interaction.guildId, next / 100);
+          return interaction.editReply({ content: `🔊 الصوت: **${next}%**` });
+        }
+        return;
+      }
+
       // ─── أزرار الألعاب الكلاسيكية ────────────────────────────────
       if (interaction.customId.startsWith("rlt_") ||
           interaction.customId.startsWith("maf_") ||

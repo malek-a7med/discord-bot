@@ -12,6 +12,8 @@ import { writeFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'fs
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { MusicStreamError, VoiceChannelError } from '../errors.js';
+import { generateMusicCard } from './music-card.js';
+import { AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
 const YTDLP_PATHS = [
   '/home/runner/workspace/.pythonlibs/bin/yt-dlp',
@@ -779,41 +781,38 @@ class MusicHandler {
         queue.isPlaying = true;
         this._resetSkipCounter(guildId); // reset لأن الأغنية نجحت
 
-        // Notify channel
+        // Notify channel with music card + control buttons
         if (queue.textChannel) {
-          const embed = {
-            embeds: [
-              {
-                title: '🎵 شغلت أغنيتك',
-                description: `**${song.title}**${song.artist ? `\n👤 ${song.artist}` : ''}`,
-                fields: [
-                  {
-                    name: 'المدة',
-                    value: this.formatDuration(song.duration),
-                    inline: true
-                  },
-                  {
-                    name: 'طلب بواسطة',
-                    value: song.requestedBy || 'Unknown',
-                    inline: true
-                  },
-                  {
-                    name: 'المنصة',
-                    value: this.getPlatformEmoji(songPlatform),
-                    inline: true
-                  },
-                  {
-                    name: 'في القائمة',
-                    value: String(queue.songs.length),
-                    inline: true
-                  }
-                ],
-                color: 3447003
-              }
-            ]
-          };
-
-          queue.textChannel.send(embed).catch(() => {});
+          try {
+            const cardBuf = await generateMusicCard(song, 0);
+            const row1 = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId('music_pause').setLabel('⏸ إيقاف').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId('music_resume').setLabel('▶️ استئناف').setStyle(ButtonStyle.Success),
+              new ButtonBuilder().setCustomId('music_skip').setLabel('⏭ تخطي').setStyle(ButtonStyle.Primary),
+              new ButtonBuilder().setCustomId('music_stop').setLabel('⏹ خروج').setStyle(ButtonStyle.Danger),
+            );
+            const row2 = new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊 +10').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉 -10').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setCustomId('music_nowplaying').setLabel('🎵 الآن').setStyle(ButtonStyle.Secondary),
+              new ButtonBuilder().setUrl(song.url || 'https://youtube.com').setLabel('🔗 الرابط').setStyle(ButtonStyle.Link),
+            );
+            const payload = { components: [row1, row2] };
+            if (cardBuf) {
+              const attachment = new AttachmentBuilder(cardBuf, { name: 'musiccard.png' });
+              payload.files = [attachment];
+            } else {
+              payload.content = `🎵 **جاري التشغيل:** ${song.title}`;
+            }
+            // حذف البطاقة القديمة لو موجودة
+            if (queue.currentCardMsg) {
+              queue.currentCardMsg.delete().catch(() => {});
+              queue.currentCardMsg = null;
+            }
+            queue.currentCardMsg = await queue.textChannel.send(payload).catch(() => null);
+          } catch {
+            queue.textChannel.send({ content: `🎵 **جاري التشغيل:** ${song.title}` }).catch(() => {});
+          }
         }
       } catch (err) {
         console.error(`❌ فشل تشغيل: ${song.title} | ${song.url}`);
