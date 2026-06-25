@@ -24,3 +24,9 @@ id = "ABJRw0hhitfhVmOaZzzkK"
 uri = "file://تقرير-البوت.md"
 type = "text"
 title = "تقرير شامل — بوت زنجي"
+
+[[outputs]]
+id = "MZNg9MmieFf3nEAhKvlHf"
+uri = "file://تقرير-البوت-الكامل.md"
+type = "text"
+title = "📊 تقرير بوت زنجي الكامل"
