@@ -3426,7 +3426,8 @@ client.on("interactionCreate", async (interaction) => {
               await guild.members.fetch();
             } catch {}
             const members = [...guild.members.cache.filter(m => !m.user.bot).values()];
-            let sent = 0, failed = 0;
+            let sent = 0;
+            const failedMembers = [];
             const total = members.length;
 
             for (let i = 0; i < members.length; i++) {
@@ -3438,9 +3439,10 @@ client.on("interactionCreate", async (interaction) => {
                 if (dmErr?.status === 429 || dmErr?.code === 429) {
                   const retryAfter = (dmErr?.rawError?.retry_after || 5) * 1000;
                   await new Promise(r => setTimeout(r, retryAfter));
-                  try { await member.send({ embeds: [embed] }); sent++; } catch { failed++; }
+                  try { await member.send({ embeds: [embed] }); sent++; }
+                  catch { failedMembers.push(member); }
                 } else {
-                  failed++;
+                  failedMembers.push(member);
                 }
               }
               await new Promise(r => setTimeout(r, 100));
@@ -3449,20 +3451,32 @@ client.on("interactionCreate", async (interaction) => {
             // لما يخلص ابعت DM للأونر بالنتيجة
             try {
               const owner = await client.users.fetch(user.id);
-              await owner.send({
-                embeds: [
-                  new EmbedBuilder()
-                    .setColor(0x2ecc71)
-                    .setTitle("✅ اتخلصت الرسالة الجماعية")
-                    .addFields(
-                      { name: "📩 وصلت لـ", value: `${sent} عضو`, inline: true },
-                      { name: "❌ فشلت مع", value: `${failed} عضو`, inline: true },
-                      { name: "👥 الإجمالي", value: `${total} عضو`, inline: true }
-                    )
-                    .setFooter({ text: "الفشل عادةً بسبب إعدادات الخصوصية عند العضو" })
-                    .setTimestamp()
-                ]
-              });
+              const resultEmbed = new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ اتخلصت الرسالة الجماعية")
+                .addFields(
+                  { name: "📩 وصلت لـ", value: `${sent} عضو`, inline: true },
+                  { name: "❌ فشلت مع", value: `${failedMembers.length} عضو`, inline: true },
+                  { name: "👥 الإجمالي", value: `${total} عضو`, inline: true }
+                )
+                .setTimestamp();
+
+              if (failedMembers.length > 0) {
+                // اعرض أسماء اللي فشلوا (أقصى 20 اسم عشان ما يطولش الرسالة)
+                const namesList = failedMembers.slice(0, 20)
+                  .map(m => `• ${m.user.username} (\`${m.id}\`)`)
+                  .join("\n");
+                const extra = failedMembers.length > 20 ? `\n... و${failedMembers.length - 20} تاني` : "";
+                resultEmbed.addFields({
+                  name: "🔒 اللي ما وصلتلهمش (خصوصية مغلقة)",
+                  value: namesList + extra
+                });
+                resultEmbed.setFooter({ text: "دول قافلين الرسائل الخاصة من أعضاء السيرفر" });
+              } else {
+                resultEmbed.setFooter({ text: "🎉 وصلت لكل الأعضاء بنجاح!" });
+              }
+
+              await owner.send({ embeds: [resultEmbed] });
             } catch {}
           })();
 
