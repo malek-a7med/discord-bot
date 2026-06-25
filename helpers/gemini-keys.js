@@ -83,6 +83,18 @@ function markAvailable(key) {
   exhaustedKeys.delete(key);
 }
 
+// ── كولداون عالمي لما كل المفاتيح تبقى محروقة ─────────────────
+let _quotaCooldownUntil = 0;
+const QUOTA_COOLDOWN_MS = 5 * 60 * 1000; // 5 دقايق
+
+export function isQuotaCooldown() {
+  return Date.now() < _quotaCooldownUntil;
+}
+
+export function getQuotaCooldownRemaining() {
+  return Math.max(0, Math.ceil((_quotaCooldownUntil - Date.now()) / 1000));
+}
+
 // ── اختار المفتاح التالي في الدايرة ──────────────────────────
 function pickKey(keys) {
   const total = keys.length;
@@ -96,11 +108,12 @@ function pickKey(keys) {
     }
   }
 
-  // كل المفاتيح خلصت — صحّيهم كلهم وابدأ من الأول (دايرة كاملة)
-  console.warn(`🔄 [GeminiKeys] كل المفاتيح اتاستخدمت — بيرجع للمفتاح الأول`);
-  exhaustedKeys.clear();
-  _currentIndex = 0;
-  return keys[0];
+  // كل المفاتيح خلصت — ارمي error فوراً بدل ما تحاول تاني
+  _quotaCooldownUntil = Date.now() + QUOTA_COOLDOWN_MS;
+  console.warn(`🚫 [GeminiKeys] كل المفاتيح محروقة — كولداون ${QUOTA_COOLDOWN_MS/60000} دقيقة`);
+  const err = new Error("ALL_KEYS_EXHAUSTED");
+  err.isQuotaError = true;
+  throw err;
 }
 
 // ── Proxy Model — بيشتغل زي model عادي بس بيدور المفاتيح ──────
@@ -123,35 +136,68 @@ class RotatingGeminiModel {
   }
 
   async generateContent(prompt) {
+    // إذا كل المفاتيح محروقة وفي كولداون — ارفض فوراً
+    if (isQuotaCooldown()) {
+      const secs = getQuotaCooldownRemaining();
+      const err = new Error(`ALL_KEYS_EXHAUSTED (cooldown ${secs}s)`);
+      err.isQuotaError = true;
+      throw err;
+    }
+
     let lastErr;
     for (let attempt = 0; attempt < this.keys.length; attempt++) {
-      const key   = pickKey(this.keys);
+      let key;
+      try { key = pickKey(this.keys); }
+      catch (pickErr) { throw pickErr; } // ALL_KEYS_EXHAUSTED — ارمي فوراً
+
       const model = this._buildModel(key);
+
+      // AbortSignal بـ 12 ثانية — يمنع SDK من الانتظار الطويل عشان retry
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), 12000);
+
       try {
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt, { signal: controller.signal });
+        clearTimeout(abortTimer);
         markAvailable(key);
         return result;
       } catch (err) {
+        clearTimeout(abortTimer);
         lastErr = err;
-        const is429 = err.message?.includes("429") || err.message?.includes("quota") || err.message?.includes("EXHAUSTED");
-        const is503 = err.message?.includes("503") || err.message?.includes("Service Unavailable") || err.message?.includes("high demand") || err.message?.includes("overloaded");
+
+        const is429    = err.message?.includes("429") || err.message?.includes("quota") || err.message?.includes("EXHAUSTED");
+        const isAbort  = err.name === "AbortError" || err.message?.includes("aborted") || err.message?.includes("abort");
+        const is503    = err.message?.includes("503") || err.message?.includes("Service Unavailable") || err.message?.includes("high demand") || err.message?.includes("overloaded");
 
         if (is429) {
           markExhausted(key);
+          // لو في مفتاح تاني — جرّبه فوراً بدون استنى
           const hasAnotherKey = this.keys.some(k => k !== key && !isExhausted(k));
-          if (!hasAnotherKey) await new Promise(r => setTimeout(r, 2000));
+          if (!hasAnotherKey) {
+            // ارمي error فوراً — pickKey هيتعامل مع الكولداون في الـ attempt الجاية
+            continue;
+          }
+        } else if (isAbort) {
+          // timeout من AbortSignal
+          console.warn(`⏱️ [GeminiKeys] ${this.modelName} استغرق أكتر من 12 ثانية — abort`);
+          const timeoutErr = new Error("timeout");
+          throw timeoutErr;
         } else if (is503 && this.modelName !== "gemini-2.0-flash-lite") {
           // الموديل مزحوم — جرّب الـ fallback فوراً بنفس المفتاح
           console.warn(`⚠️ [GeminiKeys] ${this.modelName} مزحوم (503) — بيتحول لـ gemini-2.0-flash-lite`);
+          const controller2 = new AbortController();
+          const abortTimer2 = setTimeout(() => controller2.abort(), 12000);
           try {
             const genAI = new GoogleGenerativeAI(key);
             const opts  = { model: "gemini-2.0-flash-lite" };
             if (this.systemInstruction) opts.systemInstruction = this.systemInstruction;
             const fallback = genAI.getGenerativeModel(opts);
-            const result   = await fallback.generateContent(prompt);
+            const result   = await fallback.generateContent(prompt, { signal: controller2.signal });
+            clearTimeout(abortTimer2);
             markAvailable(key);
             return result;
           } catch (fallbackErr) {
+            clearTimeout(abortTimer2);
             lastErr = fallbackErr;
             throw fallbackErr;
           }
@@ -160,7 +206,11 @@ class RotatingGeminiModel {
         }
       }
     }
-    throw lastErr;
+    // كل المفاتيح جربناها وكلها 429
+    _quotaCooldownUntil = Date.now() + QUOTA_COOLDOWN_MS;
+    const exhaustedErr = new Error("ALL_KEYS_EXHAUSTED");
+    exhaustedErr.isQuotaError = true;
+    throw exhaustedErr;
   }
 }
 

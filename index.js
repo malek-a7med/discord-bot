@@ -1596,13 +1596,15 @@ client.on("messageCreate", async (msg) => {
       const senderName = msg.author.globalName || msg.author.username;
       const prompt     = buildUserPrompt(senderName, question, msg.author.id);
       const aiPromise  = geminiModel().generateContent(prompt);
-      const timeout    = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60000));
+      const timeout    = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000));
       const result     = await Promise.race([aiPromise, timeout]);
       const reply      = result.response.text().trim();
       pushUserHistory(msg.author.id, "user", question);
       pushUserHistory(msg.author.id, "bot",  reply);
       return msg.channel.send(reply).catch(() => {});
-    } catch {
+    } catch (err) {
+      const isQuota = err?.isQuotaError || err?.message?.includes("429") || err?.message?.includes("EXHAUSTED");
+      if (isQuota) return msg.channel.send("⏳ الـ AI وصل للحد اليومي — جرب بعد شوية!").catch(() => {});
       return msg.channel.send("معلش يسطا ثواني بس 🙏").catch(() => {});
     } finally {
       clearInterval(dmTypingInterval);
@@ -1963,10 +1965,12 @@ client.on("messageCreate", async (msg) => {
   const svTypingInterval = setInterval(() => msg.channel.sendTyping().catch(() => {}), 8000);
   msg.channel.sendTyping().catch(() => {});
   try {
-    const senderName = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
-    const prompt     = buildUserPrompt(senderName, question, msg.author.id);
-    const result     = await geminiModel().generateContent(prompt);
-    const reply      = result.response.text().trim();
+    const senderName  = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
+    const prompt      = buildUserPrompt(senderName, question, msg.author.id);
+    const aiPromise   = geminiModel().generateContent(prompt);
+    const svTimeout   = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000));
+    const result      = await Promise.race([aiPromise, svTimeout]);
+    const reply       = result.response.text().trim();
     pushUserHistory(msg.author.id, "user", question);
     pushUserHistory(msg.author.id, "bot",  reply);
     await msg.reply(reply);

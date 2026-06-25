@@ -341,7 +341,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 60000);
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 15000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
       const isQuota = err.message?.includes("429") || err.message?.includes("quota") || err.message?.includes("EXHAUSTED");
