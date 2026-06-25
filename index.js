@@ -611,7 +611,7 @@ function validateLatestFeatures(allCommands) {
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة","عقوبة",
-      "شغل-اغنية","skip","stop","queue","pause","resume","nowplaying","volume",
+      "شغل-اغنية","skip","خروج","queue","pause","resume","nowplaying","volume",
       "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز","نسخ-احتياطي","بوت",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
@@ -2403,7 +2403,7 @@ client.on("interactionCreate", async (interaction) => {
 
       // Music Commands (New System)
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      const MUSIC_CMDS = ["شغل-اغنية","skip","stop","queue","pause","resume","nowplaying","volume"];
+      const MUSIC_CMDS = ["شغل-اغنية","skip","خروج","queue","pause","resume","nowplaying","volume"];
       if (MUSIC_CMDS.includes(cmd)) {
         let musicInteraction = interaction;
         if (isFromDM && guild) {
@@ -2427,7 +2427,7 @@ client.on("interactionCreate", async (interaction) => {
           const { handleSkip } = await import("./commands/music.js");
           return await handleSkip(musicInteraction);
         }
-        if (cmd === "stop") {
+        if (cmd === "خروج") {
           const { handleStop } = await import("./commands/music.js");
           return await handleStop(musicInteraction);
         }

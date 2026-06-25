@@ -27,8 +27,8 @@ async function registerMusicCommands(client) {
     },
     {
       data: new SlashCommandBuilder()
-        .setName('stop')
-        .setDescription('توقف التشغيل واتركني من القناة الصوتية'),
+        .setName('خروج')
+        .setDescription('إيقاف الموسيقى ومغادرة القناة الصوتية 🚪'),
       execute: handleStop
     },
     {
