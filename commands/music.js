@@ -9,6 +9,72 @@ import { YtDlpPlugin } from '@distube/yt-dlp';
 import { SoundCloudPlugin } from '@distube/soundcloud';
 import { SpotifyPlugin } from '@distube/spotify';
 import { sendMusicCard } from '../helpers/music-card.js';
+import https from 'https';
+
+// ─── Spotify API: بحث نصي عشان نجيب رابط الأغنية ──────────────
+let _spotifyToken = null;
+let _spotifyTokenExp = 0;
+
+async function getSpotifyToken() {
+  if (_spotifyToken && Date.now() < _spotifyTokenExp) return _spotifyToken;
+  const id = process.env.SPOTIFY_CLIENT_ID;
+  const secret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!id || !secret) return null;
+  const creds = Buffer.from(`${id}:${secret}`).toString('base64');
+  return new Promise((resolve) => {
+    const body = 'grant_type=client_credentials';
+    const req = https.request({
+      hostname: 'accounts.spotify.com',
+      path: '/api/token',
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${creds}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': body.length,
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          _spotifyToken = json.access_token;
+          _spotifyTokenExp = Date.now() + (json.expires_in - 60) * 1000;
+          resolve(_spotifyToken);
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.write(body);
+    req.end();
+  });
+}
+
+async function spotifySearch(query) {
+  const token = await getSpotifyToken();
+  if (!token) return null;
+  const q = encodeURIComponent(query);
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.spotify.com',
+      path: `/v1/search?q=${q}&type=track&limit=1`,
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` },
+    }, (res) => {
+      let data = '';
+      res.on('data', d => data += d);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          const track = json?.tracks?.items?.[0];
+          resolve(track ? track.external_urls.spotify : null);
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
 
 // كشف نوع الرابط
 function detectSourceType(query) {
@@ -276,7 +342,7 @@ export const musicHandler = {
 // ─── تسجيل أوامر الموسيقى ─────────────────────────────────────
 export async function registerMusicCommands() {
   return [
-    { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية من YouTube أو SoundCloud').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها').setRequired(true)), execute: handlePlay },
+    { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية من Spotify أو YouTube أو SoundCloud').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها').setRequired(true)), execute: handlePlay },
     { data: new SlashCommandBuilder().setName('تخطي').setDescription('⏭️ تخطي الأغنية الحالية'), execute: handleSkip },
     { data: new SlashCommandBuilder().setName('وقف').setDescription('⏹️ إيقاف الموسيقى والخروج من القناة'), execute: handleStop },
     { data: new SlashCommandBuilder().setName('قائمة').setDescription('📋 عرض قائمة التشغيل').addIntegerOption(o => o.setName('صفحة').setDescription('رقم الصفحة').setRequired(false).setMinValue(1)), execute: handleQueue },
@@ -312,7 +378,7 @@ export async function handlePlay(interaction) {
       spotify:    '🎵 جاري التحميل من Spotify...',
       youtube:    '▶️ جاري التحميل من YouTube...',
       soundcloud: '🔊 جاري التحميل من SoundCloud...',
-      text:       '🔍 جاري البحث...',
+      text:       '🎵 جاري البحث على Spotify...',
     };
     await interaction.editReply({ content: loadingMsgs[sourceType] });
 
@@ -323,20 +389,35 @@ export async function handlePlay(interaction) {
       // رابط مباشر — شغّله مباشرة
       await distube.play(voiceChannel, query, playOptions);
     } else {
-      // بحث نصي — حاول YouTube أولاً ثم SoundCloud
+      // بحث نصي — سبوتيفاي الأساس، ثم YouTube، ثم SoundCloud
       let played = false;
 
-      // محاولة YouTube
+      // 1️⃣ محاولة Spotify (بحث نصي → رابط Spotify → DisTube)
       try {
-        await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
-        played = true;
-      } catch (ytErr) {
-        console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
+        const spotifyUrl = await spotifySearch(query);
+        if (spotifyUrl) {
+          await distube.play(voiceChannel, spotifyUrl, playOptions);
+          played = true;
+        }
+      } catch (spErr) {
+        console.warn('⚠️ [Music] Spotify فشل، بيجرب YouTube...', spErr.message);
       }
 
-      // fallback إلى SoundCloud
+      // 2️⃣ fallback إلى YouTube
       if (!played) {
         try {
+          await interaction.editReply({ content: '▶️ مش لاقيها على Spotify، بيجرب YouTube...' });
+          await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
+          played = true;
+        } catch (ytErr) {
+          console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
+        }
+      }
+
+      // 3️⃣ fallback إلى SoundCloud
+      if (!played) {
+        try {
+          await interaction.editReply({ content: '🔊 بيجرب SoundCloud...' });
           await distube.play(voiceChannel, `scsearch:${query}`, { ...playOptions });
           played = true;
         } catch (scErr) {
@@ -346,7 +427,7 @@ export async function handlePlay(interaction) {
 
       if (!played) {
         return interaction.editReply({
-          content: `❌ مش لاقي الأغنية دي!\n💡 جرب ترفق رابط مباشر من:\n🎵 Spotify: \`open.spotify.com\`\n▶️ YouTube: \`youtube.com\`\n🔊 SoundCloud: \`soundcloud.com\``,
+          content: `❌ مش لاقي الأغنية دي على أي منصة!\n💡 جرب ترفق رابط مباشر من:\n🎵 Spotify: \`open.spotify.com\`\n▶️ YouTube: \`youtube.com\`\n🔊 SoundCloud: \`soundcloud.com\``,
         });
       }
     }
