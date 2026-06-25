@@ -283,6 +283,7 @@ export async function registerMusicCommands() {
     { data: new SlashCommandBuilder().setName('خلط').setDescription('🔀 خلط ترتيب القائمة عشوائياً'), execute: handleShuffle },
     { data: new SlashCommandBuilder().setName('تخطى-لـ').setDescription('⏩ تخطى لأغنية معينة في القائمة').addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية في القائمة').setRequired(true).setMinValue(1)), execute: handleJump },
     { data: new SlashCommandBuilder().setName('احذف').setDescription('🗑️ احذف أغنية من القائمة').addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية (مش الشغالة دلوقتي)').setRequired(true).setMinValue(2)), execute: handleRemove },
+    { data: new SlashCommandBuilder().setName('كلمات').setDescription('📝 اعرض كلمات الأغنية الشغالة دلوقتي'), execute: handleLyrics },
   ];
 }
 
@@ -600,5 +601,91 @@ export async function handleRemove(interaction) {
     });
   } catch (e) {
     await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
+// ─── handleLyrics ──────────────────────────────────────────────
+export async function handleLyrics(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q || !q.songs[0]) return interaction.reply({ content: '❌ مفيش أغنية شغالة دلوقتي!', ephemeral: true });
+
+    await interaction.deferReply();
+
+    const song = q.songs[0];
+    // تنظيف اسم الأغنية من الـ tags غير الضرورية
+    const cleanName = song.name
+      .replace(/\(.*?(official|video|audio|lyrics|hd|hq|mv|4k|clip|music|lyric|visualizer).*?\)/gi, '')
+      .replace(/\[.*?\]/gi, '')
+      .replace(/official\s*(video|audio|music video|lyric video)?/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    const { Client: GeniusClient } = await import('genius-lyrics');
+    const genius = new GeniusClient();
+
+    let lyrics = null;
+    let foundTitle = cleanName;
+
+    try {
+      const searches = await genius.songs.search(cleanName);
+      if (searches.length > 0) {
+        lyrics = await searches[0].lyrics();
+        foundTitle = searches[0].title;
+      }
+    } catch (searchErr) {
+      console.warn('⚠️ [Lyrics] Genius فشل:', searchErr.message);
+    }
+
+    if (!lyrics) {
+      return interaction.editReply({
+        embeds: [new EmbedBuilder()
+          .setColor(0xe74c3c)
+          .setDescription(`❌ مش لاقي كلمات لـ **${cleanName}**\n💡 جرب اسم الأغنية بالإنجليزي لو كانت أغنية عربية`)],
+      });
+    }
+
+    // تقسيم الكلمات لو أطول من 4000 حرف
+    const MAX = 4000;
+    const chunks = [];
+    let remaining = lyrics;
+    while (remaining.length > 0) {
+      if (remaining.length <= MAX) {
+        chunks.push(remaining);
+        break;
+      }
+      const cut = remaining.lastIndexOf('\n', MAX);
+      chunks.push(remaining.slice(0, cut > 0 ? cut : MAX));
+      remaining = remaining.slice(cut > 0 ? cut + 1 : MAX);
+    }
+
+    const embeds = chunks.map((chunk, i) => {
+      const e = new EmbedBuilder()
+        .setColor(0xf1c40f)
+        .setDescription(chunk);
+      if (i === 0) {
+        e.setTitle(`📝 ${foundTitle}`);
+        if (song.thumbnail) e.setThumbnail(song.thumbnail);
+      }
+      if (i === chunks.length - 1) {
+        e.setFooter({ text: `🎵 ${song.name} | الكلمات من Genius` });
+      }
+      return e;
+    });
+
+    // Discord بيسمح بـ 10 embeds في رسالة واحدة
+    for (let i = 0; i < embeds.length; i += 10) {
+      const batch = embeds.slice(i, i + 10);
+      if (i === 0) {
+        await interaction.editReply({ embeds: batch });
+      } else {
+        await interaction.followUp({ embeds: batch });
+      }
+    }
+
+  } catch (e) {
+    console.error('❌ [Lyrics]', e.message);
+    try { await interaction.editReply({ content: `❌ ${e.message}` }); } catch {}
   }
 }

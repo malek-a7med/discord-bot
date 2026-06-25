@@ -16,7 +16,7 @@ import config from "./config.js";
 import Database from "./database.js";
 import Logger from "./logger.js";
 import ModerationListener from "./helpers/moderation-listener.js";
-import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove } from "./commands/music.js";
+import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics } from "./commands/music.js";
 import { registerCleanChapterCommand, handleCleanChapter } from "./commands/image-cleaner.js";
 import { registerTranslateChapterCommand, handleTranslateChapter } from "./commands/translator.js";
 import {
@@ -2406,7 +2406,7 @@ client.on("interactionCreate", async (interaction) => {
 
       // Music Commands
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      const MUSIC_CMDS = ["شغل","شغل-اغنية","تخطي","skip","وقف","خروج","قائمة","queue","بوز","pause","كمل","resume","شغال-ايه","nowplaying","صوت","volume","تكرار","خلط","تخطى-لـ","احذف"];
+      const MUSIC_CMDS = ["شغل","شغل-اغنية","تخطي","skip","وقف","خروج","قائمة","queue","بوز","pause","كمل","resume","شغال-ايه","nowplaying","صوت","volume","تكرار","خلط","تخطى-لـ","احذف","كلمات"];
       if (MUSIC_CMDS.includes(cmd)) {
         let musicInteraction = interaction;
         if (isFromDM && guild) {
@@ -2434,6 +2434,7 @@ client.on("interactionCreate", async (interaction) => {
         if (cmd === "خلط")                         return await handleShuffle(musicInteraction);
         if (cmd === "تخطى-لـ")                     return await handleJump(musicInteraction);
         if (cmd === "احذف")                        return await handleRemove(musicInteraction);
+        if (cmd === "كلمات")                       return await handleLyrics(musicInteraction);
       }
 
       // ═══════════════════════════════════════════════════════════════
