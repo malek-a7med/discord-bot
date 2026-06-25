@@ -421,31 +421,43 @@ export async function handleStop(interaction) {
 
     const isButton = interaction.isButton?.();
 
-    // لازم نعمل acknowledge للـ interaction الأول قبل أي حاجة تانية
+    // acknowledge الـ interaction أولاً قبل أي حاجة
     if (isButton) {
       await interaction.deferUpdate().catch(() => {});
     }
 
     const q = distube.getQueue(interaction.guildId);
 
-    // امسح رسالة الداش بورد (اللي عليها الأزرار)
-    const dashMsg = isButton ? interaction.message : q?.currentMessage;
-    if (dashMsg) {
-      await dashMsg.delete().catch(() => {});
+    // امسح currentMessage المخزنة على القائمة (لو موجودة وغير رسالة الزرار)
+    if (q?.currentMessage) {
+      if (!isButton || q.currentMessage.id !== interaction.message?.id) {
+        await q.currentMessage.delete().catch(() => {});
+      }
+      q.currentMessage = null;
     }
 
-    // لو في currentMessage تانية غير رسالة الزرار، امسحها هي كمان
-    if (q?.currentMessage && q.currentMessage.id !== dashMsg?.id) {
-      await q.currentMessage.delete().catch(() => {});
+    // امسح رسالة الداش بورد — بعد deferUpdate لازم نستخدم deleteReply
+    if (isButton) {
+      await interaction.deleteReply().catch(() => {});
     }
-    if (q) q.currentMessage = null;
 
-    if (q) await distube.stop(interaction.guildId);
+    // وقّف DisTube (بيخرج من الـ voice تلقائياً)
+    if (q) {
+      await distube.stop(interaction.guildId).catch(() => {});
+    } else {
+      // مفيش queue — نحاول نخرج من الـ voice يدوياً
+      const voiceChannel = interaction.member?.voice?.channel;
+      if (voiceChannel) {
+        const { getVoiceConnection } = await import('@discordjs/voice');
+        getVoiceConnection(interaction.guildId)?.destroy();
+      }
+    }
 
     if (!isButton) {
       await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });
     }
   } catch (e) {
+    console.error('[Music] handleStop error:', e.message);
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true });

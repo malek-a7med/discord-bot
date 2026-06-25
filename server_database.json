@@ -250,7 +250,7 @@
       "_lastXpMsg": "1518218396083159042"
     },
     "1097654194061721700": {
-      "xp": 5,
+      "xp": 10,
       "level": 0,
       "coins": 0,
       "lastDaily": null,
@@ -258,7 +258,7 @@
       "timeouts": [],
       "bankCoins": 0,
       "lastBankInterest": 0,
-      "_lastXpMsg": "1519638300455866488"
+      "_lastXpMsg": "1519713414241452092"
     }
   },
   "manhwa": {},
@@ -268,9 +268,7 @@
   "settings": {
     "backupChannelId": "1486495986263261385"
   },
-  "aiMessageClaims": {
-    "1519697348165632101": 1782394482460
-  },
+  "aiMessageClaims": {},
   "lifeProfiles": {
     "1485896430957625367": {
       "954816748140503090": {
