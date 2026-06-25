@@ -72,7 +72,6 @@ import {
   entersState,
   VoiceConnectionDisconnectReason,
 } from "@discordjs/voice";
-import playdl from "play-dl";
 import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, removeKey, setActiveKeyIndex, resetExhaustedKeys } from "./helpers/gemini-keys.js";
 import { getRanks, addRank, removeRank, resetRanks } from "./helpers/rank-roles.js";
 import fs from "fs";
@@ -3468,11 +3467,10 @@ client.on("interactionCreate", async (interaction) => {
         if (id === "music_repeat")     return await handleRepeat(interaction);
         if (id === "music_lyrics")     return await handleLyrics(interaction);
         if (id === "music_vol_up" || id === "music_vol_down") {
-          const dt = musicHandler.getDistube();
-          const q = dt?.getQueue(interaction.guildId);
+          const q = musicHandler.getQueue(interaction.guildId);
           if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
           const next = id === "music_vol_up" ? Math.min(q.volume + 10, 100) : Math.max(q.volume - 10, 0);
-          dt.setVolume(interaction.guildId, next);
+          await musicHandler.setVolume(interaction.guildId, next / 100);
           return interaction.reply({ content: `🔊 الصوت: **${next}%**`, ephemeral: true });
         }
         return;
