@@ -270,6 +270,9 @@ export async function registerMusicCommands() {
     { data: new SlashCommandBuilder().setName('شغال-ايه').setDescription('🎶 اعرض الأغنية الشغالة دلوقتي'), execute: handleNowPlaying },
     { data: new SlashCommandBuilder().setName('صوت').setDescription('🔊 اضبط مستوى الصوت').addIntegerOption(o => o.setName('مستوى').setDescription('من 0 لـ 100').setRequired(true).setMinValue(0).setMaxValue(100)), execute: handleVolume },
     { data: new SlashCommandBuilder().setName('تكرار').setDescription('🔁 بدّل وضع التكرار (إيقاف / أغنية / قائمة)'), execute: handleRepeat },
+    { data: new SlashCommandBuilder().setName('خلط').setDescription('🔀 خلط ترتيب القائمة عشوائياً'), execute: handleShuffle },
+    { data: new SlashCommandBuilder().setName('تخطى-لـ').setDescription('⏩ تخطى لأغنية معينة في القائمة').addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية في القائمة').setRequired(true).setMinValue(1)), execute: handleJump },
+    { data: new SlashCommandBuilder().setName('احذف').setDescription('🗑️ احذف أغنية من القائمة').addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية (مش الشغالة دلوقتي)').setRequired(true).setMinValue(2)), execute: handleRemove },
   ];
 }
 
@@ -446,6 +449,80 @@ export async function handleRepeat(interaction) {
     distube.setRepeatMode(interaction.guildId, next);
     const labels = ['❌ التكرار اتوقف', '🔂 بيكرر الأغنية', '🔁 بيكرر القائمة'];
     await interaction.reply({ content: labels[next], ephemeral: true });
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
+// ─── handleShuffle ─────────────────────────────────────────────
+export async function handleShuffle(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+    if (q.songs.length <= 1) return interaction.reply({ content: '❌ مفيش أغاني كفاية في القائمة عشان تتخلط!', ephemeral: true });
+
+    // خلط كل الأغاني ما عدا الأغنية الشغالة حالياً (أول عنصر)
+    const current = q.songs[0];
+    const rest = q.songs.slice(1);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    q.songs = [current, ...rest];
+
+    await interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x9b59b6)
+        .setDescription(`🔀 اتخلطت القائمة! (${rest.length} أغنية)`)],
+    });
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
+// ─── handleJump ────────────────────────────────────────────────
+export async function handleJump(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+
+    const num = interaction.options.getInteger('رقم');
+    if (num < 1 || num > q.songs.length) {
+      return interaction.reply({ content: `❌ الرقم لازم يكون بين 1 و${q.songs.length}!`, ephemeral: true });
+    }
+    if (num === 1) return interaction.reply({ content: '⏩ الأغنية دي شغالة أصلاً!', ephemeral: true });
+
+    const targetSong = q.songs[num - 1];
+    await distube.jump(interaction.guildId, num - 1);
+    await interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x66FCF1)
+        .setDescription(`⏩ بتخطى لـ **${targetSong.name}**`)],
+    });
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
+// ─── handleRemove ──────────────────────────────────────────────
+export async function handleRemove(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+
+    const num = interaction.options.getInteger('رقم');
+    if (num < 2) return interaction.reply({ content: '❌ مش ممكن تحذف الأغنية الشغالة — استخدم `/تخطي`!', ephemeral: true });
+    if (num > q.songs.length) return interaction.reply({ content: `❌ مفيش رقم ${num} في القائمة! القائمة فيها ${q.songs.length} أغنية بس.`, ephemeral: true });
+
+    const removed = q.songs.splice(num - 1, 1)[0];
+    await interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0xe74c3c)
+        .setDescription(`🗑️ اتشالت من القائمة: **${removed.name}**`)],
+    });
   } catch (e) {
     await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
   }
