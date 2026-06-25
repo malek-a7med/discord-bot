@@ -405,6 +405,18 @@ const LEGACY_COMMANDS = [
     .setDescription("إرسال اقتراح للسيرفر / Submit a suggestion")
     .addStringOption((o) => o.setName("نص").setDescription("اقتراحك هنا").setRequired(true)),
   new SlashCommandBuilder()
+    .setName("حالة-البوت")
+    .setDescription("تغيير حالة البوت [أونر فقط] / Change bot status")
+    .addStringOption(o => o.setName("نص").setDescription("نص الحالة").setRequired(true))
+    .addStringOption(o => o.setName("نوع").setDescription("نوع النشاط").setRequired(false)
+      .addChoices(
+        { name: "👀 يشاهد (Watching)", value: "3" },
+        { name: "🎮 يلعب (Playing)",   value: "0" },
+        { name: "🎵 يستمع (Listening)", value: "2" },
+        { name: "🏆 ينافس (Competing)", value: "5" },
+      )
+    ),
+  new SlashCommandBuilder()
     .setName("لوحة-إدارة")
     .setDescription("إرسال لوحة تحكم الإدارة [إدارة] / Post admin control panel")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -2261,6 +2273,25 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
       if (cmd === "حياة")          return await handleBankLifeCommand(interaction, db);
       if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
+      if (cmd === "حالة-البوت") {
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        const statusText = interaction.options.getString("نص");
+        const typeVal    = parseInt(interaction.options.getString("نوع") ?? "3", 10);
+        const typeNames  = { 0: "🎮 يلعب", 2: "🎵 يستمع", 3: "👀 يشاهد", 5: "🏆 ينافس" };
+        client.user.setActivity(statusText, { type: typeVal });
+        return interaction.reply({
+          embeds: [new EmbedBuilder()
+            .setColor(0x9b59b6)
+            .setTitle("✅ تم تغيير حالة البوت")
+            .addFields(
+              { name: "📝 النص",   value: statusText, inline: true },
+              { name: "🎯 النوع",  value: typeNames[typeVal] || "👀 يشاهد", inline: true },
+            )
+            .setTimestamp()],
+          ephemeral: true,
+        });
+      }
+
       if (cmd === "تغيير-طريقة-الكلام") {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         const mode = interaction.options.getString("أسلوب");
