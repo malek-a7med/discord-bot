@@ -297,7 +297,12 @@ class ModerationListener {
     }
   }
 
+  setEnabled(value) {
+    this._enabled = !!value;
+  }
+
   isEnabled() {
+    if (typeof this._enabled !== 'undefined' && !this._enabled) return false;
     return !!config.OWNER_ID && !!config.ADMIN_CHANNEL_ID;
   }
 }
