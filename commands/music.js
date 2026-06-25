@@ -201,45 +201,27 @@ export function initMusicSystem(client) {
       const humanListeners = botVoiceChannel.members.filter(m => !m.user.bot).size;
 
       if (humanListeners === 0) {
-        // القناة فاضية — وقف تلقائي
-        if (!q.paused) {
-          q.pause();
-          pausedAt.set(q.id, Date.now());
-          const ch = q.textChannel;
-          if (ch?.send) ch.send({
-            embeds: [new EmbedBuilder()
-              .setColor(0xf39c12)
-              .setDescription('⏸️ القناة الصوتية فاضية — الموسيقى اتوقفت تلقائياً\nلما حد يرجع هتكمل! 👂')],
-          }).catch(() => {});
-        }
+        // القناة فاضية — خروج فوري
+        const ch = q.textChannel;
+        if (ch?.send) ch.send({
+          embeds: [new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setDescription('👋 مفيش حد في القناة — البوت خرج!')],
+        }).catch(() => {});
+        pausedAt.delete(q.id);
+        await distube.stop(q.id).catch(() => {});
+        botVoiceChannel.guild.members.me?.voice?.disconnect().catch(() => {});
       } else {
         // في ناس في القناة — استأنف لو كان موقوف تلقائياً
         if (q.paused && pausedAt.has(q.id)) {
-          const pausedTime = Date.now() - pausedAt.get(q.id);
           pausedAt.delete(q.id);
-
-          if (pausedTime > STREAM_MAX_AGE) {
-            // الستريم انتهت صلاحيته — تخطى للأغنية التالية
-            const ch = q.textChannel;
-            if (ch?.send) ch.send({
-              embeds: [new EmbedBuilder()
-                .setColor(0xe74c3c)
-                .setDescription('⏭️ الأغنية موقوفة من أكتر من ساعتين — الرابط انتهت صلاحيته، بتخطى للتالية!')],
-            }).catch(() => {});
-            if (q.songs.length > 1) {
-              await distube.skip(q.id).catch(() => {});
-            } else {
-              await distube.stop(q.id).catch(() => {});
-            }
-          } else {
-            q.resume();
-            const ch = q.textChannel;
-            if (ch?.send) ch.send({
-              embeds: [new EmbedBuilder()
-                .setColor(0x2ecc71)
-                .setDescription('▶️ حد رجع! بكمل الموسيقى 🎵')],
-            }).catch(() => {});
-          }
+          q.resume();
+          const ch = q.textChannel;
+          if (ch?.send) ch.send({
+            embeds: [new EmbedBuilder()
+              .setColor(0x2ecc71)
+              .setDescription('▶️ حد رجع! بكمل الموسيقى 🎵')],
+          }).catch(() => {});
         }
       }
     } catch {}
