@@ -275,7 +275,7 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
 
     proc.stdout.once('data', () => {
       clearTimeout(killTimeout);
-      resolve({ stream: proc.stdout, type: StreamType.Arbitrary, proc });
+      resolve({ stream: proc.stdout, type: StreamType.WebmOpus, proc });
     });
 
     proc.on('close', code => {

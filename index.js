@@ -607,6 +607,9 @@ const LEGACY_COMMANDS = [
   pollCommand,
   bankLifeCommand,
   bankLuckEgCommand.data,
+  new SlashCommandBuilder()
+    .setName("حالة-الحماية")
+    .setDescription("🛡️ عرض حالة كل أنظمة الحماية في البوت [أونر فقط]"),
   new ContextMenuCommandBuilder()
     .setName("✏️ تعديل رسالة")
     .setType(ApplicationCommandType.Message),
@@ -626,7 +629,7 @@ function validateLatestFeatures(allCommands) {
     // الأوامر الأساسية القديمة — موجودة قبل نظام /احدث-المميزات
     const skipList = [
       "ping","hello","roll","serverinfo","userinfo",
-      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","✏️ تعديل رسالة",
+      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
@@ -2307,6 +2310,37 @@ client.on("interactionCreate", async (interaction) => {
             ).setTimestamp()],
           ephemeral: true
         });
+      }
+
+      if (cmd === "حالة-الحماية") {
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+
+        const amStatus   = autoModEnabled;
+        const raidOk     = !!(config.OWNER_ID && config.ADMIN_CHANNEL_ID);
+        const spamLimit  = config.ANTI_SPAM_THRESHOLD;
+        const spamWindow = (config.ANTI_SPAM_WINDOW / 1000).toFixed(0);
+        const raidLimit  = config.ANTI_RAID_THRESHOLD;
+        const raidWindow = (config.ANTI_RAID_WINDOW / 1000).toFixed(0);
+        const { existsSync: _existsSync } = await import('fs');
+        const cookiesSrc = (process.env.YOUTUBE_COOKIES?.length > 0)
+          ? 'env:YOUTUBE_COOKIES'
+          : _existsSync('./cookies.txt') ? 'file:cookies.txt' : 'none';
+
+        const on  = (v) => v ? '🟢 شغّال' : '🔴 متوقف';
+        const embed = new EmbedBuilder()
+          .setColor(amStatus ? 0x2ecc71 : 0xe74c3c)
+          .setTitle('🛡️ حالة أنظمة الحماية')
+          .addFields(
+            { name: '🤖 Auto-Mod الرئيسي',   value: on(amStatus),                               inline: true },
+            { name: '🚫 أنتي سبام',           value: amStatus ? `🟢 ${spamLimit} رسايل/${spamWindow}ث` : '🔴 متوقف', inline: true },
+            { name: '🔗 أنتي لينك',           value: on(amStatus),                               inline: true },
+            { name: '🌊 أنتي رايد',           value: raidOk && amStatus ? `🟢 ${raidLimit} join/${raidWindow}ث` : '🔴 متوقف', inline: true },
+            { name: '🧠 Gemini Smart-Scan',   value: on(amStatus && _geminiReady),               inline: true },
+            { name: '🍪 YouTube Cookies',     value: cookiesSrc === 'none' ? '🔴 مفيش' : `🟢 ${cookiesSrc}`, inline: true },
+          )
+          .setFooter({ text: 'استخدم /auto-mod on/off للتحكم في كل الأنظمة' })
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
       if (cmd === "قائمة-الباند") {
