@@ -8,7 +8,7 @@ import {
 } from '@discordjs/voice';
 import playdl from 'play-dl';
 import { spawn } from 'child_process';
-import { writeFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { MusicStreamError, VoiceChannelError } from '../errors.js';
@@ -98,95 +98,37 @@ function filenameFromUrl(url) {
 }
 
 // === YouTube Cookies Support ===
-// v4: Cookies Validation + Priority Order
-//
 // الترتيب:
-//   1) ملف cookies.txt في الـ root (الأكثر موثوقية على Replit)
-//   2) Environment variable YOUTUBE_COOKIES (Secret)
-//   3) مفيش cookies (fallback)
-
-// Cache للـ cookies path عشان منكررش الـ disk I/O كل مرة
-let _cookiesPathCache = null;
-let _cookiesSourceCache = null;
-
-function validateCookiesFile(filePath) {
-  try {
-    if (!existsSync(filePath)) return false;
-    const stat = statSync(filePath);
-    if (stat.size < 100) return false; // ملف صغير = فاضي غالباً
-    const content = readFileSync(filePath, 'utf8');
-    if (!content.includes('.youtube.com')) return false;
-    if (!content.includes('VISITOR_INFO1_LIVE') && !content.includes('LOGIN_INFO')) return false;
-    return true;
-  } catch (err) {
-    console.warn(`⚠️ [cookies] validation error for ${filePath}: ${err.message}`);
-    return false;
-  }
-}
-
+// 1) Environment variable YOUTUBE_COOKIES (الأفضل لـ Replit Secrets)
+// 2) ملف cookies.txt في جذر المشروع (fallback للتطوير المحلي)
 function ensureCookiesFile() {
-  // Cache hit
-  if (_cookiesPathCache && existsSync(_cookiesPathCache)) {
-    return _cookiesPathCache;
-  }
-
-  let __dirname_local;
-  try {
-    const __filename = fileURLToPath(import.meta.url);
-    __dirname_local = dirname(__filename);
-  } catch {
-    __dirname_local = process.cwd();
-  }
-
-  // 1) ملف محلي cookies.txt (الأولوية)
-  const localCandidates = [
-    join(__dirname_local, '..', 'cookies.txt'),       // helpers/../cookies.txt
-    join(process.cwd(), 'cookies.txt'),                // ./cookies.txt
-    '/home/runner/workspace/cookies.txt'              // absolute
-  ];
-
-  for (const localPath of localCandidates) {
-    if (validateCookiesFile(localPath)) {
-      _cookiesPathCache = localPath;
-      _cookiesSourceCache = 'file:cookies.txt';
-      console.log(`🍪 [cookies] using local file: ${localPath}`);
-      return localPath;
-    }
-  }
-
-  // 2) Environment Variable
+  // 1) من Environment Variable
   const envCookies = process.env.YOUTUBE_COOKIES;
   if (envCookies && envCookies.trim().length > 0) {
-    const envPath = '/tmp/yt-cookies-env.txt';
+    const envPath = '/tmp/yt-cookies.txt';
     try {
-      const normalized = envCookies
-        .replace(/\\r\\n/g, '\n')
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t');
+      // اكتب الملف من الـ env (ممكن newline-escaped أو raw)
+      const normalized = envCookies.includes('\\n')
+        ? envCookies.replace(/\\n/g, '\n')
+        : envCookies;
       writeFileSync(envPath, normalized, 'utf8');
-      if (validateCookiesFile(envPath)) {
-        _cookiesPathCache = envPath;
-        _cookiesSourceCache = 'env:YOUTUBE_COOKIES';
-        console.log(`🍪 [cookies] using env var (${envCookies.length} chars)`);
-        return envPath;
-      } else {
-        console.warn('⚠️ [cookies] env var موجود بس invalid - مش فيه VISITOR_INFO1_LIVE');
-      }
+      return envPath;
     } catch (err) {
-      console.warn('⚠️ [cookies] فشل كتابة env cookies:', err.message);
+      console.warn('⚠️ فشل كتابة cookies من env:', err.message);
     }
   }
 
-  // 3) مفيش
-  _cookiesSourceCache = 'none';
-  console.warn('⚠️ [cookies] لا ملف محلي ولا env var! YouTube هيرفض الطلب');
-  return null;
-}
+  // 2) من ملف محلي (cookies.txt في جذر المشروع)
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const localPath = join(__dirname, '..', 'cookies.txt');
+    if (existsSync(localPath)) {
+      return localPath;
+    }
+  } catch {}
 
-function getCookiesSource() {
-  if (_cookiesSourceCache) return _cookiesSourceCache;
-  ensureCookiesFile();
-  return _cookiesSourceCache || 'none';
+  return null;
 }
 
 function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
@@ -194,10 +136,9 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
     const cookiesPath = ensureCookiesFile();
 
     // اختار extractor-args على حسب الـ platform
-    // v4: client list أوسع (tv_embedded + web_creator بيدوّر على اللي شغال)
     let extractorArgs = null;
     if (platform === 'youtube') {
-      extractorArgs = 'youtube:player_client=default,web_safari,web_embedded,android_vr,android_creator,web_creator,mweb,ios_creator,ios,android,mediaconnect;formats=missing_pot';
+      extractorArgs = 'youtube:player_client=ios,android,web,web_safari,web_embedded,mweb;formats=missing_pot';
     }
 
     // args الأساسية
@@ -205,12 +146,9 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
       '--no-playlist',
       '--no-warnings',
       ...(extractorArgs ? ['--extractor-args', extractorArgs] : []),
-      // format أوسع يشمل mediaconnect
-      '-f', 'bestaudio[acodec^=opus]/bestaudio[ext=webm]/bestaudio/best',
+      '-f', 'bestaudio[ext=webm]/bestaudio/best',
       '--no-part',
       '--no-mtime',
-      // user agent عشان نتجنّب quick bot detection
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       '-o', '-',
       url
     ];
@@ -219,23 +157,10 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
       args.push('--cookies', cookiesPath);
     }
 
-    // attempt 2: format أضعف
+    // attempt 2: جرّب format أقل صرامة (لو bestaudio/webm فشل)
     if (attempt >= 2) {
       const idx = args.indexOf('-f');
-      if (idx !== -1) args[idx + 1] = 'bestaudio/best/worst';
-    }
-    // attempt 3: بدون cookies (لو cookies فاسدة)
-    if (attempt >= 3 && cookiesPath) {
-      const cidx = args.indexOf('--cookies');
-      if (cidx !== -1) {
-        args.splice(cidx, 2); // شيل --cookies و الـ path
-      }
-    }
-
-    if (process.env.MUSIC_DEBUG === '1') {
-      console.log(`\n🎬 [yt-dlp attempt ${attempt}] url=${url}`);
-      console.log(`   platform=${platform} cookies=${cookiesPath ? '✅' : '❌'}`);
-      console.log(`   cmd: ${YTDLP_PATH} ${args.join(' ')}\n`);
+      if (idx !== -1) args[idx + 1] = 'bestaudio/best';
     }
 
     let proc;
@@ -247,22 +172,11 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
 
     let stderr = '';
     proc.stderr.on('data', d => {
-      const s = d.toString();
-      stderr += s;
-      // 🐛 Debug: اطبع stderr المهم في الـ console
-      const line = s.trim();
-      if (line && (
-        line.includes('ERROR') ||
-        line.includes('Sign in') ||
-        line.includes('HTTP Error') ||
-        line.includes('confirm') ||
-        line.includes('SABR') ||
-        line.includes('PO Token') ||
-        line.includes('Could not extract') ||
-        line.includes('Unable to extract') ||
-        line.includes('n challenge')
-      )) {
-        console.warn(`[yt-dlp attempt ${attempt}] ${line}`);
+      stderr += d.toString();
+      // 🐛 Debug: اطبع stderr في الـ console مباشرة عشان نشوف المشكلة
+      const line = d.toString().trim();
+      if (line && (line.includes('ERROR') || line.includes('WARNING') || line.includes('Sign in') || line.includes('HTTP'))) {
+        console.warn(`[yt-dlp] ${line}`);
       }
     });
 
@@ -281,9 +195,8 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
     proc.on('close', code => {
       clearTimeout(killTimeout);
       if (code !== 0 && code !== null) {
-        if (process.env.MUSIC_DEBUG === '1') {
-          console.error(`\n[yt-dlp exit ${code}]: ${stderr.slice(-1200)}\n`);
-        }
+        // اطبع stderr كامل في الـ console عشان نشخّص
+        console.error(`[yt-dlp exit ${code}]: ${stderr.slice(-800)}`);
         reject(new Error(`yt-dlp فشل (كود ${code}, محاولة ${attempt}): ${stderr.slice(-500)}`));
       }
     });
@@ -687,7 +600,7 @@ class MusicHandler {
         const songPlatform = song.platform || 'youtube';
         let lastErr = null;
 
-        // Strategy 1: yt-dlp attempt 1 (default clients)
+        // Strategy 1: yt-dlp attempt 1
         try {
           stream = await createYtDlpStream(song.url, 1, songPlatform);
         } catch (err1) {
@@ -701,47 +614,14 @@ class MusicHandler {
               stream = await createYtDlpStream(song.url, 2, songPlatform);
             } catch (err2) {
               lastErr = err2;
-              // Strategy 3: yt-dlp attempt 3 (بدون cookies)
-              if (songPlatform === 'youtube' && getCookiesSource() !== 'none') {
-                console.warn(`⚠️ محاولة 3 (بدون cookies): ${song.title}`);
-                try {
-                  stream = await createYtDlpStream(song.url, 3, songPlatform);
-                } catch (err3) {
-                  lastErr = err3;
-                  // Strategy 4: لو YouTube، جرّب 3 بدائل من نتائج البحث
-                  if (songPlatform === 'youtube') {
-                    console.warn(`⚠️ محاولة 4 (بحث عن بديل): ${song.title}`);
-                    const searchQ = song.artist ? `${song.title} ${song.artist}` : song.title;
-                    try {
-                      const altResults = await this.searchYouTube(searchQ);
-                      let found = false;
-                      for (const alt of altResults.slice(0, 5)) {
-                        if (alt.url === song.url) continue;
-                        try {
-                          stream = await createYtDlpStream(alt.url, 1, 'youtube');
-                          song.url = alt.url;
-                          song.title = alt.title;
-                          found = true;
-                          console.log(`✅ نسخة بديلة: ${alt.title}`);
-                          break;
-                        } catch {}
-                      }
-                      if (!found) throw err3;
-                    } catch (searchErr) {
-                      throw err3;
-                    }
-                  } else {
-                    throw err3;
-                  }
-                }
-              } else if (songPlatform === 'youtube') {
-                // بدون cookies من الأساس: روح على Strategy 4 مباشرة
-                console.warn(`⚠️ محاولة 4 (بحث عن بديل): ${song.title}`);
+              // Strategy 3: لو YouTube، جرّب 3 بدائل من نتائج البحث
+              if (songPlatform === 'youtube') {
+                console.warn(`⚠️ محاولة 3 (بحث عن بديل): ${song.title}`);
                 const searchQ = song.artist ? `${song.title} ${song.artist}` : song.title;
                 try {
                   const altResults = await this.searchYouTube(searchQ);
                   let found = false;
-                  for (const alt of altResults.slice(0, 5)) {
+                  for (const alt of altResults.slice(0, 3)) {
                     if (alt.url === song.url) continue;
                     try {
                       stream = await createYtDlpStream(alt.url, 1, 'youtube');
@@ -825,9 +705,8 @@ class MusicHandler {
           let reason;
           const msg = err.message || '';
           if (isSignInError(msg)) {
-            const cs = getCookiesSource();
             reason = songPlat === 'youtube'
-              ? `YouTube رفض الطلب (cookies: ${cs === 'none' ? '❌ مفقودة!' : '⚠️ موجودة بس ممكن تكون قديمة'})`
+              ? 'YouTube رفض الطلب (حدّث YOUTUBE_COOKIES في Secrets)'
               : `${songPlat} رفض الطلب`;
           } else if (msg.includes('Unsupported URL')) {
             reason = `yt-dlp مش بيساند الرابط ده (${songPlat})`;
