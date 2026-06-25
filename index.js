@@ -1335,7 +1335,7 @@ async function sendAutoBackup(clientInstance) {
 client.once("clientReady", async (c) => {
   logger.setClient(c);
   logger.success(`تسجيل الدخول بـ: ${c.user.username}`);
-  c.user.setActivity(`${LEGACY_COMMANDS.length + 14} أمر | /مساعدة`, { type: 3 });
+  c.user.setActivity(`زنجي لديكم لا خوف عليكم`, { type: 3 });
   await deployCommands(process.env.DISCORD_TOKEN, c.user.id);
   validateLatestFeatures(LEGACY_COMMANDS);
   await ensureSuggestionsPanel(c);
