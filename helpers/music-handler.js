@@ -171,7 +171,14 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
     }
 
     let stderr = '';
-    proc.stderr.on('data', d => { stderr += d.toString(); });
+    proc.stderr.on('data', d => {
+      stderr += d.toString();
+      // 🐛 Debug: اطبع stderr في الـ console مباشرة عشان نشوف المشكلة
+      const line = d.toString().trim();
+      if (line && (line.includes('ERROR') || line.includes('WARNING') || line.includes('Sign in') || line.includes('HTTP'))) {
+        console.warn(`[yt-dlp] ${line}`);
+      }
+    });
 
     proc.on('error', err => reject(new Error(`yt-dlp spawn error: ${err.message}`)));
 
@@ -188,6 +195,8 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
     proc.on('close', code => {
       clearTimeout(killTimeout);
       if (code !== 0 && code !== null) {
+        // اطبع stderr كامل في الـ console عشان نشخّص
+        console.error(`[yt-dlp exit ${code}]: ${stderr.slice(-800)}`);
         reject(new Error(`yt-dlp فشل (كود ${code}, محاولة ${attempt}): ${stderr.slice(-500)}`));
       }
     });
@@ -198,6 +207,7 @@ class MusicHandler {
   constructor() {
     this.queues = new Map(); // guildId -> queue object
     this.autoplayTimeouts = new Map(); // guildId -> timeout
+    this.skipCounters = new Map(); // guildId -> عدد الأغاني اللي اتخطّت على التوالي (عشان recursion)
   }
 
   createQueue(guildId, textChannel, voiceChannel) {
@@ -355,18 +365,38 @@ class MusicHandler {
     if (isSpotify) {
       const spotifyTracks = await this.fetchSpotifyInfo(effectiveQuery);
       const results = [];
-      for (const track of spotifyTracks) {
+      console.log(`🎵 Spotify: ${spotifyTracks.length} أغنية`);
+
+      // ⚡ البحث في parallel (بدل sequential) عشان نوفر وقت
+      const searchPromises = spotifyTracks.map(async (track) => {
         try {
           const searchQuery = track.artist ? `${track.title} ${track.artist}` : track.title;
           const ytResults = await this.searchYouTube(searchQuery);
           if (ytResults.length > 0) {
-            results.push({ ...ytResults[0], title: track.title, artist: track.artist, duration: track.duration || ytResults[0].duration, platform: 'spotify', requestedBy });
+            return {
+              ...ytResults[0],
+              title: track.title,
+              artist: track.artist,
+              duration: track.duration || ytResults[0].duration,
+              platform: 'spotify',
+              requestedBy
+            };
           }
         } catch (err) {
           console.warn(`⚠️ تخطي "${track.title}": ${err.message}`);
         }
+        return null;
+      });
+
+      const searchResults = await Promise.allSettled(searchPromises);
+      for (const r of searchResults) {
+        if (r.status === 'fulfilled' && r.value) {
+          results.push(r.value);
+        }
       }
+
       if (results.length === 0) throw new MusicStreamError('ما لقيتش أي أغنية من Spotify');
+      console.log(`✅ Spotify: ${results.length}/${spotifyTracks.length} أغنية جاهزة`);
       return results;
     }
 
@@ -500,10 +530,36 @@ class MusicHandler {
     return queue.songs.length;
   }
 
+  _incrementSkipCounter(guildId) {
+    const c = (this.skipCounters.get(guildId) || 0) + 1;
+    this.skipCounters.set(guildId, c);
+    return c;
+  }
+
+  _resetSkipCounter(guildId) {
+    this.skipCounters.set(guildId, 0);
+  }
+
   async playNext(guildId) {
     try {
       const queue = this.getQueue(guildId);
       if (!queue || !queue.connection || !queue.player) {
+        return;
+      }
+
+      // ⚠️ أمان: لو عدّى أكتر من 10 أغاني متخطّية على التوالي، نوقف (احتمال مشكلة كبيرة)
+      const skippedCount = this.skipCounters.get(guildId) || 0;
+      if (skippedCount > 10) {
+        console.error(`❌ وقف التشغيل: ${skippedCount} أغنية متخطّية على التوالي (غلط كبير)`);
+        this._resetSkipCounter(guildId);
+        queue.isPlaying = false;
+        queue.currentSong = null;
+        if (queue.textChannel) {
+          await queue.textChannel.send({
+            content: `⛔ **وقف التشغيل بسبب فشل متكرر**\n📋 اتخطّت ${skippedCount} أغنية على التوالي\n💡 شوف الـ console للتفاصيل أو حدّث YOUTUBE_COOKIES`
+          }).catch(() => {});
+        }
+        this.setupAutoDisconnect(guildId);
         return;
       }
 
@@ -515,6 +571,7 @@ class MusicHandler {
       if (queue.songs.length === 0) {
         queue.isPlaying = false;
         queue.currentSong = null;
+        this._resetSkipCounter(guildId);
         this.setupAutoDisconnect(guildId);
         return;
       }
@@ -532,46 +589,59 @@ class MusicHandler {
             msg.includes('Sign in to confirm') ||
             msg.includes('confirm you') ||
             msg.includes('HTTP Error 403') ||
-            msg.includes('429')
+            msg.includes('429') ||
+            msg.includes('SABR') ||
+            msg.includes('PO Token') ||
+            msg.includes('Could not extract') ||
+            msg.includes('Unable to extract')
           );
 
         // Try primary URL (نمرّر platform عشان args مناسبة)
         const songPlatform = song.platform || 'youtube';
+        let lastErr = null;
+
+        // Strategy 1: yt-dlp attempt 1
         try {
           stream = await createYtDlpStream(song.url, 1, songPlatform);
-        } catch (primaryErr) {
-          const primaryMsg = primaryErr.message || '';
+        } catch (err1) {
+          lastErr = err1;
+          const msg1 = err1.message || '';
 
-          // 1) لو مشكلة Sign-in / bot detection: جرّب format أضعف
-          if (isSignInError(primaryMsg) || primaryMsg.includes('SABR') || primaryMsg.includes('PO Token')) {
-            console.warn(`⚠️ حماية YouTube، بنجرب format بديل: ${song.title}`);
+          // Strategy 2: yt-dlp attempt 2 (format أضعف)
+          if (isSignInError(msg1) || msg1.includes('format') || msg1.includes('No video')) {
+            console.warn(`⚠️ محاولة 2 (format أضعف): ${song.title}`);
             try {
               stream = await createYtDlpStream(song.url, 2, songPlatform);
-            } catch (altErr) {
-              // 2) بس لو YouTube: جرّب 3 بدائل من نتائج البحث
+            } catch (err2) {
+              lastErr = err2;
+              // Strategy 3: لو YouTube، جرّب 3 بدائل من نتائج البحث
               if (songPlatform === 'youtube') {
-                console.warn(`⚠️ البحث عن نسخة بديلة: ${song.title}`);
+                console.warn(`⚠️ محاولة 3 (بحث عن بديل): ${song.title}`);
                 const searchQ = song.artist ? `${song.title} ${song.artist}` : song.title;
-                const altResults = await this.searchYouTube(searchQ);
-                let found = false;
-                for (const alt of altResults.slice(0, 3)) {
-                  if (alt.url === song.url) continue;
-                  try {
-                    stream = await createYtDlpStream(alt.url, 1, 'youtube');
-                    song.url = alt.url;
-                    found = true;
-                    console.log(`✅ لقيت نسخة بديلة: ${alt.title}`);
-                    break;
-                  } catch {}
+                try {
+                  const altResults = await this.searchYouTube(searchQ);
+                  let found = false;
+                  for (const alt of altResults.slice(0, 3)) {
+                    if (alt.url === song.url) continue;
+                    try {
+                      stream = await createYtDlpStream(alt.url, 1, 'youtube');
+                      song.url = alt.url;
+                      song.title = alt.title;
+                      found = true;
+                      console.log(`✅ نسخة بديلة: ${alt.title}`);
+                      break;
+                    } catch {}
+                  }
+                  if (!found) throw err2;
+                } catch (searchErr) {
+                  throw err2;
                 }
-                if (!found) throw primaryErr;
               } else {
-                // SoundCloud / direct: مفيش بديل، هنرمي الـ err
-                throw primaryErr;
+                throw err2;
               }
             }
           } else {
-            throw primaryErr;
+            throw err1;
           }
         }
 
@@ -587,6 +657,7 @@ class MusicHandler {
         resource.volume.setVolume(queue.volume);
         queue.player.play(resource);
         queue.isPlaying = true;
+        this._resetSkipCounter(guildId); // reset لأن الأغنية نجحت
 
         // Notify channel
         if (queue.textChannel) {
@@ -594,7 +665,7 @@ class MusicHandler {
             embeds: [
               {
                 title: '🎵 شغلت أغنيتك',
-                description: `**${song.title}**`,
+                description: `**${song.title}**${song.artist ? `\n👤 ${song.artist}` : ''}`,
                 fields: [
                   {
                     name: 'المدة',
@@ -604,6 +675,11 @@ class MusicHandler {
                   {
                     name: 'طلب بواسطة',
                     value: song.requestedBy || 'Unknown',
+                    inline: true
+                  },
+                  {
+                    name: 'المنصة',
+                    value: this.getPlatformEmoji(songPlatform),
                     inline: true
                   },
                   {
@@ -620,33 +696,42 @@ class MusicHandler {
           queue.textChannel.send(embed).catch(() => {});
         }
       } catch (err) {
-        console.error('❌ خطأ في تشغيل الأغنية:', err.message);
+        console.error(`❌ فشل تشغيل: ${song.title} | ${song.url}`);
+        console.error(`   السبب: ${err.message}`);
+        const skipNum = this._incrementSkipCounter(guildId);
+
         if (queue.textChannel) {
           const songPlat = song.platform || 'youtube';
           let reason;
-          if (isSignInError(err.message)) {
+          const msg = err.message || '';
+          if (isSignInError(msg)) {
             reason = songPlat === 'youtube'
-              ? 'YouTube رفض الطلب (محتاج cookies صالحة في YOUTUBE_COOKIES)'
+              ? 'YouTube رفض الطلب (حدّث YOUTUBE_COOKIES في Secrets)'
               : `${songPlat} رفض الطلب`;
-          } else if (err.message?.includes('Unsupported URL')) {
+          } else if (msg.includes('Unsupported URL')) {
             reason = `yt-dlp مش بيساند الرابط ده (${songPlat})`;
-          } else if (err.message?.includes('HTTP Error 404')) {
+          } else if (msg.includes('HTTP Error 404')) {
             reason = 'الرابط مش موجود أو اتحذف';
-          } else if (err.message?.includes('timeout')) {
-            reason = 'انتهت المهلة قبل ما يجيب البث';
-          } else if (err.message?.includes('Private video') || err.message?.includes('private')) {
+          } else if (msg.includes('timeout')) {
+            reason = 'انتهت المهلة (النت بطيء)';
+          } else if (msg.includes('Private video') || msg.includes('private')) {
             reason = 'الفيديو private';
+          } else if (msg.includes('Video unavailable')) {
+            reason = 'الفيديو مش متاح';
           } else {
-            reason = 'تعذر جلب البث الصوتي';
+            // اظهر آخر 200 حرف من الـ error عشان المستخدم يفهم
+            reason = msg.length > 200 ? msg.slice(-200) : msg;
           }
+
           await queue.textChannel
             .send({
-              content: `⚠️ تعذر تشغيل: **${song.title}**\n🎯 المنصة: ${this.getPlatformEmoji(songPlat)}\n📋 السبب: ${reason}\n⏭️ جاري الانتقال للأغنية التالية...`
+              content: `⚠️ تعذر تشغيل: **${song.title}**\n🎯 المنصة: ${this.getPlatformEmoji(songPlat)}\n📋 السبب: ${reason}\n⏭️ تخطّى (${skipNum} على التوالي)...`
             })
             .catch(() => {});
         }
-        // Skip to next song without breaking connection
-        await this.playNext(guildId);
+
+        // بدل recursion: setImmediate (أأمن للـ stack)
+        setImmediate(() => this.playNext(guildId));
       }
     } catch (err) {
       console.error('❌ خطأ في تشغيل التالي:', err.message);
