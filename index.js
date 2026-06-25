@@ -3410,12 +3410,52 @@ client.on("interactionCreate", async (interaction) => {
 
         if (نوع === "dm") {
           await guild.members.fetch();
-          const members = guild.members.cache.filter(m => !m.user.bot);
+          const members = [...guild.members.cache.filter(m => !m.user.bot).values()];
           let sent = 0, failed = 0;
+          const total = members.length;
+          let lastProgressUpdate = Date.now();
 
-          for (const [, member] of members) {
-            await member.send({ embeds: [embed] }).then(() => sent++).catch(() => failed++);
-            await new Promise(r => setTimeout(r, 500));
+          await interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0xa020f0)
+                .setTitle("📤 جاري الإرسال...")
+                .setDescription(`بيبعت لـ **${total}** عضو — استنى لحظة`)
+                .setTimestamp()
+            ]
+          });
+
+          for (let i = 0; i < members.length; i++) {
+            const member = members[i];
+            try {
+              await member.send({ embeds: [embed] });
+              sent++;
+            } catch (dmErr) {
+              if (dmErr?.status === 429 || dmErr?.code === 429) {
+                const retryAfter = (dmErr?.rawError?.retry_after || 5) * 1000;
+                await new Promise(r => setTimeout(r, retryAfter));
+                try { await member.send({ embeds: [embed] }); sent++; } catch { failed++; }
+              } else {
+                failed++;
+              }
+            }
+
+            // تحديث كل 10 ثواني أو كل 20 عضو
+            const now = Date.now();
+            if (now - lastProgressUpdate > 10000 || (i + 1) % 20 === 0) {
+              lastProgressUpdate = now;
+              await interaction.editReply({
+                embeds: [
+                  new EmbedBuilder()
+                    .setColor(0xa020f0)
+                    .setTitle("📤 جاري الإرسال...")
+                    .setDescription(`تم: **${i + 1}** / **${total}**\n✅ وصلت: ${sent} | ❌ فشلت: ${failed}`)
+                    .setTimestamp()
+                ]
+              }).catch(() => {});
+            }
+
+            await new Promise(r => setTimeout(r, 100));
           }
 
           return interaction.editReply({
@@ -3425,7 +3465,8 @@ client.on("interactionCreate", async (interaction) => {
                 .setTitle("✅ تم إرسال الرسالة الجماعية")
                 .addFields(
                   { name: "📩 وصلت لـ", value: `${sent} عضو`, inline: true },
-                  { name: "❌ فشلت مع", value: `${failed} عضو`, inline: true }
+                  { name: "❌ فشلت مع", value: `${failed} عضو`, inline: true },
+                  { name: "👥 الإجمالي", value: `${total} عضو`, inline: true }
                 )
                 .setFooter({ text: "الفشل عادةً بسبب إعدادات الخصوصية عند العضو" })
                 .setTimestamp()
