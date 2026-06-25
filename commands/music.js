@@ -156,18 +156,53 @@ async function resolveYoutubeUrlFromWeb(query) {
   return `https://www.youtube.com/watch?v=${videoId}`;
 }
 
+const INVIDIOUS_INSTANCES = [
+  'https://invidious.kavin.rocks',
+  'https://inv.riverside.rocks',
+  'https://yt.artemislena.eu',
+  'https://invidious.nerdvpn.de',
+  'https://invidious.tiekoetter.com',
+];
+
+async function resolveYoutubeUrlFromInvidious(query) {
+  for (const instance of INVIDIOUS_INSTANCES) {
+    try {
+      const url = `${instance}/api/v1/search?q=${encodeURIComponent(query)}&type=video&fields=videoId&page=1`;
+      const res = await fetch(url, {
+        headers: { 'user-agent': 'ZangiBot/1.0' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const videoId = Array.isArray(data) && data[0]?.videoId;
+      if (videoId) return `https://www.youtube.com/watch?v=${videoId}`;
+    } catch { continue; }
+  }
+  throw new Error('Invidious: مفيش instance شغال دلوقتي');
+}
+
 async function resolveYoutubeUrl(query) {
   const safeQuery = String(query || '').replace(/\s+/g, ' ').trim();
   if (!safeQuery) throw new Error('مفيش كلمات بحث صالحة للتشغيل');
 
+  // 1) Invidious API — موثوق ومش بيتبلوك
+  try {
+    return await resolveYoutubeUrlFromInvidious(safeQuery);
+  } catch (invErr) {
+    console.warn('⚠️ [Music] Invidious فشل، هنجرب web scraping:', invErr.message);
+  }
+
+  // 2) YouTube web scraping مباشرة
   try {
     return await resolveYoutubeUrlFromWeb(safeQuery);
   } catch (webErr) {
-    console.warn('⚠️ [Music] YouTube web search فشل، هنجرب yt-dlp:', webErr.message);
+    console.warn('⚠️ [Music] web scraping فشل، هنجرب yt-dlp:', webErr.message);
   }
 
+  // 3) yt-dlp مع android client لتخطي bot detection
   const output = await runYtDlp([
-    '--no-playlist', '--default-search', 'ytsearch1',
+    '--no-playlist',
+    '--extractor-args', 'youtube:player_client=android,web',
     '--print', 'webpage_url',
     `ytsearch1:${safeQuery}`,
   ]);
@@ -210,7 +245,12 @@ export function initMusicSystem(client) {
     plugins: [
       new SpotifyPlugin(),
       // YtDlpPlugin مطلوب كـ backend للـ SpotifyPlugin (بيشغّل الصوت فعلياً)
-      new YtDlpPlugin({ update: false }),
+      new YtDlpPlugin({
+        update: false,
+        ytdlpOptions: {
+          extractorArgs: 'youtube:player_client=android,web',
+        },
+      }),
     ],
   });
 
