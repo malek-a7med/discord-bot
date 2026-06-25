@@ -1,0 +1,227 @@
+bash <<'BASH'
+set -e
+
+echo "🚀 بدء إصلاح مشكلة NO_EXTRACTOR_PLUGIN في الموسيقى..."
+
+# دخول فولدر المشروع
+if [ -d "/workspace/discord-bot" ]; then
+  cd /workspace/discord-bot
+elif [ -d "/home/runner/workspace" ]; then
+  cd /home/runner/workspace
+else
+  echo "❌ مش لاقي فولدر المشروع. افتح Shell من داخل مشروع البوت."
+  exit 1
+fi
+
+echo "📁 المسار الحالي: $(pwd)"
+
+if [ ! -f "commands/music.js" ]; then
+  echo "❌ ملف commands/music.js مش موجود."
+  exit 1
+fi
+
+echo "📦 تثبيت/تحديث yt-dlp..."
+python3 -m pip install -U yt-dlp --user || pip install -U yt-dlp --user || echo "⚠️ pip فشل، هنكمل لو yt-dlp موجود بالفعل."
+
+cp commands/music.js commands/music.js.bak.no-extractor-fix
+echo "✅ اتعمل Backup: commands/music.js.bak.no-extractor-fix"
+
+python3 <<'PY'
+from pathlib import Path
+
+path = Path("commands/music.js")
+text = path.read_text(encoding="utf-8")
+
+# 1) imports
+if "import { execFile } from 'child_process';" not in text:
+    marker = "import { sendMusicCard } from '../helpers/music-card.js';\n"
+    if marker not in text:
+        raise SystemExit("❌ مش لاقي import بتاع music-card.")
+    text = text.replace(
+        marker,
+        marker + "import { execFile } from 'child_process';\nimport { promisify } from 'util';\n",
+        1
+    )
+
+# 2) constants
+if "const execFileAsync = promisify(execFile);" not in text:
+    marker = "const SPOTIFY_INTERNAL_LIMIT = 100;\n"
+    if marker not in text:
+        raise SystemExit("❌ مش لاقي SPOTIFY_INTERNAL_LIMIT. طبق إصلاح Spotify الأول.")
+    text = text.replace(
+        marker,
+        marker + """const execFileAsync = promisify(execFile);
+const YTDLP_CANDIDATES = [
+  process.env.YTDLP_PATH,
+  '/home/runner/workspace/.pythonlibs/bin/yt-dlp',
+  '/usr/local/bin/yt-dlp',
+  '/usr/bin/yt-dlp',
+  'yt-dlp',
+].filter(Boolean);
+""",
+        1
+    )
+
+# 3) add yt-dlp resolver functions before playResolvedSpotifyTracks
+resolver_block = r"""
+async function runYtDlp(args) {
+  let lastError;
+  for (const bin of YTDLP_CANDIDATES) {
+    try {
+      const { stdout } = await execFileAsync(bin, args, {
+        timeout: 30000,
+        maxBuffer: 1024 * 1024,
+      });
+      return stdout.trim();
+    } catch (e) {
+      lastError = e;
+      if (e.code === 'ENOENT') continue;
+    }
+  }
+  throw new Error(`yt-dlp search فشل: ${lastError?.message || 'yt-dlp مش موجود'}`);
+}
+
+async function resolveYoutubeUrl(query) {
+  const safeQuery = String(query || '').replace(/\s+/g, ' ').trim();
+  if (!safeQuery) throw new Error('مفيش كلمات بحث صالحة للتشغيل');
+
+  const output = await runYtDlp([
+    '--no-playlist',
+    '--default-search',
+    'ytsearch1',
+    '--print',
+    'webpage_url',
+    `ytsearch1:${safeQuery}`,
+  ]);
+
+  const url = output.split(/\r?\n/).find(line => /^https?:\/\//.test(line));
+  if (!url) throw new Error(`مش لاقي نتيجة تشغيل لـ: ${safeQuery}`);
+  return url;
+}
+
+async function playInternalSearch(voiceChannel, query, playOptions, metadata = {}) {
+  const youtubeUrl = await resolveYoutubeUrl(query);
+  return distube.play(voiceChannel, youtubeUrl, {
+    ...playOptions,
+    metadata: {
+      ...metadata,
+      backend: 'yt-dlp',
+      searchQuery: query,
+    },
+  });
+}
+
+"""
+
+if "async function runYtDlp(args)" not in text:
+    marker = "async function playResolvedSpotifyTracks(voiceChannel, tracks, playOptions) {\n"
+    if marker not in text:
+        raise SystemExit("❌ مش لاقي playResolvedSpotifyTracks.")
+    text = text.replace(marker, resolver_block + marker, 1)
+
+# 4) replace ytsearch inside playResolvedSpotifyTracks
+old_play = """async function playResolvedSpotifyTracks(voiceChannel, tracks, playOptions) {
+  if (!tracks.length) throw new Error('Spotify مرجعش أي أغاني قابلة للتشغيل');
+  const limitedTracks = tracks.slice(0, SPOTIFY_INTERNAL_LIMIT);
+  for (const [index, track] of limitedTracks.entries()) {
+    await distube.play(voiceChannel, `ytsearch:${track.query}`, {
+      ...playOptions,
+      metadata: {
+        source: 'spotify',
+        spotifyUrl: track.url,
+        spotifyTitle: track.title,
+      },
+    });
+    if (index === 0) await new Promise(resolve => setTimeout(resolve, 350));
+  }
+  return limitedTracks.length;
+}
+"""
+
+new_play = """async function playResolvedSpotifyTracks(voiceChannel, tracks, playOptions) {
+  if (!tracks.length) throw new Error('Spotify مرجعش أي أغاني قابلة للتشغيل');
+  const limitedTracks = tracks.slice(0, SPOTIFY_INTERNAL_LIMIT);
+  for (const [index, track] of limitedTracks.entries()) {
+    await playInternalSearch(voiceChannel, track.query, playOptions, {
+      source: 'spotify',
+      spotifyUrl: track.url,
+      spotifyTitle: track.title,
+    });
+    if (index === 0) await new Promise(resolve => setTimeout(resolve, 350));
+  }
+  return limitedTracks.length;
+}
+"""
+
+if old_play in text:
+    text = text.replace(old_play, new_play, 1)
+
+# 5) fix musicHandler.resolveSource previous ytsearch returns
+old_resolve = """    if (sourceType === 'spotify' || sourceType === 'spotify_playlist') {
+      const tracks = await resolveSpotifyUrl(query);
+      return tracks.map(track => ({ query: `ytsearch:${track.query}`, title: track.title || track.query, requestedBy: userTag }));
+    }
+    return [{ query: `ytsearch:${query}`, title: query, requestedBy: userTag }];
+"""
+
+new_resolve = """    if (sourceType === 'spotify' || sourceType === 'spotify_playlist') {
+      const tracks = await resolveSpotifyUrl(query);
+      const resolved = [];
+      for (const track of tracks) {
+        resolved.push({
+          query: await resolveYoutubeUrl(track.query),
+          title: track.title || track.query,
+          requestedBy: userTag,
+        });
+      }
+      return resolved;
+    }
+    return [{ query: await resolveYoutubeUrl(query), title: query, requestedBy: userTag }];
+"""
+
+if old_resolve in text:
+    text = text.replace(old_resolve, new_resolve, 1)
+
+# 6) fix fallback in handlePlay
+old_fallback = "        await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);"
+new_fallback = "        await playInternalSearch(voiceChannel, query, playOptions, { source: 'spotify_text_fallback' });"
+
+if old_fallback in text:
+    text = text.replace(old_fallback, new_fallback, 1)
+
+path.write_text(text, encoding="utf-8")
+print("✅ تم تطبيق إصلاح NO_EXTRACTOR_PLUGIN")
+PY
+
+echo "🧪 فحص Syntax..."
+node --check commands/music.js
+
+echo "🧪 فحص Git diff..."
+git diff --check
+
+echo "💾 Commit..."
+git add commands/music.js
+git commit -m "fix: resolve yt-dlp search before playback" || echo "ℹ️ مفيش تغييرات جديدة للـ commit أو الإصلاح كان متطبق قبل كده."
+
+echo "🔗 ضبط GitHub remote..."
+if git remote get-url origin >/dev/null 2>&1; then
+  git remote set-url origin https://github.com/malek-a7med/discord-bot.git
+else
+  git remote add origin https://github.com/malek-a7med/discord-bot.git
+fi
+
+echo "⬆️ محاولة رفع التعديلات على GitHub..."
+git push -u origin HEAD:main --force || echo "⚠️ الـ push فشل. لو ريبلت طلب login استخدم GitHub token أو اربط GitHub من Replit."
+
+echo "♻️ Restart البوت..."
+pkill -f "node index.js" || true
+
+if [ -f "index.js" ]; then
+  nohup node index.js > bot.log 2>&1 &
+  echo "✅ البوت اشتغل في الخلفية."
+  echo "📜 تابع اللوج بالأمر:"
+  echo "tail -f bot.log"
+fi
+
+echo "🎉 خلصنا. جرّب /شغل تاني."
+BASH

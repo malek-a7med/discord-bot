@@ -8,9 +8,19 @@ import { DisTube } from 'distube';
 import { SpotifyPlugin } from '@distube/spotify';
 import { YtDlpPlugin } from '@distube/yt-dlp';
 import { sendMusicCard } from '../helpers/music-card.js';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
 const SPOTIFY_URL_RE = /https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-z]{2}\/)?(track|playlist|album)\/([a-zA-Z0-9]+)/i;
 const SPOTIFY_INTERNAL_LIMIT = 100;
+const execFileAsync = promisify(execFile);
+const YTDLP_CANDIDATES = [
+  process.env.YTDLP_PATH,
+  '/home/runner/workspace/node_modules/@distube/yt-dlp/bin/yt-dlp',
+  '/usr/local/bin/yt-dlp',
+  '/usr/bin/yt-dlp',
+  'yt-dlp',
+].filter(Boolean);
 
 // كشف نوع الإدخال بدقة (رابط سبوتيفاي / بحث نصي)
 function detectSourceType(query) {
@@ -102,13 +112,47 @@ async function resolveSpotifyUrl(url) {
   return fetchSpotifyOEmbed(url);
 }
 
+async function runYtDlp(args) {
+  let lastError;
+  for (const bin of YTDLP_CANDIDATES) {
+    try {
+      const { stdout } = await execFileAsync(bin, args, { timeout: 30000, maxBuffer: 1024 * 1024 });
+      return stdout.trim();
+    } catch (e) {
+      lastError = e;
+      if (e.code === 'ENOENT') continue;
+    }
+  }
+  throw new Error(`yt-dlp search فشل: ${lastError?.message || 'yt-dlp مش موجود'}`);
+}
+
+async function resolveYoutubeUrl(query) {
+  const safeQuery = String(query || '').replace(/\s+/g, ' ').trim();
+  if (!safeQuery) throw new Error('مفيش كلمات بحث صالحة للتشغيل');
+  const output = await runYtDlp([
+    '--no-playlist', '--default-search', 'ytsearch1',
+    '--print', 'webpage_url',
+    `ytsearch1:${safeQuery}`,
+  ]);
+  const url = output.split(/\r?\n/).find(line => /^https?:\/\//.test(line));
+  if (!url) throw new Error(`مش لاقي نتيجة تشغيل لـ: ${safeQuery}`);
+  return url;
+}
+
+async function playInternalSearch(voiceChannel, query, playOptions, metadata = {}) {
+  const youtubeUrl = await resolveYoutubeUrl(query);
+  return distube.play(voiceChannel, youtubeUrl, {
+    ...playOptions,
+    metadata: { ...metadata, backend: 'yt-dlp', searchQuery: query },
+  });
+}
+
 async function playResolvedSpotifyTracks(voiceChannel, tracks, playOptions) {
   if (!tracks.length) throw new Error('Spotify مرجعش أي أغاني قابلة للتشغيل');
   const limited = tracks.slice(0, SPOTIFY_INTERNAL_LIMIT);
   for (const [index, track] of limited.entries()) {
-    await distube.play(voiceChannel, `ytsearch:${track.query}`, {
-      ...playOptions,
-      metadata: { source: 'spotify', spotifyUrl: track.url, spotifyTitle: track.title },
+    await playInternalSearch(voiceChannel, track.query, playOptions, {
+      source: 'spotify', spotifyUrl: track.url, spotifyTitle: track.title,
     });
     if (index === 0) await new Promise(resolve => setTimeout(resolve, 350));
   }
@@ -282,9 +326,17 @@ export const musicHandler = {
     }
     if (sourceType === 'spotify' || sourceType === 'spotify_playlist') {
       const tracks = await resolveSpotifyUrl(query);
-      return tracks.map(t => ({ query: `ytsearch:${t.query}`, title: t.title || t.query, requestedBy: userTag }));
+      const resolved = [];
+      for (const track of tracks) {
+        resolved.push({
+          query: await resolveYoutubeUrl(track.query),
+          title: track.title || track.query,
+          requestedBy: userTag,
+        });
+      }
+      return resolved;
     }
-    return [{ query: `ytsearch:${query}`, title: query, requestedBy: userTag }];
+    return [{ query: await resolveYoutubeUrl(query), title: query, requestedBy: userTag }];
   },
 
   async addToQueue(guildId, song) {
@@ -434,14 +486,8 @@ export async function handlePlay(interaction) {
         return;
       }
     } else {
-      // ─── بحث نصي — ytsearch مباشرة ───
-      try {
-        await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);
-      } catch (e) {
-        const errMsg = e?.message || String(e) || 'خطأ مجهول';
-        console.warn('⚠️ [Music] ytsearch فشل، بنحاول تاني:', errMsg);
-        await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);
-      }
+      // ─── بحث نصي — yt-dlp search مباشرة ───
+      await playInternalSearch(voiceChannel, query, playOptions, { source: 'text_search' });
     }
 
     await interaction.editReply({ content: `✅ تم!` }).catch(() => {});
