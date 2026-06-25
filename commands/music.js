@@ -6,6 +6,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { DisTube } from 'distube';
 import { SpotifyPlugin } from '@distube/spotify';
+import { YtDlpPlugin } from '@distube/yt-dlp';
 import { sendMusicCard } from '../helpers/music-card.js';
 
 // كشف نوع الإدخال بدقة (رابط سبوتيفاي / بحث نصي)
@@ -16,6 +17,9 @@ function detectSourceType(query) {
   if (/open\.spotify\.com\/(playlist|album)/i.test(q)) return 'spotify_playlist';
   if (/open\.spotify\.com\/track/i.test(q))            return 'spotify';
   if (/open\.spotify\.com/i.test(q))                   return 'spotify';       // أي رابط سبوتيفاي تاني
+
+  // YouTube / SoundCloud — مرفوضين (نظام Spotify-Only)
+  if (/youtube\.com|youtu\.be|soundcloud\.com/i.test(q)) return 'unsupported';
 
   return 'text';
 }
@@ -38,6 +42,8 @@ export function initMusicSystem(client) {
     emitAddListWhenCreatingQueue: true,
     plugins: [
       new SpotifyPlugin(),
+      // YtDlpPlugin مطلوب كـ backend للـ SpotifyPlugin (بيشغّل الصوت فعلياً)
+      new YtDlpPlugin({ update: false }),
     ],
   });
 
@@ -276,7 +282,7 @@ export const musicHandler = {
 // ─── تسجيل أوامر الموسيقى ─────────────────────────────────────
 export async function registerMusicCommands() {
   return [
-    { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية أو بلاي ليست من Spotify').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها').setRequired(true)), execute: handlePlay },
+    { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية أو بلاي ليست من Spotify (YouTube/SoundCloud مش مدعومين)').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها').setRequired(true)), execute: handlePlay },
     { data: new SlashCommandBuilder().setName('تخطي').setDescription('⏭️ تخطي الأغنية الحالية'), execute: handleSkip },
     { data: new SlashCommandBuilder().setName('وقف').setDescription('⏹️ إيقاف الموسيقى والخروج من القناة'), execute: handleStop },
     { data: new SlashCommandBuilder().setName('قائمة').setDescription('📋 عرض قائمة التشغيل').addIntegerOption(o => o.setName('صفحة').setDescription('رقم الصفحة').setRequired(false).setMinValue(1)), execute: handleQueue },
@@ -312,8 +318,16 @@ export async function handlePlay(interaction) {
       spotify_playlist: '🎵 جاري تحميل البلاي ليست من Spotify...',
       spotify:          '🎵 جاري التحميل من Spotify...',
       text:             '🔍 جاري البحث في Spotify...',
+      unsupported:      '❌',
     };
     await interaction.editReply({ content: loadingMsgs[sourceType] || '🔍 جاري التحميل...' });
+
+    // لو المستخدم بعت رابط YouTube/SoundCloud — ارفض فوراً برسالة واضحة
+    if (sourceType === 'unsupported') {
+      return interaction.editReply({
+        content: `❌ النظام بقى Spotify-Only!\n💡 جرب ترفق رابط من \`open.spotify.com\` أو اكتب اسم الأغنية للبحث`,
+      });
+    }
 
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
 
@@ -345,7 +359,9 @@ export async function handlePlay(interaction) {
     console.error('❌ [Music] handlePlay error:', errMsg, e?.stack?.split('\n')[1] || '');
 
     let msg;
-    if (/private|unavailable|blocked|age.?restricted/i.test(errMsg)) {
+    if (/NO_EXTRACTOR_PLUGIN/i.test(errMsg)) {
+      msg = `⚠️ مشكلة في إعداد الموسيقى! كلم الأونر — محتاج يحط YtDlpPlugin في الـ plugins`;
+    } else if (/private|unavailable|blocked|age.?restricted/i.test(errMsg)) {
       msg = `🔒 فيه محتوى مقفول في البلاي ليست/الألبوم ده (private أو blocked)\n💡 جرب بلاي ليست تانية أو رابط أغنية واحدة`;
     } else if (/no result|not found/i.test(errMsg)) {
       msg = `❌ مش لاقي الأغنية دي على Spotify!\n💡 جرب ترفق رابط مباشر من \`open.spotify.com\``;
