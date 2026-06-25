@@ -1606,6 +1606,113 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
+  // ── أوامر الموسيقى النصية (Prefix + Arabic) ───────────────────────
+  if (msg.guild) {
+    const txt = msg.content.trim();
+
+    // play / شغل / تشغيل + query
+    const playMatch = txt.match(/^[!?؟.,،]?\s*(play|شغل|تشغيل|شغلها|شغل\s*الأغنية)\s+(.+)/iu);
+    if (playMatch) {
+      const query = playMatch[2].trim();
+      const voiceChannel = msg.member?.voice?.channel;
+      if (!voiceChannel) {
+        await msg.reply('❌ لازم تكون في قناة صوتية الأول!').catch(() => {});
+        return;
+      }
+      const statusMsg = await msg.reply('🔍 جاري البحث...').catch(() => null);
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        await mh.joinVoiceChannelAndPlay(msg.guildId, voiceChannel, msg.channel);
+        const results = await mh.resolveSource(query, msg.author.tag);
+        let added = 0;
+        for (const song of results) {
+          try { await mh.addToQueue(msg.guildId, song); added++; } catch {}
+        }
+        const reply = results.length > 1
+          ? `✅ تم إضافة **${added}** أغنية للقائمة!`
+          : `🎵 شغال دلوقتي: **${results[0]?.title || query}**`;
+        await statusMsg?.edit(reply).catch(() => msg.channel.send(reply).catch(() => {}));
+      } catch (err) {
+        await statusMsg?.edit(`❌ ${err.message}`).catch(() => {});
+      }
+      return;
+    }
+
+    // skip / تخطي / التالي
+    if (/^[!?؟.,،]?\s*(skip|تخطي|تخطى|التالي|next|سكيب)$/iu.test(txt)) {
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        await mh.skip(msg.guildId);
+        await msg.react('⏭️').catch(() => {});
+      } catch { await msg.reply('❌ مفيش أغنية شغالة!').catch(() => {}); }
+      return;
+    }
+
+    // stop / وقف / اوقف / اطلع
+    if (/^[!?؟.,،]?\s*(stop|وقف|اوقف|اطلع|استوب|leave|اخرج|وقفها)$/iu.test(txt)) {
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        await mh.stop(msg.guildId);
+        await msg.react('⏹️').catch(() => {});
+      } catch { await msg.reply('❌ مفيش موسيقى شغالة!').catch(() => {}); }
+      return;
+    }
+
+    // pause / وقف مؤقت / بوز
+    if (/^[!?؟.,،]?\s*(pause|وقف\s*مؤقت|وقفها\s*شوية|بوز|باوز)$/iu.test(txt)) {
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        await mh.pause(msg.guildId);
+        await msg.react('⏸️').catch(() => {});
+      } catch { await msg.reply('❌ مفيش أغنية شغالة!').catch(() => {}); }
+      return;
+    }
+
+    // resume / استمر / كمل / رجعها
+    if (/^[!?؟.,،]?\s*(resume|استمر|كمل|رجعها|unpause|شغل\s*تاني)$/iu.test(txt)) {
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        await mh.resume(msg.guildId);
+        await msg.react('▶️').catch(() => {});
+      } catch { await msg.reply('❌ مفيش أغنية موقوفة!').catch(() => {}); }
+      return;
+    }
+
+    // queue / قائمة / القائمة
+    if (/^[!?؟.,،]?\s*(queue|قائمة|القائمة|قائمة\s*التشغيل|list)$/iu.test(txt)) {
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        const display = mh.getQueueDisplay(msg.guildId, 1);
+        await msg.reply(`\`\`\`\n${display}\n\`\`\``).catch(() => {});
+      } catch { await msg.reply('❌ القائمة فارغة!').catch(() => {}); }
+      return;
+    }
+
+    // np / nowplaying / الأغنية الحالية
+    if (/^[!?؟.,،]?\s*(np|nowplaying|now\s*playing|الأغنية\s*الحالية|ايه\s*الأغنية|بتشغل\s*ايه)$/iu.test(txt)) {
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        const queue = mh.getQueue(msg.guildId);
+        if (!queue?.currentSong) return msg.reply('❌ مفيش أغنية شغالة!').catch(() => {});
+        const s = queue.currentSong;
+        await msg.reply(`🎵 **${s.title}**${s.artist ? ` — ${s.artist}` : ''}`).catch(() => {});
+      } catch { await msg.reply('❌ مفيش أغنية شغالة!').catch(() => {}); }
+      return;
+    }
+
+    // volume / صوت + number
+    const volMatch = txt.match(/^[!?؟.,،]?\s*(volume|vol|صوت|الصوت)\s+(\d+)$/iu);
+    if (volMatch) {
+      try {
+        const { musicHandler: mh } = await import('./commands/music.js');
+        const level = Math.max(0, Math.min(100, parseInt(volMatch[2])));
+        mh.setVolume(msg.guildId, level / 100);
+        await msg.reply(`🔊 تم ضبط الصوت على **${level}%**`).catch(() => {});
+      } catch { await msg.reply('❌ مفيش موسيقى شغالة!').catch(() => {}); }
+      return;
+    }
+  }
+
   // ── Auto-Mod الذكي (السيرفر بس) ──────────────────────────────────
   if (msg.guild) {
     const notifyOwner = async (userId, member, reason, warnCount) => {

@@ -86,118 +86,55 @@ async function handlePlay(interaction) {
 
     if (!voiceChannel) {
       return await interaction.reply({
-        content: '❌ لازم تكون في قناة صوتية شنو!',
+        content: '❌ لازم تكون في قناة صوتية الأول!',
         ephemeral: true
       });
     }
 
     await interaction.deferReply();
 
-    // Join voice channel
-    const queue = await musicHandler.joinVoiceChannelAndPlay(
+    await musicHandler.joinVoiceChannelAndPlay(
       interaction.guildId,
       voiceChannel,
       interaction.channel
     );
 
-    // Search for song
-    let results = [];
-    let addedCount = 0;
+    const results = await musicHandler.resolveSource(query, interaction.user.tag);
 
-    if (query.includes('youtube.com') || query.includes('youtu.be')) {
-      // Direct YouTube link
-      results = [
-        {
-          title: 'Direct Link',
-          url: query,
-          duration: 0,
-          platform: 'youtube'
-        }
-      ];
-    } else if (query.includes('spotify.com') && query.includes('/playlist/')) {
-      // Spotify Playlist - extract playlist ID and fetch tracks
-      try {
-        const playlistId = query.match(/\/playlist\/([a-zA-Z0-9]+)/)?.[1];
-        if (playlistId) {
-          const playlistTracks = await musicHandler.searchSpotifyPlaylist(playlistId);
-          results = playlistTracks;
-          addedCount = results.length;
-        } else {
-          throw new Error('معرف البلاي ليست غير صحيح');
-        }
-      } catch (err) {
-        console.warn('⚠️ فشل جلب بلاي ليست Spotify، جاري البحث في YouTube:', err.message);
-        const trackName = query.split('/').pop();
-        results = await musicHandler.searchYouTube(trackName);
-      }
-    } else if (query.includes('spotify.com') || query.includes('open.spotify.com')) {
-      // Spotify track or link - try Spotify search first
-      try {
-        results = await musicHandler.searchSpotify(query);
-        if (results.length === 0) throw new Error('No results from Spotify');
-      } catch (err) {
-        console.warn('⚠️ فشل البحث في Spotify، جاري البحث في YouTube:', err.message);
-        const trackName = query.split('/').pop();
-        results = await musicHandler.searchYouTube(trackName);
-      }
-    } else {
-      // Search YouTube
-      results = await musicHandler.searchYouTube(query);
-    }
-
-    if (results.length === 0) {
-      return await interaction.editReply({
-        content: '❌ ما لقيتش الأغنية بتاعتك!'
-      });
-    }
-
-    // Add all results to queue
     let totalAdded = 0;
-    for (const result of results) {
+    for (const song of results) {
       try {
-        const song = {
-          ...result,
-          requestedBy: interaction.user.tag
-        };
         await musicHandler.addToQueue(interaction.guildId, song);
         totalAdded++;
       } catch (err) {
-        console.warn('⚠️ تعذر إضافة أغنية:', err.message);
+        if (!err.message?.includes('موجودة بالفعل')) {
+          console.warn('⚠️ تعذر إضافة أغنية:', err.message);
+        }
       }
     }
 
     if (totalAdded === 0) {
-      return await interaction.editReply({
-        content: '❌ فشل في إضافة أي أغاني للقائمة!'
-      });
+      return await interaction.editReply({ content: '❌ ما قدرتش أضيف أي أغنية للقائمة!' });
     }
 
+    const isPlaylist = results.length > 1;
     const embed = new EmbedBuilder()
-      .setTitle('➕ تمت إضافة الأغاني')
-      .setDescription(totalAdded === 1 ? results[0].title : `تم إضافة ${totalAdded} أغنية`)
+      .setTitle(isPlaylist ? '📋 تمت إضافة البلاي ليست' : '🎵 تمت إضافة الأغنية')
+      .setDescription(isPlaylist
+        ? `تم إضافة **${totalAdded}** أغنية للقائمة`
+        : `**${results[0].title}**${results[0].artist ? `\n${results[0].artist}` : ''}`)
       .addFields(
-        {
-          name: 'عدد الأغاني المضافة',
-          value: String(totalAdded),
-          inline: true
-        },
-        {
-          name: 'عدد الأغاني بالقائمة',
-          value: String((await musicHandler.getQueueSize(interaction.guildId))),
-          inline: true
-        }
+        { name: '➕ مضاف', value: String(totalAdded), inline: true },
+        { name: '📋 في القائمة', value: String(await musicHandler.getQueueSize(interaction.guildId)), inline: true }
       )
-      .setColor('#2ecc71')
+      .setColor(results[0]?.platform === 'spotify' ? '#1DB954' : '#FF0000')
       .setTimestamp();
 
-    await interaction.editReply({
-      embeds: [embed]
-    });
+    await interaction.editReply({ embeds: [embed] });
   } catch (err) {
     console.error('❌ خطأ في التشغيل:', err);
-    await interaction.editReply({
-      content: `❌ خطأ: ${err.message}`
-    }).catch(() => {});
+    const errMsg = `❌ ${err.message || 'حصل خطأ غير معروف'}`;
+    try { await interaction.editReply({ content: errMsg }); } catch { await interaction.reply({ content: errMsg, ephemeral: true }).catch(() => {}); }
   }
 }
 

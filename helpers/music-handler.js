@@ -156,68 +156,88 @@ class MusicHandler {
     }
   }
 
-  async searchSpotifyPlaylist(playlistId) {
-    try {
-      const playlist = await playdl.spotify(playlistId);
+  async fetchSpotifyInfo(spotifyUrl) {
+    const match = spotifyUrl.match(/spotify\.com\/(track|playlist|album|artist)\/([a-zA-Z0-9]+)/);
+    if (!match) throw new MusicStreamError('رابط Spotify غير صحيح');
+    const [, type, id] = match;
 
-      if (!playlist || !playlist.page) {
-        throw new MusicStreamError('لم يتم العثور على البلاي ليست');
-      }
+    const embedUrl = `https://open.spotify.com/embed/${type}/${id}`;
+    const res = await fetch(embedUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120' }
+    });
+    const html = await res.text();
 
+    const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!m) throw new MusicStreamError('فشل جلب بيانات Spotify');
+
+    const data = JSON.parse(m[1]);
+    const entity = data?.props?.pageProps?.state?.data?.entity;
+    if (!entity) throw new MusicStreamError('فشل العثور على بيانات Spotify');
+
+    if (type === 'track') {
+      return [{
+        title: entity.name || 'Unknown',
+        artist: entity.artists?.map(a => a.name).join(', ') || '',
+        duration: Math.floor((entity.duration || 0) / 1000),
+        platform: 'spotify'
+      }];
+    }
+
+    const trackList = entity.trackList || [];
+    return trackList
+      .filter(t => t.isPlayable !== false)
+      .map(t => ({
+        title: t.title || 'Unknown',
+        artist: t.subtitle || '',
+        duration: Math.floor((t.duration || 0) / 1000),
+        platform: 'spotify'
+      }));
+  }
+
+  async resolveSource(query, requestedBy) {
+    const isSpotify = query.includes('spotify.com') || query.includes('open.spotify.com');
+    const isYouTube = query.includes('youtube.com') || query.includes('youtu.be');
+
+    if (isSpotify) {
+      const spotifyTracks = await this.fetchSpotifyInfo(query);
       const results = [];
-
-      // Get all tracks from playlist
-      for (const track of playlist.page) {
+      for (const track of spotifyTracks) {
         try {
-          const ytResults = await this.searchYouTube(`${track.name} ${track.artists?.map(a => a.name).join(' ')}`);
+          const searchQuery = track.artist ? `${track.title} ${track.artist}` : track.title;
+          const ytResults = await this.searchYouTube(searchQuery);
           if (ytResults.length > 0) {
-            results.push({
-              title: track.name || 'Unknown',
-              artist: track.artists?.map(a => a.name).join(', ') || '',
-              url: ytResults[0].url,
-              duration: track.durationInMs ? Math.floor(track.durationInMs / 1000) : 0,
-              platform: 'spotify',
-              thumbnail: track.thumbnail ? track.thumbnail.url : null
-            });
+            results.push({ ...ytResults[0], title: track.title, artist: track.artist, duration: track.duration || ytResults[0].duration, platform: 'spotify', requestedBy });
           }
         } catch (err) {
-          console.warn(`⚠️ تعذر إضافة الأغنية ${track.name}:`, err.message);
-          continue;
+          console.warn(`⚠️ تخطي "${track.title}": ${err.message}`);
         }
       }
-
+      if (results.length === 0) throw new MusicStreamError('ما لقيتش أي أغنية من Spotify');
       return results;
-    } catch (err) {
-      throw new MusicStreamError(`خطأ في جلب بلاي ليست Spotify: ${err.message}`);
     }
+
+    if (isYouTube) {
+      return [{
+        title: 'YouTube Video',
+        url: query,
+        duration: 0,
+        platform: 'youtube',
+        requestedBy
+      }];
+    }
+
+    const ytResults = await this.searchYouTube(query);
+    if (ytResults.length === 0) throw new MusicStreamError('ما لقيتش أغنية بالاسم ده');
+    return [{ ...ytResults[0], requestedBy }];
+  }
+
+  async searchSpotifyPlaylist(playlistId) {
+    return this.fetchSpotifyInfo(`https://open.spotify.com/playlist/${playlistId}`);
   }
 
   async searchSpotify(query) {
-    try {
-      const sp_search = await playdl.search(query, {
-        source: { spotify: 'track' },
-        limit: 5
-      });
-
-      // Spotify search returns metadata; convert to YouTube for streaming
-      const youtubeResults = [];
-      for (const track of sp_search) {
-        const ytResults = await this.searchYouTube(`${track.name} ${track.artist || ''}`);
-        if (ytResults.length > 0) {
-          youtubeResults.push({
-            title: track.name || 'Unknown',
-            artist: track.artist || '',
-            url: ytResults[0].url,
-            duration: track.durationInSec || 0,
-            platform: 'spotify',
-            thumbnail: track.thumbnail ? track.thumbnail.url : null
-          });
-        }
-      }
-      return youtubeResults;
-    } catch (err) {
-      throw new MusicStreamError(`خطأ في البحث على Spotify: ${err.message}`);
-    }
+    const ytResults = await this.searchYouTube(query);
+    return ytResults.slice(0, 1);
   }
 
   async addToQueue(guildId, song) {
