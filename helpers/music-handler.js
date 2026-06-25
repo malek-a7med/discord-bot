@@ -15,9 +15,9 @@ const YTDLP_PATH = '/home/runner/workspace/.pythonlibs/bin/yt-dlp';
 function createYtDlpStream(url) {
   return new Promise((resolve, reject) => {
     const proc = spawn(YTDLP_PATH, [
-      '--js-runtimes', 'node',
       '--no-playlist',
       '--quiet',
+      '--extractor-args', 'youtube:player_client=ios,android,web',
       '-f', 'bestaudio[ext=webm]/bestaudio/best',
       '-o', '-',
       url
@@ -92,7 +92,9 @@ class MusicHandler {
       const connection = joinVoiceChannel({
         channelId: voiceChannel.id,
         guildId,
-        adapterCreator: voiceChannel.guild.voiceAdapterCreator
+        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+        selfDeaf: false,
+        selfMute: false
       });
 
       connection.on('stateChange', (oldState, newState) => {
