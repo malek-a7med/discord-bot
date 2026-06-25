@@ -8,167 +8,20 @@ import {
 } from '@discordjs/voice';
 import playdl from 'play-dl';
 import { spawn } from 'child_process';
-import { writeFileSync, existsSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
 import { MusicStreamError, VoiceChannelError } from '../errors.js';
 
-const YTDLP_PATHS = [
-  '/home/runner/workspace/.pythonlibs/bin/yt-dlp',
-  '/usr/local/bin/yt-dlp',
-  '/usr/bin/yt-dlp',
-  '/opt/homebrew/bin/yt-dlp'
-];
-const { execSync } = await import('child_process');
+const YTDLP_PATH = '/home/runner/workspace/.pythonlibs/bin/yt-dlp';
 
-function findYtDlp() {
-  for (const p of YTDLP_PATHS) {
-    try {
-      if (existsSync(p)) return p;
-    } catch {}
-  }
-  try {
-    const found = execSync('which yt-dlp', { encoding: 'utf8' }).trim();
-    if (found) return found;
-  } catch {}
-  return YTDLP_PATHS[0]; // fallback
-}
-const YTDLP_PATH = findYtDlp();
-
-// === Platform Detection ===
-function detectPlatform(input) {
-  const lower = input.toLowerCase();
-  const info = {
-    isSpotify: false,
-    isYouTube: false,
-    isSoundCloud: false,
-    soundcloudType: null, // 'track' | 'playlist' | 'set'
-    isDirect: false,
-    platform: 'unknown'
-  };
-
-  // Spotify
-  if (/open\.spotify\.com|spotify\.com/i.test(input)) {
-    info.isSpotify = true;
-    info.platform = 'spotify';
-    return info;
-  }
-
-  // YouTube
-  if (/youtube\.com|youtu\.be/i.test(input)) {
-    info.isYouTube = true;
-    info.platform = 'youtube';
-    return info;
-  }
-
-  // SoundCloud
-  if (/soundcloud\.com/i.test(input)) {
-    info.isSoundCloud = true;
-    info.platform = 'soundcloud';
-    if (/\/sets?\//i.test(input)) info.soundcloudType = 'playlist';
-    else info.soundcloudType = 'track';
-    return info;
-  }
-
-  // روابط مباشرة (ملفات صوتية / HLS streams)
-  if (/^https?:\/\//i.test(input) && /\.(mp3|m4a|aac|ogg|opus|wav|flac|m3u8|m3u|mp4|webm|mpd)(\?|$)/i.test(input)) {
-    info.isDirect = true;
-    info.platform = 'direct';
-    return info;
-  }
-
-  // m3u8 / m3u من أي domain
-  if (/^https?:\/\//i.test(input) && /m3u8|m3u(\?|$)/i.test(input)) {
-    info.isDirect = true;
-    info.platform = 'direct';
-    return info;
-  }
-
-  return info;
-}
-
-function filenameFromUrl(url) {
-  try {
-    const u = new URL(url);
-    const path = u.pathname.split('/').pop() || 'audio';
-    return decodeURIComponent(path.split('?')[0]) || 'audio';
-  } catch {
-    return 'audio';
-  }
-}
-
-// === YouTube Cookies Support ===
-// الترتيب:
-// 1) Environment variable YOUTUBE_COOKIES (الأفضل لـ Replit Secrets)
-// 2) ملف cookies.txt في جذر المشروع (fallback للتطوير المحلي)
-function ensureCookiesFile() {
-  // 1) من Environment Variable
-  const envCookies = process.env.YOUTUBE_COOKIES;
-  if (envCookies && envCookies.trim().length > 0) {
-    const envPath = '/tmp/yt-cookies.txt';
-    try {
-      // اكتب الملف من الـ env (ممكن newline-escaped أو raw)
-      const normalized = envCookies.includes('\\n')
-        ? envCookies.replace(/\\n/g, '\n')
-        : envCookies;
-      writeFileSync(envPath, normalized, 'utf8');
-      return envPath;
-    } catch (err) {
-      console.warn('⚠️ فشل كتابة cookies من env:', err.message);
-    }
-  }
-
-  // 2) من ملف محلي (cookies.txt في جذر المشروع)
-  try {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const localPath = join(__dirname, '..', 'cookies.txt');
-    if (existsSync(localPath)) {
-      return localPath;
-    }
-  } catch {}
-
-  return null;
-}
-
-function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
+function createYtDlpStream(url) {
   return new Promise((resolve, reject) => {
-    const cookiesPath = ensureCookiesFile();
-
-    // اختار extractor-args على حسب الـ platform
-    let extractorArgs = null;
-    if (platform === 'youtube') {
-      extractorArgs = 'youtube:player_client=ios,android,web,web_safari,web_embedded,mweb;formats=missing_pot';
-    }
-
-    // args الأساسية
-    const args = [
+    const proc = spawn(YTDLP_PATH, [
       '--no-playlist',
-      '--no-warnings',
-      ...(extractorArgs ? ['--extractor-args', extractorArgs] : []),
+      '--quiet',
+      '--extractor-args', 'youtube:player_client=ios,android,web',
       '-f', 'bestaudio[ext=webm]/bestaudio/best',
-      '--no-part',
-      '--no-mtime',
       '-o', '-',
       url
-    ];
-
-    if (cookiesPath) {
-      args.push('--cookies', cookiesPath);
-    }
-
-    // attempt 2: جرّب format أقل صرامة (لو bestaudio/webm فشل)
-    if (attempt >= 2) {
-      const idx = args.indexOf('-f');
-      if (idx !== -1) args[idx + 1] = 'bestaudio/best';
-    }
-
-    let proc;
-    try {
-      proc = spawn(YTDLP_PATH, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    } catch (err) {
-      return reject(new Error(`yt-dlp spawn error: ${err.message}`));
-    }
+    ]);
 
     let stderr = '';
     proc.stderr.on('data', d => { stderr += d.toString(); });
@@ -176,9 +29,9 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
     proc.on('error', err => reject(new Error(`yt-dlp spawn error: ${err.message}`)));
 
     const killTimeout = setTimeout(() => {
-      try { proc.kill('SIGKILL'); } catch {}
-      reject(new Error(`yt-dlp timeout بعد 60 ثانية (محاولة ${attempt})`));
-    }, 60000);
+      proc.kill();
+      reject(new Error('yt-dlp timeout بعد 30 ثانية'));
+    }, 30000);
 
     proc.stdout.once('data', () => {
       clearTimeout(killTimeout);
@@ -188,7 +41,7 @@ function createYtDlpStream(url, attempt = 1, platform = 'youtube') {
     proc.on('close', code => {
       clearTimeout(killTimeout);
       if (code !== 0 && code !== null) {
-        reject(new Error(`yt-dlp فشل (كود ${code}, محاولة ${attempt}): ${stderr.slice(-500)}`));
+        reject(new Error(`yt-dlp فشل (كود ${code}): ${stderr.slice(-400)}`));
       }
     });
   });
@@ -344,13 +197,12 @@ class MusicHandler {
   }
 
   async resolveSource(query, requestedBy) {
-    // استخرج URL لو موجود في وسط النص (يوتيوب + سبوتيفاي + ساوند كلاود + مباشر)
-    const urlRegex = /(https?:\/\/[^\s]+)/i;
-    const extractedUrl = query.match(urlRegex)?.[1];
+    // استخرج URL لو موجود في وسط النص
+    const extractedUrl = query.match(/(https?:\/\/(?:open\.spotify\.com|spotify\.com|youtube\.com|youtu\.be|soundcloud\.com)[^\s]+)/i)?.[1];
     const effectiveQuery = extractedUrl || query.trim();
 
-    const platformInfo = detectPlatform(effectiveQuery);
-    const { isSpotify, isYouTube, isSoundCloud, soundcloudType, isDirect } = platformInfo;
+    const isSpotify = effectiveQuery.includes('spotify.com');
+    const isYouTube = effectiveQuery.includes('youtube.com') || effectiveQuery.includes('youtu.be');
 
     if (isSpotify) {
       const spotifyTracks = await this.fetchSpotifyInfo(effectiveQuery);
@@ -380,57 +232,6 @@ class MusicHandler {
       }];
     }
 
-    if (isSoundCloud) {
-      // SoundCloud: لو link مباشر => stream على طول
-      // لو playlist => play-dl يجيب قائمة
-      try {
-        if (soundcloudType === 'track') {
-          const info = await playdl.soundcloud(effectiveQuery);
-          return [{
-            title: info.name || 'SoundCloud Track',
-            url: info.url,
-            duration: Math.floor((info.durationInSec || info.duration / 1000) || 0),
-            artist: info.user?.name || '',
-            thumbnail: info.thumbnail || null,
-            platform: 'soundcloud',
-            requestedBy
-          }];
-        }
-        const so_playlist = await playdl.soundcloud(effectiveQuery);
-        const tracks = await so_playlist.allVideos?.() || [];
-        if (!tracks.length) throw new MusicStreamError('البلاي ليست SoundCloud فاضية');
-        return tracks.slice(0, 100).map(t => ({
-          title: t.name || 'Unknown',
-          url: t.url,
-          duration: Math.floor((t.durationInSec || t.duration / 1000) || 0),
-          artist: t.user?.name || '',
-          thumbnail: t.thumbnail || null,
-          platform: 'soundcloud',
-          requestedBy
-        }));
-      } catch (err) {
-        console.warn('⚠️ فشل SoundCloud, بنجرب yt-dlp مباشرة:', err.message);
-        return [{
-          title: 'SoundCloud',
-          url: effectiveQuery,
-          duration: 0,
-          platform: 'soundcloud',
-          requestedBy
-        }];
-      }
-    }
-
-    if (isDirect) {
-      // رابط مباشر لملف صوتي (mp3, m3u8, opus, ogg, wav, m4a...)
-      return [{
-        title: filenameFromUrl(effectiveQuery),
-        url: effectiveQuery,
-        duration: 0,
-        platform: 'direct',
-        requestedBy
-      }];
-    }
-
     const ytResults = await this.searchYouTube(effectiveQuery);
     if (ytResults.length === 0) throw new MusicStreamError('ما لقيتش أغنية بالاسم ده');
     return [{ ...ytResults[0], requestedBy }];
@@ -443,35 +244,6 @@ class MusicHandler {
   async searchSpotify(query) {
     const ytResults = await this.searchYouTube(query);
     return ytResults.slice(0, 1);
-  }
-
-  async searchSoundCloud(query) {
-    try {
-      const results = await playdl.search(query, {
-        source: { soundcloud: 'tracks' },
-        limit: 5
-      });
-      return results.map(t => ({
-        title: t.name || 'Unknown',
-        url: t.url,
-        duration: Math.floor((t.durationInSec || (t.duration || 0) / 1000) || 0),
-        artist: t.user?.name || '',
-        thumbnail: t.thumbnail || null,
-        platform: 'soundcloud'
-      }));
-    } catch (err) {
-      throw new MusicStreamError(`خطأ في البحث على SoundCloud: ${err.message}`);
-    }
-  }
-
-  getPlatformEmoji(platform) {
-    const map = {
-      youtube: '📺 YouTube',
-      spotify: '🎵 Spotify',
-      soundcloud: '☁️ SoundCloud',
-      direct: '🔗 Direct'
-    };
-    return map[platform] || '🎵 Unknown';
   }
 
   async addToQueue(guildId, song) {
@@ -524,51 +296,31 @@ class MusicHandler {
 
       try {
         let stream;
-        const isSignInError = (msg) =>
-          msg && (
-            msg.includes('Sign in') ||
-            msg.includes('bot') ||
-            msg.includes('sign_in') ||
-            msg.includes('Sign in to confirm') ||
-            msg.includes('confirm you') ||
-            msg.includes('HTTP Error 403') ||
-            msg.includes('429')
-          );
+        const isSignInError = (msg) => msg && (msg.includes('Sign in') || msg.includes('bot') || msg.includes('sign_in'));
 
-        // Try primary URL (نمرّر platform عشان args مناسبة)
-        const songPlatform = song.platform || 'youtube';
+        // Try primary URL
         try {
-          stream = await createYtDlpStream(song.url, 1, songPlatform);
+          stream = await createYtDlpStream(song.url);
         } catch (primaryErr) {
-          const primaryMsg = primaryErr.message || '';
-
-          // 1) لو مشكلة Sign-in / bot detection: جرّب format أضعف
-          if (isSignInError(primaryMsg) || primaryMsg.includes('SABR') || primaryMsg.includes('PO Token')) {
-            console.warn(`⚠️ حماية YouTube، بنجرب format بديل: ${song.title}`);
+          // If Sign-in error, try alternative YouTube results for same song
+          if (isSignInError(primaryErr.message)) {
+            console.warn(`⚠️ الفيديو محمي، بنجرب نسخة تانية: ${song.title}`);
+            const searchQ = song.artist ? `${song.title} ${song.artist}` : song.title;
             try {
-              stream = await createYtDlpStream(song.url, 2, songPlatform);
-            } catch (altErr) {
-              // 2) بس لو YouTube: جرّب 3 بدائل من نتائج البحث
-              if (songPlatform === 'youtube') {
-                console.warn(`⚠️ البحث عن نسخة بديلة: ${song.title}`);
-                const searchQ = song.artist ? `${song.title} ${song.artist}` : song.title;
-                const altResults = await this.searchYouTube(searchQ);
-                let found = false;
-                for (const alt of altResults.slice(0, 3)) {
-                  if (alt.url === song.url) continue;
-                  try {
-                    stream = await createYtDlpStream(alt.url, 1, 'youtube');
-                    song.url = alt.url;
-                    found = true;
-                    console.log(`✅ لقيت نسخة بديلة: ${alt.title}`);
-                    break;
-                  } catch {}
-                }
-                if (!found) throw primaryErr;
-              } else {
-                // SoundCloud / direct: مفيش بديل، هنرمي الـ err
-                throw primaryErr;
+              const altResults = await this.searchYouTube(searchQ);
+              let found = false;
+              for (const alt of altResults) {
+                if (alt.url === song.url) continue; // skip same video
+                try {
+                  stream = await createYtDlpStream(alt.url);
+                  song.url = alt.url; // update to working URL
+                  found = true;
+                  break;
+                } catch {}
               }
+              if (!found) throw primaryErr;
+            } catch {
+              throw primaryErr;
             }
           } else {
             throw primaryErr;
@@ -622,26 +374,9 @@ class MusicHandler {
       } catch (err) {
         console.error('❌ خطأ في تشغيل الأغنية:', err.message);
         if (queue.textChannel) {
-          const songPlat = song.platform || 'youtube';
-          let reason;
-          if (isSignInError(err.message)) {
-            reason = songPlat === 'youtube'
-              ? 'YouTube رفض الطلب (محتاج cookies صالحة في YOUTUBE_COOKIES)'
-              : `${songPlat} رفض الطلب`;
-          } else if (err.message?.includes('Unsupported URL')) {
-            reason = `yt-dlp مش بيساند الرابط ده (${songPlat})`;
-          } else if (err.message?.includes('HTTP Error 404')) {
-            reason = 'الرابط مش موجود أو اتحذف';
-          } else if (err.message?.includes('timeout')) {
-            reason = 'انتهت المهلة قبل ما يجيب البث';
-          } else if (err.message?.includes('Private video') || err.message?.includes('private')) {
-            reason = 'الفيديو private';
-          } else {
-            reason = 'تعذر جلب البث الصوتي';
-          }
           await queue.textChannel
             .send({
-              content: `⚠️ تعذر تشغيل: **${song.title}**\n🎯 المنصة: ${this.getPlatformEmoji(songPlat)}\n📋 السبب: ${reason}\n⏭️ جاري الانتقال للأغنية التالية...`
+              content: `⚠️ تعذر تشغيل الأغنية: ${song.title}، جاري الانتقال للأغنية التالية...`
             })
             .catch(() => {});
         }
