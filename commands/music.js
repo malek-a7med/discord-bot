@@ -7,7 +7,16 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { DisTube } from 'distube';
 import { YtDlpPlugin } from '@distube/yt-dlp';
 import { SoundCloudPlugin } from '@distube/soundcloud';
+import { SpotifyPlugin } from '@distube/spotify';
 import { sendMusicCard } from '../helpers/music-card.js';
+
+// كشف نوع الرابط
+function detectSourceType(query) {
+  if (/open\.spotify\.com/i.test(query)) return 'spotify';
+  if (/youtube\.com|youtu\.be/i.test(query)) return 'youtube';
+  if (/soundcloud\.com/i.test(query)) return 'soundcloud';
+  return 'text';
+}
 
 // نسخة واحدة من DisTube بيتم ربطها بالكلاينت عند init
 let distube = null;
@@ -21,6 +30,7 @@ export function initMusicSystem(client) {
     emitAddSongWhenCreatingQueue: false,
     emitAddListWhenCreatingQueue: false,
     plugins: [
+      new SpotifyPlugin(),
       new SoundCloudPlugin(),
       new YtDlpPlugin({ update: false }),
     ],
@@ -289,15 +299,60 @@ export async function handlePlay(interaction) {
 
     await interaction.deferReply();
 
-    await distube.play(voiceChannel, query, {
-      textChannel: interaction.channel,
-      member: interaction.member,
-    });
+    const sourceType = detectSourceType(query);
 
-    await interaction.editReply({ content: `🔍 جاري التشغيل: **${query}**` });
+    // رسالة الانتظار حسب نوع المصدر
+    const loadingMsgs = {
+      spotify:    '🎵 جاري التحميل من Spotify...',
+      youtube:    '▶️ جاري التحميل من YouTube...',
+      soundcloud: '🔊 جاري التحميل من SoundCloud...',
+      text:       '🔍 جاري البحث...',
+    };
+    await interaction.editReply({ content: loadingMsgs[sourceType] });
+
+    // محاولة التشغيل مع fallback للبحث النصي
+    const playOptions = { textChannel: interaction.channel, member: interaction.member };
+
+    if (sourceType !== 'text') {
+      // رابط مباشر — شغّله مباشرة
+      await distube.play(voiceChannel, query, playOptions);
+    } else {
+      // بحث نصي — حاول YouTube أولاً ثم SoundCloud
+      let played = false;
+
+      // محاولة YouTube
+      try {
+        await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
+        played = true;
+      } catch (ytErr) {
+        console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
+      }
+
+      // fallback إلى SoundCloud
+      if (!played) {
+        try {
+          await distube.play(voiceChannel, `scsearch:${query}`, { ...playOptions });
+          played = true;
+        } catch (scErr) {
+          console.warn('⚠️ [Music] SoundCloud فشل:', scErr.message);
+        }
+      }
+
+      if (!played) {
+        return interaction.editReply({
+          content: `❌ مش لاقي الأغنية دي!\n💡 جرب ترفق رابط مباشر من:\n🎵 Spotify: \`open.spotify.com\`\n▶️ YouTube: \`youtube.com\`\n🔊 SoundCloud: \`soundcloud.com\``,
+        });
+      }
+    }
+
+    // لو الرد مش اتعدّل بعد التشغيل، نخليه يختفي
+    await interaction.editReply({ content: `✅ تم!` }).catch(() => {});
   } catch (e) {
     console.error('❌ [Music] handlePlay:', e.message);
-    const msg = `❌ ${e.message || 'حصل خطأ!'}`;
+    const isNotFound = /no result|not found|unavailable|private|blocked/i.test(e.message);
+    const msg = isNotFound
+      ? `❌ مش لاقي الأغنية دي!\n💡 جرب ترفق رابط مباشر من Spotify أو YouTube أو SoundCloud`
+      : `❌ ${e.message || 'حصل خطأ!'}`;
     try { await interaction.editReply({ content: msg }); } catch { await interaction.reply({ content: msg, ephemeral: true }).catch(() => {}); }
   }
 }
@@ -322,10 +377,30 @@ export async function handleStop(interaction) {
     if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
     const q = distube.getQueue(interaction.guildId);
     if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+
+    // لو الأمر جاي من زر الداش بورد — نمسح الرسالة نفسها
+    const isButton = interaction.isButton?.();
+    if (isButton) {
+      await interaction.message?.delete().catch(() => {});
+    }
+
+    // مسح رسالة الداش بورد المخزنة على القائمة (لو مش نفس الرسالة)
+    if (q.currentMessage && q.currentMessage.id !== interaction.message?.id) {
+      await q.currentMessage.delete().catch(() => {});
+    }
+    q.currentMessage = null;
+
     await distube.stop(interaction.guildId);
-    await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });
+
+    if (!isButton) {
+      await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });
+    }
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    try {
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true });
+      }
+    } catch {}
   }
 }
 

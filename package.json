@@ -13,6 +13,7 @@
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
     "@distube/soundcloud": "^2.0.4",
+    "@distube/spotify": "^2.0.2",
     "@distube/yt-dlp": "^2.0.1",
     "@distube/ytdl-core": "^4.16.12",
     "@google/generative-ai": "^0.24.1",
