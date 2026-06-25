@@ -9,4 +9,4 @@
 - [Speech Mode](speech-mode.md) — 3 modes: normal(no swearing)/free(mirror swear back)/toxic(swears freely); buildUserPrompt in index.js; /تغيير-طريقة-الكلام owner-only
 - [Latest Features Rule](latest-features-rule.md) — every new feature MUST be added to LATEST_FEATURES array in commands/games-hub.js (newest entry first)
 - [Codenames 5-Row Limit](codenames-5row.md) — Discord max 5 ActionRows: board alone takes all 5 rows; skip/cancel buttons go as separate control message in channel; spymaster gets "give clue" via DM (sendActiveSpymasterControl); modal submits must NOT use interaction.update() — edit message by fetching state.channelId+state.messageId directly
-- [Music Audio Fix](music-audio-fix.md) — opusscript (npm) must be installed; StreamType.WebmOpus not Arbitrary; yt-dlp outputs webm/opus; ModerationListener needs setEnabled() method
+- [Music System DisTube](music-distube.md) — replaced play-dl/voice with DisTube+YtDlpPlugin+SoundCloud; initMusicSystem(client) called in index.js after client creation; button IDs music_pause/resume/skip/stop/repeat/vol_up/vol_down; card uses song.name not song.title; YtDlpPlugin must be LAST in plugins array

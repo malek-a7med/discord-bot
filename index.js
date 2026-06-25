@@ -16,7 +16,7 @@ import config from "./config.js";
 import Database from "./database.js";
 import Logger from "./logger.js";
 import ModerationListener from "./helpers/moderation-listener.js";
-import { registerMusicCommands, musicHandler } from "./commands/music.js";
+import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat } from "./commands/music.js";
 import { registerCleanChapterCommand, handleCleanChapter } from "./commands/image-cleaner.js";
 import { registerTranslateChapterCommand, handleTranslateChapter } from "./commands/translator.js";
 import {
@@ -779,6 +779,9 @@ const client = new Client({
     },
   },
 });
+
+// ── تهيئة DisTube بعد إنشاء الكلاينت مباشرة ──────────────────
+initMusicSystem(client);
 
 const activeGames = new Collection();
 // إجراءات التأديب المعلقة — تنتظر تأكيد المشرف
@@ -2401,9 +2404,9 @@ client.on("interactionCreate", async (interaction) => {
         return await handleOcrUpload(interaction);
       }
 
-      // Music Commands (New System)
+      // Music Commands
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      const MUSIC_CMDS = ["شغل-اغنية","skip","خروج","queue","pause","resume","nowplaying","volume"];
+      const MUSIC_CMDS = ["شغل","شغل-اغنية","تخطي","skip","وقف","خروج","قائمة","queue","بوز","pause","كمل","resume","شغال-ايه","nowplaying","صوت","volume","تكرار"];
       if (MUSIC_CMDS.includes(cmd)) {
         let musicInteraction = interaction;
         if (isFromDM && guild) {
@@ -2419,38 +2422,15 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        if (cmd === "شغل-اغنية") {
-          const { handlePlay } = await import("./commands/music.js");
-          return await handlePlay(musicInteraction);
-        }
-        if (cmd === "skip") {
-          const { handleSkip } = await import("./commands/music.js");
-          return await handleSkip(musicInteraction);
-        }
-        if (cmd === "خروج") {
-          const { handleStop } = await import("./commands/music.js");
-          return await handleStop(musicInteraction);
-        }
-        if (cmd === "queue") {
-          const { handleQueue } = await import("./commands/music.js");
-          return await handleQueue(musicInteraction);
-        }
-        if (cmd === "pause") {
-          const { handlePause } = await import("./commands/music.js");
-          return await handlePause(musicInteraction);
-        }
-        if (cmd === "resume") {
-          const { handleResume } = await import("./commands/music.js");
-          return await handleResume(musicInteraction);
-        }
-        if (cmd === "nowplaying") {
-          const { handleNowPlaying } = await import("./commands/music.js");
-          return await handleNowPlaying(musicInteraction);
-        }
-        if (cmd === "volume") {
-          const { handleVolume } = await import("./commands/music.js");
-          return await handleVolume(musicInteraction);
-        }
+        if (cmd === "شغل" || cmd === "شغل-اغنية") return await handlePlay(musicInteraction);
+        if (cmd === "تخطي" || cmd === "skip")      return await handleSkip(musicInteraction);
+        if (cmd === "وقف"  || cmd === "خروج")      return await handleStop(musicInteraction);
+        if (cmd === "قائمة"|| cmd === "queue")     return await handleQueue(musicInteraction);
+        if (cmd === "بوز"  || cmd === "pause")     return await handlePause(musicInteraction);
+        if (cmd === "كمل"  || cmd === "resume")    return await handleResume(musicInteraction);
+        if (cmd === "شغال-ايه" || cmd === "nowplaying") return await handleNowPlaying(musicInteraction);
+        if (cmd === "صوت"  || cmd === "volume")    return await handleVolume(musicInteraction);
+        if (cmd === "تكرار")                       return await handleRepeat(musicInteraction);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -3475,21 +3455,20 @@ client.on("interactionCreate", async (interaction) => {
 
       // ─── أزرار التحكم في الموسيقى ────────────────────────────────
       if (interaction.customId.startsWith("music_")) {
-        const { handleSkip, handlePause, handleResume, handleStop, handleNowPlaying, musicHandler: mhInst } = await import("./commands/music.js");
         const id = interaction.customId;
         if (id === "music_pause")      return await handlePause(interaction);
         if (id === "music_resume")     return await handleResume(interaction);
         if (id === "music_skip")       return await handleSkip(interaction);
         if (id === "music_stop")       return await handleStop(interaction);
         if (id === "music_nowplaying") return await handleNowPlaying(interaction);
+        if (id === "music_repeat")     return await handleRepeat(interaction);
         if (id === "music_vol_up" || id === "music_vol_down") {
-          await interaction.deferReply({ ephemeral: true });
-          const queue = mhInst?.getQueue?.(interaction.guildId);
-          if (!queue) return interaction.editReply({ content: '❌ مفيش موسيقى شغالة!' });
-          const current = Math.round((queue.volume || 0.5) * 100);
-          const next = id === "music_vol_up" ? Math.min(current + 10, 100) : Math.max(current - 10, 0);
-          mhInst.setVolume(interaction.guildId, next / 100);
-          return interaction.editReply({ content: `🔊 الصوت: **${next}%**` });
+          const dt = musicHandler.getDistube();
+          const q = dt?.getQueue(interaction.guildId);
+          if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+          const next = id === "music_vol_up" ? Math.min(q.volume + 10, 100) : Math.max(q.volume - 10, 0);
+          dt.setVolume(interaction.guildId, next);
+          return interaction.reply({ content: `🔊 الصوت: **${next}%**`, ephemeral: true });
         }
         return;
       }
@@ -3747,17 +3726,15 @@ client.on("interactionCreate", async (interaction) => {
 
         // 🎵 قائمة الميوزك
         if (interaction.customId === "dmp_queue") {
-          const { musicHandler: mh } = await import("./commands/music.js");
-          const q = mh?.getQueue?.(g?.id);
-          if (!q || q.length === 0) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", ephemeral: true });
-          const txt = q.slice(0, 5).map((s, i) => `**${i+1}.** ${s.title}`).join("\n");
+          const q = musicHandler?.getQueue?.(g?.id);
+          if (!q || !q.songs?.length) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", ephemeral: true });
+          const txt = q.songs.slice(0, 5).map((s, i) => `**${i+1}.** ${s.title || s.name}`).join("\n");
           return interaction.reply({ content: `🎵 **قائمة التشغيل:**\n${txt}`, ephemeral: true });
         }
 
         // ⏹️ إيقاف الميوزك
         if (interaction.customId === "dmp_stop") {
-          const { musicHandler: mh } = await import("./commands/music.js");
-          mh?.stop?.(g?.id);
+          await musicHandler?.stop?.(g?.id).catch(() => {});
           return interaction.reply({ content: "⏹️ تم إيقاف الميوزك!", ephemeral: true });
         }
 
