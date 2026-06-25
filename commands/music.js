@@ -118,14 +118,17 @@ async function handlePlay(interaction) {
     }
 
     const isPlaylist = results.length > 1;
+    const queueSize = musicHandler.getQueueSize(interaction.guildId);
+    const isNowPlaying = !isPlaylist && queueSize === 0;
+
     const embed = new EmbedBuilder()
-      .setTitle(isPlaylist ? '📋 تمت إضافة البلاي ليست' : '🎵 تمت إضافة الأغنية')
+      .setTitle(isPlaylist ? '📋 تمت إضافة البلاي ليست' : isNowPlaying ? '🎵 جاري التشغيل الآن' : '✅ أُضيفت للقائمة')
       .setDescription(isPlaylist
         ? `تم إضافة **${totalAdded}** أغنية للقائمة`
         : `**${results[0].title}**${results[0].artist ? `\n${results[0].artist}` : ''}`)
       .addFields(
-        { name: '➕ مضاف', value: String(totalAdded), inline: true },
-        { name: '📋 في القائمة', value: String(await musicHandler.getQueueSize(interaction.guildId)), inline: true }
+        ...(isPlaylist ? [{ name: '➕ مضاف', value: String(totalAdded), inline: true }] : []),
+        { name: '📋 في القائمة', value: String(queueSize), inline: true }
       )
       .setColor(results[0]?.platform === 'spotify' ? '#1DB954' : '#FF0000')
       .setTimestamp();
