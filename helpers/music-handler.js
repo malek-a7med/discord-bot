@@ -3,10 +3,49 @@ import {
   createAudioPlayer,
   createAudioResource,
   AudioPlayerStatus,
-  VoiceConnectionStatus
+  VoiceConnectionStatus,
+  StreamType
 } from '@discordjs/voice';
 import playdl from 'play-dl';
+import { spawn } from 'child_process';
 import { MusicStreamError, VoiceChannelError } from '../errors.js';
+
+const YTDLP_PATH = '/home/runner/workspace/.pythonlibs/bin/yt-dlp';
+
+function createYtDlpStream(url) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(YTDLP_PATH, [
+      '--js-runtimes', 'node',
+      '--no-playlist',
+      '--quiet',
+      '-f', 'bestaudio[ext=webm]/bestaudio/best',
+      '-o', '-',
+      url
+    ]);
+
+    let stderr = '';
+    proc.stderr.on('data', d => { stderr += d.toString(); });
+
+    proc.on('error', err => reject(new Error(`yt-dlp spawn error: ${err.message}`)));
+
+    const killTimeout = setTimeout(() => {
+      proc.kill();
+      reject(new Error('yt-dlp timeout بعد 30 ثانية'));
+    }, 30000);
+
+    proc.stdout.once('data', () => {
+      clearTimeout(killTimeout);
+      resolve({ stream: proc.stdout, type: StreamType.Arbitrary, proc });
+    });
+
+    proc.on('close', code => {
+      clearTimeout(killTimeout);
+      if (code !== 0 && code !== null) {
+        reject(new Error(`yt-dlp فشل (كود ${code}): ${stderr.slice(-400)}`));
+      }
+    });
+  });
+}
 
 class MusicHandler {
   constructor() {
@@ -236,7 +275,7 @@ class MusicHandler {
 
         while (retries < maxRetries) {
           try {
-            stream = await playdl.stream(song.url);
+            stream = await createYtDlpStream(song.url);
             break;
           } catch (streamErr) {
             retries++;
@@ -244,7 +283,7 @@ class MusicHandler {
               throw streamErr;
             }
             console.warn(`⚠️ إعادة محاولة تحميل الأغنية (${retries}/${maxRetries}): ${streamErr.message}`);
-            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+            await new Promise(resolve => setTimeout(resolve, 2000 * retries));
           }
         }
 
