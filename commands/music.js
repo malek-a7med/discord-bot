@@ -261,6 +261,9 @@ export function initMusicSystem(client) {
   // لما حد يدخل/يخرج من القناة الصوتية
   client.on('voiceStateUpdate', async (oldState, newState) => {
     try {
+      // تجاهل أحداث البوت نفسه عشان منعملش loop
+      if (oldState.member?.user?.bot || newState.member?.user?.bot) return;
+
       const q = distube.getQueue(newState.guild.id || oldState.guild.id);
       if (!q) return;
 
@@ -271,7 +274,7 @@ export function initMusicSystem(client) {
       const humanListeners = botVoiceChannel.members.filter(m => !m.user.bot).size;
 
       if (humanListeners === 0) {
-        // القناة فاضية — خروج فوري
+        // القناة فاضية — خروج فوري (distube.stop بيعمل الـ disconnect تلقائياً)
         const ch = q.textChannel;
         if (ch?.send) ch.send({
           embeds: [new EmbedBuilder()
@@ -280,7 +283,6 @@ export function initMusicSystem(client) {
         }).catch(() => {});
         pausedAt.delete(q.id);
         await distube.stop(q.id).catch(() => {});
-        botVoiceChannel.guild.members.me?.voice?.disconnect().catch(() => {});
       } else {
         // في ناس في القناة — استأنف لو كان موقوف تلقائياً
         if (q.paused && pausedAt.has(q.id)) {
