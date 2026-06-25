@@ -15,11 +15,14 @@ const SPOTIFY_URL_RE = /https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-z]{2}\/)?
 const SPOTIFY_INTERNAL_LIMIT = 100;
 const execFileAsync = promisify(execFile);
 const YTDLP_CANDIDATES = [
-  process.env.YTDLP_PATH,
-  '/home/runner/workspace/node_modules/@distube/yt-dlp/bin/yt-dlp',
-  '/usr/local/bin/yt-dlp',
-  '/usr/bin/yt-dlp',
-  'yt-dlp',
+  process.env.YTDLP_PATH ? { bin: process.env.YTDLP_PATH, baseArgs: [] } : null,
+  { bin: '/home/runner/workspace/.pythonlibs/bin/yt-dlp', baseArgs: [] },
+  { bin: '/home/runner/workspace/node_modules/@distube/yt-dlp/bin/yt-dlp', baseArgs: [] },
+  { bin: '/usr/local/bin/yt-dlp', baseArgs: [] },
+  { bin: '/usr/bin/yt-dlp', baseArgs: [] },
+  { bin: 'yt-dlp', baseArgs: [] },
+  { bin: process.env.PYTHON || 'python3', baseArgs: ['-m', 'yt_dlp'] },
+  { bin: 'python', baseArgs: ['-m', 'yt_dlp'] },
 ].filter(Boolean);
 
 // كشف نوع الإدخال بدقة (رابط سبوتيفاي / بحث نصي)
@@ -114,16 +117,20 @@ async function resolveSpotifyUrl(url) {
 
 async function runYtDlp(args) {
   let lastError;
-  for (const bin of YTDLP_CANDIDATES) {
+  for (const candidate of YTDLP_CANDIDATES) {
     try {
-      const { stdout } = await execFileAsync(bin, args, { timeout: 30000, maxBuffer: 1024 * 1024 });
+      const { bin, baseArgs } = candidate;
+      const { stdout } = await execFileAsync(bin, [...baseArgs, ...args], {
+        timeout: 30000,
+        maxBuffer: 1024 * 1024,
+      });
       return stdout.trim();
     } catch (e) {
       lastError = e;
       if (e.code === 'ENOENT') continue;
     }
   }
-  throw new Error(`yt-dlp search فشل: ${lastError?.message || 'yt-dlp مش موجود'}`);
+  throw new Error(`yt-dlp مش متثبت أو مش قابل للتشغيل. شغّل: python3 -m pip install -U yt-dlp --user (${lastError?.message || 'ENOENT'})`);
 }
 
 async function resolveYoutubeUrl(query) {

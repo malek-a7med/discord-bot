@@ -1,0 +1,205 @@
+bash <<'BASH'
+set -e
+
+echo "🚀 بدء الحل النهائي لمشكلة yt-dlp ENOENT + Spotify playback..."
+
+# ادخل فولدر المشروع
+if [ -d "/workspace/discord-bot" ]; then
+  cd /workspace/discord-bot
+elif [ -d "/home/runner/workspace" ]; then
+  cd /home/runner/workspace
+else
+  echo "❌ مش لاقي فولدر المشروع. افتح Shell من داخل مشروع البوت."
+  exit 1
+fi
+
+echo "📁 Project path: $(pwd)"
+
+if [ ! -f "commands/music.js" ]; then
+  echo "❌ commands/music.js مش موجود."
+  exit 1
+fi
+
+echo "📦 تثبيت yt-dlp..."
+if command -v uv >/dev/null 2>&1; then
+  uv sync || echo "⚠️ uv sync فشل، هنجرب pip..."
+fi
+
+python3 -m pip install -U yt-dlp --user || pip install -U yt-dlp --user || echo "⚠️ pip فشل، هنكمل ونشوف هل yt-dlp موجود ولا لأ."
+
+export PATH="$HOME/.local/bin:$PWD/.venv/bin:/home/runner/workspace/.venv/bin:/home/runner/workspace/.pythonlibs/bin:$PATH"
+
+echo "🔎 فحص yt-dlp..."
+if command -v yt-dlp >/dev/null 2>&1; then
+  echo "✅ yt-dlp موجود: $(command -v yt-dlp)"
+  yt-dlp --version || true
+elif python3 -m yt_dlp --version >/dev/null 2>&1; then
+  echo "✅ yt-dlp موجود كـ Python module:"
+  python3 -m yt_dlp --version || true
+else
+  echo "❌ yt-dlp لسه مش متثبت."
+  echo "جرّب من Packages في Replit أو شغّل:"
+  echo "python3 -m pip install -U yt-dlp --user"
+  exit 1
+fi
+
+echo "🛠️ تطبيق تعديل الكود..."
+cp commands/music.js commands/music.js.bak.ytdlp-enoent-fix
+
+python3 <<'PY'
+from pathlib import Path
+
+path = Path("commands/music.js")
+text = path.read_text(encoding="utf-8")
+
+# تأكد من imports
+if "import { execFile } from 'child_process';" not in text:
+    marker = "import { sendMusicCard } from '../helpers/music-card.js';\n"
+    if marker not in text:
+        raise SystemExit("❌ مش لاقي import music-card.")
+    text = text.replace(
+        marker,
+        marker + "import { execFile } from 'child_process';\nimport { promisify } from 'util';\n",
+        1
+    )
+
+# استبدال YTDLP_CANDIDATES القديم أو إضافته
+old_candidates_1 = """const execFileAsync = promisify(execFile);
+const YTDLP_CANDIDATES = [
+  process.env.YTDLP_PATH,
+  '/home/runner/workspace/.pythonlibs/bin/yt-dlp',
+  '/usr/local/bin/yt-dlp',
+  '/usr/bin/yt-dlp',
+  'yt-dlp',
+].filter(Boolean);
+"""
+
+new_candidates = """const execFileAsync = promisify(execFile);
+const YTDLP_CANDIDATES = [
+  process.env.YTDLP_PATH ? { bin: process.env.YTDLP_PATH, baseArgs: [] } : null,
+  { bin: '/home/runner/workspace/.pythonlibs/bin/yt-dlp', baseArgs: [] },
+  { bin: '/home/runner/workspace/.venv/bin/yt-dlp', baseArgs: [] },
+  { bin: './.venv/bin/yt-dlp', baseArgs: [] },
+  { bin: '/usr/local/bin/yt-dlp', baseArgs: [] },
+  { bin: '/usr/bin/yt-dlp', baseArgs: [] },
+  { bin: 'yt-dlp', baseArgs: [] },
+  { bin: process.env.PYTHON || 'python3', baseArgs: ['-m', 'yt_dlp'] },
+  { bin: 'python', baseArgs: ['-m', 'yt_dlp'] },
+].filter(Boolean);
+"""
+
+if old_candidates_1 in text:
+    text = text.replace(old_candidates_1, new_candidates, 1)
+elif "const execFileAsync = promisify(execFile);" not in text:
+    marker = "const SPOTIFY_INTERNAL_LIMIT = 100;\n"
+    if marker not in text:
+        raise SystemExit("❌ مش لاقي SPOTIFY_INTERNAL_LIMIT.")
+    text = text.replace(marker, marker + new_candidates, 1)
+
+# استبدال runYtDlp القديم
+start = text.find("async function runYtDlp(args) {")
+if start != -1:
+    end = text.find("\n}\n\nasync function resolveYoutubeUrl", start)
+    if end == -1:
+        raise SystemExit("❌ لقيت runYtDlp بس مش عارف أحدد نهايتها.")
+    end += len("\n}\n")
+    new_run = """async function runYtDlp(args) {
+  let lastError;
+  for (const candidate of YTDLP_CANDIDATES) {
+    try {
+      const { bin, baseArgs } = candidate;
+      const { stdout } = await execFileAsync(bin, [...baseArgs, ...args], {
+        timeout: 30000,
+        maxBuffer: 1024 * 1024,
+      });
+      return stdout.trim();
+    } catch (e) {
+      lastError = e;
+      if (e.code === 'ENOENT') continue;
+    }
+  }
+  throw new Error(`yt-dlp مش متثبت أو مش قابل للتشغيل. شغّل: python3 -m pip install -U yt-dlp --user (${lastError?.message || 'ENOENT'})`);
+}
+"""
+    text = text[:start] + new_run + text[end:]
+
+# لو playInternalSearch مش موجود، ضيفه مع resolver كامل
+if "async function resolveYoutubeUrl(query)" not in text:
+    marker = "async function playResolvedSpotifyTracks(voiceChannel, tracks, playOptions) {\n"
+    if marker not in text:
+        raise SystemExit("❌ مش لاقي playResolvedSpotifyTracks.")
+    block = r"""
+async function resolveYoutubeUrl(query) {
+  const safeQuery = String(query || '').replace(/\s+/g, ' ').trim();
+  if (!safeQuery) throw new Error('مفيش كلمات بحث صالحة للتشغيل');
+
+  const output = await runYtDlp([
+    '--no-playlist',
+    '--default-search',
+    'ytsearch1',
+    '--print',
+    'webpage_url',
+    `ytsearch1:${safeQuery}`,
+  ]);
+
+  const url = output.split(/\r?\n/).find(line => /^https?:\/\//.test(line));
+  if (!url) throw new Error(`مش لاقي نتيجة تشغيل لـ: ${safeQuery}`);
+  return url;
+}
+
+async function playInternalSearch(voiceChannel, query, playOptions, metadata = {}) {
+  const youtubeUrl = await resolveYoutubeUrl(query);
+  return distube.play(voiceChannel, youtubeUrl, {
+    ...playOptions,
+    metadata: {
+      ...metadata,
+      backend: 'yt-dlp',
+      searchQuery: query,
+    },
+  });
+}
+
+"""
+    text = text.replace(marker, block + marker, 1)
+
+# أمنع أي fallback قديم يستخدم ytsearch مباشرة
+text = text.replace(
+    "await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);",
+    "await playInternalSearch(voiceChannel, query, playOptions, { source: 'spotify_text_fallback' });"
+)
+
+path.write_text(text, encoding="utf-8")
+print("✅ تم تعديل commands/music.js")
+PY
+
+echo "🧪 فحص Syntax..."
+node --check commands/music.js
+
+echo "🧪 فحص Git diff..."
+git diff --check
+
+echo "💾 Commit..."
+git add commands/music.js pyproject.toml uv.lock 2>/dev/null || git add commands/music.js
+git commit -m "fix: support python yt-dlp fallback" || echo "ℹ️ مفيش تغييرات جديدة أو الإصلاح كان متطبق."
+
+echo "🔗 ضبط GitHub remote..."
+if git remote get-url origin >/dev/null 2>&1; then
+  git remote set-url origin https://github.com/malek-a7med/discord-bot.git
+else
+  git remote add origin https://github.com/malek-a7med/discord-bot.git
+fi
+
+echo "⬆️ محاولة push..."
+git push -u origin HEAD:main --force || echo "⚠️ الـ push فشل، غالبًا محتاج GitHub login/token من Replit."
+
+echo "♻️ Restart البوت..."
+pkill -f "node index.js" || true
+sleep 2
+
+nohup node index.js > bot.log 2>&1 &
+
+echo "✅ البوت اشتغل."
+echo "📜 راقب اللوج:"
+echo "tail -f bot.log"
+echo "🎵 جرّب /شغل تاني."
+BASH
