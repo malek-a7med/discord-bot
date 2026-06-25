@@ -9,8 +9,8 @@ async function registerMusicCommands(client) {
   return [
     {
       data: new SlashCommandBuilder()
-        .setName('play')
-        .setDescription('شغل أغنية من YouTube أو Spotify')
+        .setName('شغل-اغنية')
+        .setDescription('شغل أغنية من YouTube أو Spotify 🎵')
         .addStringOption((option) =>
           option
             .setName('query')

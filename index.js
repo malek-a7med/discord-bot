@@ -401,29 +401,6 @@ const LEGACY_COMMANDS = [
     .setDescription("تعيين قناة رسائل الترحيب [إدارة] / Set welcome channel")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addChannelOption((o) => o.setName("القناة").setDescription("القناة المخصصة للترحيب").setRequired(true)),
-  // ✅ دمج: تشغيل/إيقاف/تخطي/قائمة-تشغيل/توقف-مؤقت/استئناف بقوا subcommands تحت /موسيقى
-  new SlashCommandBuilder()
-    .setName("موسيقى")
-    .setDescription("🎵 كل أوامر تشغيل الموسيقى في مكان واحد")
-    .addSubcommand(sub =>
-      sub.setName("تشغيل").setDescription("تشغيل أغنية من يوتيوب أو سبوتيفاي / Play a song")
-        .addStringOption((o) => o.setName("بحث").setDescription("رابط أو اسم الأغنية").setRequired(true))
-    )
-    .addSubcommand(sub =>
-      sub.setName("إيقاف").setDescription("إيقاف الموسيقى وإخراج البوت / Stop music and leave")
-    )
-    .addSubcommand(sub =>
-      sub.setName("تخطي").setDescription("تخطي الأغنية الحالية / Skip current song")
-    )
-    .addSubcommand(sub =>
-      sub.setName("قائمة-تشغيل").setDescription("عرض قائمة الأغاني الحالية / Show music queue")
-    )
-    .addSubcommand(sub =>
-      sub.setName("توقف-مؤقت").setDescription("إيقاف مؤقت / Pause music")
-    )
-    .addSubcommand(sub =>
-      sub.setName("استئناف").setDescription("استئناف التشغيل / Resume music")
-    ),
   new SlashCommandBuilder()
     .setName("اقتراح")
     .setDescription("إرسال اقتراح للسيرفر / Submit a suggestion")
@@ -634,7 +611,7 @@ function validateLatestFeatures(allCommands) {
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة","عقوبة",
-      "تشغيل","إيقاف","تخطي","قائمة-تشغيل","توقف-مؤقت","استئناف","موسيقى",
+      "شغل-اغنية","skip","stop","queue","pause","resume","nowplaying","volume",
       "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز","نسخ-احتياطي","بوت",
       "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
@@ -2426,14 +2403,8 @@ client.on("interactionCreate", async (interaction) => {
 
       // Music Commands (New System)
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      // ✅ دمج: أوامر الموسيقى العربية بقت subcommands تحت /موسيقى (تشغيل/إيقاف/تخطي/قائمة-تشغيل/توقف-مؤقت/استئناف)
-      //   بنفس منطق الـ DM proxy المستخدم مع الأوامر الإنجليزية (play/skip/stop/queue/pause/resume)
-      const MUSIC_CMDS = ["play","skip","stop","queue","pause","resume","nowplaying","volume","موسيقى"];
+      const MUSIC_CMDS = ["شغل-اغنية","skip","stop","queue","pause","resume","nowplaying","volume"];
       if (MUSIC_CMDS.includes(cmd)) {
-        // لو الأمر هو /موسيقى المدموج، نجيب الـ subcommand العربي كـ effectiveCmd
-        // عشان باقي المنطق (proxy، التحويل لـ handlePlay/handleSkip...) يفضل شغال زي ما هو بدون تغيير
-        const effectiveCmd = cmd === "موسيقى" ? interaction.options.getSubcommand() : cmd;
-
         let musicInteraction = interaction;
         if (isFromDM && guild) {
           const guildMember = await guild.members.fetch(user.id).catch(() => null);
@@ -2448,62 +2419,35 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        // ✅ FIX: أمر "تشغيل" العربي بيستخدم اسم الخيار "بحث" مش "query".
-        //   نلف الـ interaction بـ proxy خفيف يحوّل getString('query') → getString('بحث')
-        //   تلقائيًا، عشان handlePlay الأصلية تشتغل من غير أي تعديل في commands/music.js
-        if (effectiveCmd === "تشغيل") {
-          musicInteraction = new Proxy(musicInteraction, {
-            get(target, prop) {
-              if (prop === "options") {
-                const opts = target.options;
-                return new Proxy(opts, {
-                  get(optTarget, optProp) {
-                    if (optProp === "getString") {
-                      return (name, ...rest) => {
-                        if (name === "query") return optTarget.getString("بحث", ...rest);
-                        return optTarget.getString(name, ...rest);
-                      };
-                    }
-                    const v = optTarget[optProp];
-                    return typeof v === "function" ? v.bind(optTarget) : v;
-                  }
-                });
-              }
-              const val = target[prop];
-              return typeof val === "function" ? val.bind(target) : val;
-            }
-          });
-        }
-
-        if (effectiveCmd === "play" || effectiveCmd === "تشغيل") {
+        if (cmd === "شغل-اغنية") {
           const { handlePlay } = await import("./commands/music.js");
           return await handlePlay(musicInteraction);
         }
-        if (effectiveCmd === "skip" || effectiveCmd === "تخطي") {
+        if (cmd === "skip") {
           const { handleSkip } = await import("./commands/music.js");
           return await handleSkip(musicInteraction);
         }
-        if (effectiveCmd === "stop" || effectiveCmd === "إيقاف") {
+        if (cmd === "stop") {
           const { handleStop } = await import("./commands/music.js");
           return await handleStop(musicInteraction);
         }
-        if (effectiveCmd === "queue" || effectiveCmd === "قائمة-تشغيل") {
+        if (cmd === "queue") {
           const { handleQueue } = await import("./commands/music.js");
           return await handleQueue(musicInteraction);
         }
-        if (effectiveCmd === "pause" || effectiveCmd === "توقف-مؤقت") {
+        if (cmd === "pause") {
           const { handlePause } = await import("./commands/music.js");
           return await handlePause(musicInteraction);
         }
-        if (effectiveCmd === "resume" || effectiveCmd === "استئناف") {
+        if (cmd === "resume") {
           const { handleResume } = await import("./commands/music.js");
           return await handleResume(musicInteraction);
         }
-        if (effectiveCmd === "nowplaying") {
+        if (cmd === "nowplaying") {
           const { handleNowPlaying } = await import("./commands/music.js");
           return await handleNowPlaying(musicInteraction);
         }
-        if (effectiveCmd === "volume") {
+        if (cmd === "volume") {
           const { handleVolume } = await import("./commands/music.js");
           return await handleVolume(musicInteraction);
         }
