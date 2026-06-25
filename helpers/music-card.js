@@ -195,7 +195,7 @@ function buildMusicRows(song) {
     new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉-').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_repeat').setLabel('🔁 تكرار').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setLabel('🔗 افتح').setStyle(ButtonStyle.Link).setURL(song.url || 'https://youtube.com'),
+    new ButtonBuilder().setLabel('🔗 افتح في Spotify').setStyle(ButtonStyle.Link).setURL(song.url || 'https://open.spotify.com'),
   );
   return [row1, row2];
 }

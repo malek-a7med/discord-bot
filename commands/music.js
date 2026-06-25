@@ -5,27 +5,17 @@
 
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { DisTube } from 'distube';
-import { YtDlpPlugin } from '@distube/yt-dlp';
-import { SoundCloudPlugin } from '@distube/soundcloud';
 import { SpotifyPlugin } from '@distube/spotify';
 import { sendMusicCard } from '../helpers/music-card.js';
 
-// كشف نوع الإدخال بدقة (رابط أغنية / بلاي ليست / البوم / بحث نصي)
+// كشف نوع الإدخال بدقة (رابط سبوتيفاي / بحث نصي)
 function detectSourceType(query) {
   const q = query.trim();
 
-  // Spotify
+  // Spotify — الرابط المباشر
   if (/open\.spotify\.com\/(playlist|album)/i.test(q)) return 'spotify_playlist';
   if (/open\.spotify\.com\/track/i.test(q))            return 'spotify';
   if (/open\.spotify\.com/i.test(q))                   return 'spotify';       // أي رابط سبوتيفاي تاني
-
-  // YouTube
-  if (/youtube\.com\/playlist|list=/i.test(q))         return 'youtube_playlist';
-  if (/youtube\.com|youtu\.be/i.test(q))               return 'youtube';
-
-  // SoundCloud
-  if (/soundcloud\.com\/.+\/sets\//i.test(q))          return 'soundcloud_playlist';
-  if (/soundcloud\.com/i.test(q))                      return 'soundcloud';
 
   return 'text';
 }
@@ -47,13 +37,7 @@ export function initMusicSystem(client) {
     emitAddSongWhenCreatingQueue: false,
     emitAddListWhenCreatingQueue: true,
     plugins: [
-      new SpotifyPlugin(
-        process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET
-          ? { api: { clientId: process.env.SPOTIFY_CLIENT_ID, clientSecret: process.env.SPOTIFY_CLIENT_SECRET } }
-          : {}
-      ),
-      new SoundCloudPlugin(),
-      new YtDlpPlugin({ update: false }),
+      new SpotifyPlugin(),
     ],
   });
 
@@ -292,7 +276,7 @@ export const musicHandler = {
 // ─── تسجيل أوامر الموسيقى ─────────────────────────────────────
 export async function registerMusicCommands() {
   return [
-    { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية من Spotify أو YouTube أو SoundCloud').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها').setRequired(true)), execute: handlePlay },
+    { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية أو بلاي ليست من Spotify').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها').setRequired(true)), execute: handlePlay },
     { data: new SlashCommandBuilder().setName('تخطي').setDescription('⏭️ تخطي الأغنية الحالية'), execute: handleSkip },
     { data: new SlashCommandBuilder().setName('وقف').setDescription('⏹️ إيقاف الموسيقى والخروج من القناة'), execute: handleStop },
     { data: new SlashCommandBuilder().setName('قائمة').setDescription('📋 عرض قائمة التشغيل').addIntegerOption(o => o.setName('صفحة').setDescription('رقم الصفحة').setRequired(false).setMinValue(1)), execute: handleQueue },
@@ -327,57 +311,30 @@ export async function handlePlay(interaction) {
     const loadingMsgs = {
       spotify_playlist: '🎵 جاري تحميل البلاي ليست من Spotify...',
       spotify:          '🎵 جاري التحميل من Spotify...',
-      youtube_playlist: '▶️ جاري تحميل البلاي ليست من YouTube...',
-      youtube:          '▶️ جاري التحميل من YouTube...',
-      soundcloud_playlist: '🔊 جاري تحميل البلاي ليست من SoundCloud...',
-      soundcloud:       '🔊 جاري التحميل من SoundCloud...',
-      text:             '🔍 جاري البحث...',
+      text:             '🔍 جاري البحث في Spotify...',
     };
     await interaction.editReply({ content: loadingMsgs[sourceType] || '🔍 جاري التحميل...' });
 
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
 
     if (isDirectUrl(sourceType)) {
-      // ─── رابط مباشر: أغنية أو بلاي ليست أو ألبوم — DisTube بيتعامل مع الكل ───
+      // ─── رابط Spotify مباشر: أغنية أو بلاي ليست أو ألبوم — DisTube+SpotifyPlugin بيتعامل معاه ───
       await distube.play(voiceChannel, query, playOptions);
     } else {
-      // ─── بحث نصي — Spotify أولاً، YouTube fallback، SoundCloud آخر ───
-      let played = false;
+      // ─── بحث نصي — Spotify مباشرة عبر spsearch: prefix ───
+      try {
+        await distube.play(voiceChannel, `spsearch:${query}`, playOptions);
+      } catch (e) {
+        const errMsg = e?.message || String(e) || 'خطأ مجهول';
+        console.error('❌ [Music] Spotify search فشل:', errMsg);
 
-      // 1️⃣ Spotify عبر SpotifyPlugin (spsearch:)
-      if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET) {
-        try {
-          await distube.play(voiceChannel, `spsearch:${query}`, playOptions);
-          played = true;
-        } catch (spErr) {
-          console.warn('⚠️ [Music] Spotify فشل، بيجرب YouTube...', spErr.message);
+        if (/no result|not found/i.test(errMsg)) {
+          return interaction.editReply({
+            content: `❌ مش لاقي الأغنية دي على Spotify!\n💡 جرب ترفق رابط مباشر من: \`open.spotify.com\``,
+          });
         }
-      }
-
-      // 2️⃣ YouTube عبر yt-dlp
-      if (!played) {
-        try {
-          await distube.play(voiceChannel, query, { ...playOptions, searchSources: ['youtube'] });
-          played = true;
-        } catch (ytErr) {
-          console.warn('⚠️ [Music] YouTube فشل، بيجرب SoundCloud...', ytErr.message);
-        }
-      }
-
-      // 3️⃣ SoundCloud fallback أخير
-      if (!played) {
-        try {
-          await interaction.editReply({ content: '🔊 بيجرب SoundCloud...' });
-          await distube.play(voiceChannel, `scsearch:${query}`, playOptions);
-          played = true;
-        } catch (scErr) {
-          console.warn('⚠️ [Music] SoundCloud فشل:', scErr.message);
-        }
-      }
-
-      if (!played) {
         return interaction.editReply({
-          content: `❌ مش لاقي الأغنية دي على أي منصة!\n💡 جرب ترفق رابط مباشر من:\n🎵 Spotify: \`open.spotify.com\`\n▶️ YouTube: \`youtube.com\`\n🔊 SoundCloud: \`soundcloud.com\``,
+          content: `❌ حصل خطأ: \`${errMsg.slice(0, 300)}\``,
         });
       }
     }
@@ -389,9 +346,9 @@ export async function handlePlay(interaction) {
 
     let msg;
     if (/private|unavailable|blocked|age.?restricted/i.test(errMsg)) {
-      msg = `🔒 الأغنية/البلاي ليست دي مش متاحة (private أو blocked)`;
+      msg = `🔒 فيه محتوى مقفول في البلاي ليست/الألبوم ده (private أو blocked)\n💡 جرب بلاي ليست تانية أو رابط أغنية واحدة`;
     } else if (/no result|not found/i.test(errMsg)) {
-      msg = `❌ مش لاقي الأغنية دي!\n💡 جرب رابط مباشر من Spotify أو YouTube`;
+      msg = `❌ مش لاقي الأغنية دي على Spotify!\n💡 جرب ترفق رابط مباشر من \`open.spotify.com\``;
     } else {
       msg = `❌ حصل خطأ: \`${errMsg.slice(0, 300)}\``;
     }
@@ -421,43 +378,31 @@ export async function handleStop(interaction) {
 
     const isButton = interaction.isButton?.();
 
-    // acknowledge الـ interaction أولاً قبل أي حاجة
+    // لازم نعمل acknowledge للـ interaction الأول قبل أي حاجة تانية
     if (isButton) {
       await interaction.deferUpdate().catch(() => {});
     }
 
     const q = distube.getQueue(interaction.guildId);
 
-    // امسح currentMessage المخزنة على القائمة (لو موجودة وغير رسالة الزرار)
-    if (q?.currentMessage) {
-      if (!isButton || q.currentMessage.id !== interaction.message?.id) {
-        await q.currentMessage.delete().catch(() => {});
-      }
-      q.currentMessage = null;
+    // امسح رسالة الداش بورد (اللي عليها الأزرار)
+    const dashMsg = isButton ? interaction.message : q?.currentMessage;
+    if (dashMsg) {
+      await dashMsg.delete().catch(() => {});
     }
 
-    // امسح رسالة الداش بورد — بعد deferUpdate لازم نستخدم deleteReply
-    if (isButton) {
-      await interaction.deleteReply().catch(() => {});
+    // لو في currentMessage تانية غير رسالة الزرار، امسحها هي كمان
+    if (q?.currentMessage && q.currentMessage.id !== dashMsg?.id) {
+      await q.currentMessage.delete().catch(() => {});
     }
+    if (q) q.currentMessage = null;
 
-    // وقّف DisTube (بيخرج من الـ voice تلقائياً)
-    if (q) {
-      await distube.stop(interaction.guildId).catch(() => {});
-    } else {
-      // مفيش queue — نحاول نخرج من الـ voice يدوياً
-      const voiceChannel = interaction.member?.voice?.channel;
-      if (voiceChannel) {
-        const { getVoiceConnection } = await import('@discordjs/voice');
-        getVoiceConnection(interaction.guildId)?.destroy();
-      }
-    }
+    if (q) await distube.stop(interaction.guildId);
 
     if (!isButton) {
       await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });
     }
   } catch (e) {
-    console.error('[Music] handleStop error:', e.message);
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true });
