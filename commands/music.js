@@ -9,6 +9,9 @@ import { SpotifyPlugin } from '@distube/spotify';
 import { YtDlpPlugin } from '@distube/yt-dlp';
 import { sendMusicCard } from '../helpers/music-card.js';
 
+const SPOTIFY_URL_RE = /https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-z]{2}\/)?(track|playlist|album)\/([a-zA-Z0-9]+)/i;
+const SPOTIFY_INTERNAL_LIMIT = 100;
+
 // كشف نوع الإدخال بدقة (رابط سبوتيفاي / بحث نصي)
 function detectSourceType(query) {
   const q = query.trim();
@@ -27,6 +30,89 @@ function detectSourceType(query) {
 // هل الـ sourceType رابط مباشر (مش بحث نصي)؟
 function isDirectUrl(sourceType) {
   return sourceType !== 'text';
+}
+
+function cleanSpotifyName(value = '') {
+  return String(value)
+    .replace(/\s*[-–]\s*song and lyrics by .+$/i, '')
+    .replace(/\s*\|\s*Spotify\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function spotifyTrackToQuery(track) {
+  const title = cleanSpotifyName(track?.title || track?.name);
+  const artists = Array.isArray(track?.artists)
+    ? track.artists.map(a => cleanSpotifyName(a?.name || a)).filter(Boolean).join(' ')
+    : cleanSpotifyName(track?.artist || track?.subtitle);
+  return [title, artists].filter(Boolean).join(' ').trim();
+}
+
+function collectSpotifyTracks(value, tracks = []) {
+  if (!value || tracks.length >= SPOTIFY_INTERNAL_LIMIT) return tracks;
+  if (Array.isArray(value)) {
+    for (const item of value) collectSpotifyTracks(item, tracks);
+    return tracks;
+  }
+  if (typeof value !== 'object') return tracks;
+  const type = String(value.type || value.__typename || '').toLowerCase();
+  const name = value.name || value.title;
+  const artists = value.artists || value.subtitle || value.artist;
+  if (name && (type.includes('track') || artists)) {
+    const query = spotifyTrackToQuery({ title: name, artists, artist: artists, subtitle: value.subtitle });
+    if (query && !tracks.some(t => t.query === query)) {
+      tracks.push({ query, title: cleanSpotifyName(name), url: value.uri || value.shareUrl || value.url });
+    }
+  }
+  for (const key of ['track', 'tracks', 'items', 'entities', 'contents', 'data']) {
+    collectSpotifyTracks(value[key], tracks);
+  }
+  return tracks;
+}
+
+async function fetchSpotifyOEmbed(url) {
+  const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
+  if (!res.ok) throw new Error(`Spotify oEmbed رجّع ${res.status}`);
+  const data = await res.json();
+  const title = cleanSpotifyName(data?.title);
+  if (!title) throw new Error('Spotify oEmbed مرجعش اسم الأغنية');
+  return [{ query: title, title, url }];
+}
+
+async function resolveSpotifyUrl(url) {
+  const match = url.match(SPOTIFY_URL_RE);
+  if (!match) throw new Error('رابط Spotify غير صحيح');
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; ZangiBot/1.0; +https://discord.com)',
+        accept: 'text/html,application/xhtml+xml',
+      },
+    });
+    if (!res.ok) throw new Error(`Spotify page رجّع ${res.status}`);
+    const html = await res.text();
+    const script = html.match(/<script id="__NEXT_DATA__" type="application\/json">([^<]+)<\/script>/);
+    if (!script?.[1]) throw new Error('Spotify غيّر شكل الصفحة');
+    const data = JSON.parse(script[1]);
+    const tracks = collectSpotifyTracks(data).slice(0, SPOTIFY_INTERNAL_LIMIT);
+    if (tracks.length) return tracks;
+  } catch (e) {
+    console.warn('⚠️ [Music] Spotify page resolve فشل، هنستخدم oEmbed:', e.message);
+  }
+  return fetchSpotifyOEmbed(url);
+}
+
+async function playResolvedSpotifyTracks(voiceChannel, tracks, playOptions) {
+  if (!tracks.length) throw new Error('Spotify مرجعش أي أغاني قابلة للتشغيل');
+  const limited = tracks.slice(0, SPOTIFY_INTERNAL_LIMIT);
+  for (const [index, track] of limited.entries()) {
+    await distube.play(voiceChannel, `ytsearch:${track.query}`, {
+      ...playOptions,
+      metadata: { source: 'spotify', spotifyUrl: track.url, spotifyTitle: track.title },
+    });
+    if (index === 0) await new Promise(resolve => setTimeout(resolve, 350));
+  }
+  return limited.length;
 }
 
 // نسخة واحدة من DisTube بيتم ربطها بالكلاينت عند init
@@ -190,7 +276,15 @@ export const musicHandler = {
   },
 
   async resolveSource(query, userTag) {
-    return [{ query, title: query, requestedBy: userTag }];
+    const sourceType = detectSourceType(query);
+    if (sourceType === 'unsupported') {
+      throw new Error('النظام Spotify-Only: ابعت رابط Spotify أو اسم أغنية بس');
+    }
+    if (sourceType === 'spotify' || sourceType === 'spotify_playlist') {
+      const tracks = await resolveSpotifyUrl(query);
+      return tracks.map(t => ({ query: `ytsearch:${t.query}`, title: t.title || t.query, requestedBy: userTag }));
+    }
+    return [{ query: `ytsearch:${query}`, title: query, requestedBy: userTag }];
   },
 
   async addToQueue(guildId, song) {
@@ -332,24 +426,21 @@ export async function handlePlay(interaction) {
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
 
     if (isDirectUrl(sourceType)) {
-      // ─── رابط Spotify مباشر: أغنية أو بلاي ليست أو ألبوم — DisTube+SpotifyPlugin بيتعامل معاه ───
-      await distube.play(voiceChannel, query, playOptions);
+      // ─── رابط Spotify مباشر: نجيب أسماء التراكات من Spotify ونشغل الصوت داخلياً عبر yt-dlp ───
+      const tracks = await resolveSpotifyUrl(query);
+      const count = await playResolvedSpotifyTracks(voiceChannel, tracks, playOptions);
+      if (count > 1) {
+        await interaction.editReply({ content: `✅ تم إضافة ${count} أغنية من Spotify!` }).catch(() => {});
+        return;
+      }
     } else {
-      // ─── بحث نصي — Spotify مباشرة عبر spsearch: prefix ───
+      // ─── بحث نصي — ytsearch مباشرة ───
       try {
-        await distube.play(voiceChannel, `spsearch:${query}`, playOptions);
+        await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);
       } catch (e) {
         const errMsg = e?.message || String(e) || 'خطأ مجهول';
-        console.error('❌ [Music] Spotify search فشل:', errMsg);
-
-        if (/no result|not found/i.test(errMsg)) {
-          return interaction.editReply({
-            content: `❌ مش لاقي الأغنية دي على Spotify!\n💡 جرب ترفق رابط مباشر من: \`open.spotify.com\``,
-          });
-        }
-        return interaction.editReply({
-          content: `❌ حصل خطأ: \`${errMsg.slice(0, 300)}\``,
-        });
+        console.warn('⚠️ [Music] ytsearch فشل، بنحاول تاني:', errMsg);
+        await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);
       }
     }
 
