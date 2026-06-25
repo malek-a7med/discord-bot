@@ -30,14 +30,7 @@ export function initMusicSystem(client) {
     emitAddSongWhenCreatingQueue: false,
     emitAddListWhenCreatingQueue: false,
     plugins: [
-      new SpotifyPlugin({
-        parallel: true,
-        emitEventsAfterFetching: true,
-        api: {
-          clientId: process.env.SPOTIFY_CLIENT_ID,
-          clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-        },
-      }),
+      new SpotifyPlugin(),
       new SoundCloudPlugin(),
       new YtDlpPlugin({ update: false }),
     ],
