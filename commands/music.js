@@ -26,6 +26,67 @@ export function initMusicSystem(client) {
     ],
   });
 
+  // Map لتتبع وقت الإيقاف التلقائي لكشف انتهاء الصلاحية
+  const pausedAt = new Map(); // guildId → Date.now()
+  const STREAM_MAX_AGE = 2 * 60 * 60 * 1000; // ساعتين
+
+  // لما حد يدخل/يخرج من القناة الصوتية
+  client.on('voiceStateUpdate', async (oldState, newState) => {
+    try {
+      const q = distube.getQueue(newState.guild.id || oldState.guild.id);
+      if (!q) return;
+
+      const botVoiceChannel = q.voice?.channel;
+      if (!botVoiceChannel) return;
+
+      // حساب عدد الناس في القناة (غير البوت)
+      const humanListeners = botVoiceChannel.members.filter(m => !m.user.bot).size;
+
+      if (humanListeners === 0) {
+        // القناة فاضية — وقف تلقائي
+        if (!q.paused) {
+          q.pause();
+          pausedAt.set(q.id, Date.now());
+          const ch = q.textChannel;
+          if (ch?.send) ch.send({
+            embeds: [new EmbedBuilder()
+              .setColor(0xf39c12)
+              .setDescription('⏸️ القناة الصوتية فاضية — الموسيقى اتوقفت تلقائياً\nلما حد يرجع هتكمل! 👂')],
+          }).catch(() => {});
+        }
+      } else {
+        // في ناس في القناة — استأنف لو كان موقوف تلقائياً
+        if (q.paused && pausedAt.has(q.id)) {
+          const pausedTime = Date.now() - pausedAt.get(q.id);
+          pausedAt.delete(q.id);
+
+          if (pausedTime > STREAM_MAX_AGE) {
+            // الستريم انتهت صلاحيته — تخطى للأغنية التالية
+            const ch = q.textChannel;
+            if (ch?.send) ch.send({
+              embeds: [new EmbedBuilder()
+                .setColor(0xe74c3c)
+                .setDescription('⏭️ الأغنية موقوفة من أكتر من ساعتين — الرابط انتهت صلاحيته، بتخطى للتالية!')],
+            }).catch(() => {});
+            if (q.songs.length > 1) {
+              await distube.skip(q.id).catch(() => {});
+            } else {
+              await distube.stop(q.id).catch(() => {});
+            }
+          } else {
+            q.resume();
+            const ch = q.textChannel;
+            if (ch?.send) ch.send({
+              embeds: [new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setDescription('▶️ حد رجع! بكمل الموسيقى 🎵')],
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch {}
+  });
+
   // ── أحداث DisTube ──────────────────────────────────────────
   distube.on('playSong', async (queue, song) => {
     try {
@@ -75,10 +136,7 @@ export function initMusicSystem(client) {
   });
 
   distube.on('empty', (queue) => {
-    try {
-      const ch = queue.textChannel;
-      if (ch?.send) ch.send('⚠️ القناة الصوتية فاضية، بخرج!').catch(() => {});
-    } catch {}
+    // تم التعامل مع الحدة دا في voiceStateUpdate (وقف تلقائي بدل الخروج)
   });
 
   distube.on('error', (error, queue) => {
