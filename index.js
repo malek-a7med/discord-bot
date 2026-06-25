@@ -1608,7 +1608,11 @@ client.on("messageCreate", async (msg) => {
 
   // ── أوامر الموسيقى النصية (Prefix + Arabic) ───────────────────────
   if (msg.guild) {
-    const txt = msg.content.trim();
+    // نظّف الرسالة من اسم البوت في الأول
+    const txt = msg.content.trim()
+      .replace(/^(?:يا\s*)?(?:زنجي|بوت)\s*/iu, '')
+      .replace(/^<@!?\d+>\s*/u, '')
+      .trim();
 
     // play / شغل / تشغيل + query
     const playMatch = txt.match(/^[!?؟.,،]?\s*(play|شغل|تشغيل|شغلها|شغل\s*الأغنية)\s+(.+)/iu);

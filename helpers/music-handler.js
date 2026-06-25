@@ -197,11 +197,15 @@ class MusicHandler {
   }
 
   async resolveSource(query, requestedBy) {
-    const isSpotify = query.includes('spotify.com') || query.includes('open.spotify.com');
-    const isYouTube = query.includes('youtube.com') || query.includes('youtu.be');
+    // استخرج URL لو موجود في وسط النص
+    const extractedUrl = query.match(/(https?:\/\/(?:open\.spotify\.com|spotify\.com|youtube\.com|youtu\.be|soundcloud\.com)[^\s]+)/i)?.[1];
+    const effectiveQuery = extractedUrl || query.trim();
+
+    const isSpotify = effectiveQuery.includes('spotify.com');
+    const isYouTube = effectiveQuery.includes('youtube.com') || effectiveQuery.includes('youtu.be');
 
     if (isSpotify) {
-      const spotifyTracks = await this.fetchSpotifyInfo(query);
+      const spotifyTracks = await this.fetchSpotifyInfo(effectiveQuery);
       const results = [];
       for (const track of spotifyTracks) {
         try {
@@ -221,14 +225,14 @@ class MusicHandler {
     if (isYouTube) {
       return [{
         title: 'YouTube Video',
-        url: query,
+        url: effectiveQuery,
         duration: 0,
         platform: 'youtube',
         requestedBy
       }];
     }
 
-    const ytResults = await this.searchYouTube(query);
+    const ytResults = await this.searchYouTube(effectiveQuery);
     if (ytResults.length === 0) throw new MusicStreamError('ما لقيتش أغنية بالاسم ده');
     return [{ ...ytResults[0], requestedBy }];
   }
@@ -292,20 +296,34 @@ class MusicHandler {
 
       try {
         let stream;
-        let retries = 0;
-        const maxRetries = 3;
+        const isSignInError = (msg) => msg && (msg.includes('Sign in') || msg.includes('bot') || msg.includes('sign_in'));
 
-        while (retries < maxRetries) {
-          try {
-            stream = await createYtDlpStream(song.url);
-            break;
-          } catch (streamErr) {
-            retries++;
-            if (retries >= maxRetries) {
-              throw streamErr;
+        // Try primary URL
+        try {
+          stream = await createYtDlpStream(song.url);
+        } catch (primaryErr) {
+          // If Sign-in error, try alternative YouTube results for same song
+          if (isSignInError(primaryErr.message)) {
+            console.warn(`⚠️ الفيديو محمي، بنجرب نسخة تانية: ${song.title}`);
+            const searchQ = song.artist ? `${song.title} ${song.artist}` : song.title;
+            try {
+              const altResults = await this.searchYouTube(searchQ);
+              let found = false;
+              for (const alt of altResults) {
+                if (alt.url === song.url) continue; // skip same video
+                try {
+                  stream = await createYtDlpStream(alt.url);
+                  song.url = alt.url; // update to working URL
+                  found = true;
+                  break;
+                } catch {}
+              }
+              if (!found) throw primaryErr;
+            } catch {
+              throw primaryErr;
             }
-            console.warn(`⚠️ إعادة محاولة تحميل الأغنية (${retries}/${maxRetries}): ${streamErr.message}`);
-            await new Promise(resolve => setTimeout(resolve, 2000 * retries));
+          } else {
+            throw primaryErr;
           }
         }
 
