@@ -1944,7 +1944,7 @@ client.on("messageCreate", async (msg) => {
               .setLabel(isLogOnly ? "↩️ ابعت للقناة" : "↩️ رجاع الرسالة")
               .setStyle(ButtonStyle.Secondary)
               .setDisabled(!ld.savedContent),   // معطّل لو مفيش محتوى محفوظ
-            new ButtonBuilder().setCustomId(`aml_confirm_${logId}`).setLabel("✅ تجاهل").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`aml_confirm_${logId}`).setLabel("✅ تأكيد الحذف").setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`aml_warn_${logId}`).setLabel("⚠️ تحذير").setStyle(ButtonStyle.Primary),
           );
           // ─── صف 2: إجراءات أقوى ─────────────────────────────────
@@ -1953,8 +1953,14 @@ client.on("messageCreate", async (msg) => {
             new ButtonBuilder().setCustomId(`aml_kick_${logId}`).setLabel("👢 طرد").setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId(`aml_ban_${logId}`).setLabel("🔨 حظر").setStyle(ButtonStyle.Danger),
           );
+          // ─── صف 3: إلغاء الإجراءات ──────────────────────────────
+          const row3 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`aml_unwarn_${logId}`).setLabel("❌ شيل التحذير").setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`aml_unmute_${logId}`).setLabel("🔊 شيل الإسكات").setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId(`aml_unban_${logId}`).setLabel("🔓 رفع الحظر").setStyle(ButtonStyle.Secondary),
+          );
 
-          const rows = [row1, row2];
+          const rows = [row1, row2, row3];
           await logCh.send({ embeds: [embed], components: rows }).catch(() => {});
         }).catch(() => {});
       }
@@ -4024,7 +4030,7 @@ client.on("interactionCreate", async (interaction) => {
         }
 
         const parts  = interaction.customId.split("_");
-        const action = parts[1]; // restore | confirm | warn | mute | kick | ban
+        const action = parts[1]; // restore | confirm | warn | mute | kick | ban | unwarn | unmute | unban
         const logId  = parts.slice(2).join("_");
         const ld     = autoModLogs.get(logId);
 
@@ -4145,6 +4151,75 @@ client.on("interactionCreate", async (interaction) => {
             ),
           );
           return interaction.showModal(modal);
+        }
+
+        // ❌ شيل التحذير — بيشيل آخر تحذير من العضو
+        if (action === "unwarn") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          const warnings = db.getWarnings(ld.userId);
+          if (!warnings || warnings.length === 0) {
+            return interaction.reply({ content: "ℹ️ العضو ده معندوش تحذيرات أصلاً!", ephemeral: true });
+          }
+          db.removeLastWarning(ld.userId);
+          const newWarnings = db.getWarnings(ld.userId);
+          await interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0x2ecc71)
+              .setTitle("❌ تم شيل التحذير")
+              .setDescription(`<@${ld.userId}> اتشال منه تحذير واحد\nالتحذيرات المتبقية: **${newWarnings.length}**`)
+              .setTimestamp()],
+            ephemeral: true,
+          });
+          return;
+        }
+
+        // 🔊 شيل الإسكات — بيرفع الـ timeout فوراً
+        if (action === "unmute") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          try {
+            await interaction.guild.members.fetch(ld.userId);
+            const member = interaction.guild.members.cache.get(ld.userId);
+            if (!member) return interaction.reply({ content: "❌ العضو مش في السيرفر!", ephemeral: true });
+            if (!member.isCommunicationDisabled()) {
+              return interaction.reply({ content: "ℹ️ العضو ده مش متساكت أصلاً!", ephemeral: true });
+            }
+            await member.timeout(null, `Auto-Mod Log — رفع الإسكات بواسطة ${interaction.user.username}`);
+            await interaction.reply({
+              embeds: [new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("🔊 تم رفع الإسكات")
+                .setDescription(`<@${ld.userId}> اترفع منه الإسكات\nبواسطة: ${interaction.user.username}`)
+                .setTimestamp()],
+              ephemeral: true,
+            });
+          } catch (e) {
+            await interaction.reply({ content: `❌ فشل رفع الإسكات: ${e.message}`, ephemeral: true });
+          }
+          return;
+        }
+
+        // 🔓 رفع الحظر — بيرفع البان عن العضو
+        if (action === "unban") {
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          try {
+            await interaction.guild.bans.fetch(ld.userId).catch(() => null);
+            await interaction.guild.members.unban(ld.userId, `Auto-Mod Log — رفع الحظر بواسطة ${interaction.user.username}`);
+            db.removeBan?.(ld.userId);
+            await interaction.reply({
+              embeds: [new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("🔓 تم رفع الحظر")
+                .setDescription(`<@${ld.userId}> (${ld.username}) اترفع عنه الحظر\nبواسطة: ${interaction.user.username}`)
+                .setTimestamp()],
+              ephemeral: true,
+            });
+          } catch (e) {
+            const msg = e.code === 10026
+              ? "ℹ️ العضو ده مش محظور أصلاً!"
+              : `❌ فشل رفع الحظر: ${e.message}`;
+            await interaction.reply({ content: msg, ephemeral: true });
+          }
+          return;
         }
 
         return;

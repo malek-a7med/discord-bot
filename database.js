@@ -128,6 +128,15 @@ class Database {
     return this.data.users[userId].warnings || [];
   }
 
+  removeLastWarning(userId) {
+    this.ensureUser(userId);
+    const warnings = this.data.users[userId].warnings;
+    if (warnings && warnings.length > 0) {
+      warnings.pop();
+      this.save();
+    }
+  }
+
   addTimeout(userId, duration, reason) {
     this.ensureUser(userId);
     if (!this.data.users[userId].timeouts) {
