@@ -1937,24 +1937,24 @@ client.on("messageCreate", async (msg) => {
             });
           }
 
-          // أزرار الإجراءات (بدون restore لو مش متحذفة)
-          const row1Components = [];
-          if (!isLogOnly) {
-            row1Components.push(
-              new ButtonBuilder().setCustomId(`aml_restore_${logId}`).setLabel("↩️ رجاع الرسالة").setStyle(ButtonStyle.Secondary),
-            );
-          }
-          row1Components.push(
-            new ButtonBuilder().setCustomId(`aml_confirm_${logId}`).setLabel("✅ تأكيد").setStyle(ButtonStyle.Success),
+          // ─── صف 1: رجاع الرسالة دايماً + تأكيد + تحذير ──────────
+          const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`aml_restore_${logId}`)
+              .setLabel(isLogOnly ? "↩️ ابعت للقناة" : "↩️ رجاع الرسالة")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(!ld.savedContent),   // معطّل لو مفيش محتوى محفوظ
+            new ButtonBuilder().setCustomId(`aml_confirm_${logId}`).setLabel("✅ تجاهل").setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`aml_warn_${logId}`).setLabel("⚠️ تحذير").setStyle(ButtonStyle.Primary),
           );
+          // ─── صف 2: إجراءات أقوى ─────────────────────────────────
           const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`aml_mute_${logId}`).setLabel("🔇 إسكات").setStyle(ButtonStyle.Primary),
             new ButtonBuilder().setCustomId(`aml_kick_${logId}`).setLabel("👢 طرد").setStyle(ButtonStyle.Danger),
             new ButtonBuilder().setCustomId(`aml_ban_${logId}`).setLabel("🔨 حظر").setStyle(ButtonStyle.Danger),
           );
 
-          const rows = [new ActionRowBuilder().addComponents(...row1Components), row2];
+          const rows = [row1, row2];
           await logCh.send({ embeds: [embed], components: rows }).catch(() => {});
         }).catch(() => {});
       }
