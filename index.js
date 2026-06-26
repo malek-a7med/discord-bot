@@ -1448,6 +1448,93 @@ function pushUserHistory(userId, role, text) {
 }
 let botSpeechMode = "normal"; // "normal" | "free" | "toxic"
 
+// ─── قائمة GIFs مصنّفة بـ Tenor ──────────────────────────────────
+const GIF_MAP = {
+  funny: [
+    "https://media.tenor.com/Sq-wfTkdOekAAAAC/laugh-haha.gif",
+    "https://media.tenor.com/0FMdFiEJPJIAAAAC/arabic-meme.gif",
+    "https://media.tenor.com/oBgoriKBBHwAAAAC/hahaha-funny.gif",
+    "https://media.tenor.com/2oo_Rg7BN1IAAAAC/laughing-cracking-up.gif",
+    "https://media.tenor.com/X5ALsUPc9HEAAAAC/laughing-funny.gif",
+  ],
+  sad: [
+    "https://media.tenor.com/aKMDfVmaMYcAAAAC/cry-sad.gif",
+    "https://media.tenor.com/WT5VEXH9ieoAAAAC/crying-sad.gif",
+    "https://media.tenor.com/4VFNNUAi2xIAAAAC/sad-cry.gif",
+  ],
+  angry: [
+    "https://media.tenor.com/J7XMULbrH8sAAAAC/angry-mad.gif",
+    "https://media.tenor.com/2V7DGS3BGPQAAAAC/angry.gif",
+    "https://media.tenor.com/zVVQaFzYANwAAAAC/no-angry.gif",
+  ],
+  love: [
+    "https://media.tenor.com/0dv2BJtJSyIAAAAC/heart-love.gif",
+    "https://media.tenor.com/J5H7rFZmorsAAAAC/love-heart.gif",
+    "https://media.tenor.com/A-a7HXN0DZEAAAAC/lovely-love.gif",
+  ],
+  hype: [
+    "https://media.tenor.com/MYCURs5A4LAAAAAC/fire-hype.gif",
+    "https://media.tenor.com/fgRBHGLM3PYAAAAC/lets-go-excited.gif",
+    "https://media.tenor.com/7XeFTKwkZ3AAAAAC/yes-excited.gif",
+  ],
+  thinking: [
+    "https://media.tenor.com/Jh0mNKY0H60AAAAC/thinking.gif",
+    "https://media.tenor.com/b1R5fv0j5HAAAAAC/hmm-think.gif",
+  ],
+  welcome: [
+    "https://media.tenor.com/mKPNfDasq5sAAAAC/welcome-hi.gif",
+    "https://media.tenor.com/p7LKFdS0VNIAAAAC/hi-wave.gif",
+  ],
+  wow: [
+    "https://media.tenor.com/pQMCE7GJMR0AAAAC/wow-omg.gif",
+    "https://media.tenor.com/YP_tNpq4fQsAAAAC/wow-amazing.gif",
+  ],
+  facepalm: [
+    "https://media.tenor.com/NLHdklqoFqoAAAAC/facepalm.gif",
+    "https://media.tenor.com/LLHNiVQEVrwAAAAC/facepalm-sigh.gif",
+  ],
+};
+
+/** يختار GIF عشوائي من الكاتيجوري */
+function pickGif(category) {
+  const list = GIF_MAP[category];
+  if (!list?.length) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+// Regex يتطابق مع إيموجي unicode واحد أو Discord custom emoji
+const SINGLE_EMOJI_RE = /^(?:<a?:[^:]+:\d+>|(?:\p{Emoji_Presentation}|\p{Extended_Pictographic})(?:\uFE0F|\u200D\p{Extended_Pictographic})*)$/u;
+
+/** يفصل الـ META tag عن نص الرد */
+function parseAiReply(raw) {
+  // [META:react=😂,gif=funny]
+  const metaMatch = raw.match(/\[META:([^\]]+)\]/i);
+  let reactionEmoji = null;
+  let gifCategory   = null;
+  let text = raw.replace(/\[META:[^\]]*\]/gi, "").trim();
+
+  // لو النص فضي — رجع رسالة افتراضية
+  if (!text) text = "🙂";
+
+  if (metaMatch) {
+    const parts = metaMatch[1].split(",");
+    for (const p of parts) {
+      const eqIdx = p.indexOf("=");
+      if (eqIdx === -1) continue;
+      const k = p.slice(0, eqIdx).trim().toLowerCase();
+      const v = p.slice(eqIdx + 1).trim();
+      if (k === "react") {
+        // تحقق إن القيمة إيموجي واحد فعلاً
+        if (v && SINGLE_EMOJI_RE.test(v)) reactionEmoji = v;
+      }
+      if (k === "gif") gifCategory = v.toLowerCase() || null;
+    }
+  }
+  // لو الـ GIF كاتيجوري "none" أو مش موجودة في الـ map — نلغيها
+  if (!gifCategory || gifCategory === "none" || !GIF_MAP[gifCategory]) gifCategory = null;
+  return { text, reactionEmoji, gifCategory };
+}
+
 function buildUserPrompt(senderName, question, userId) {
   const hist = getUserHistory(userId);
   const histText = hist.map(m => `${m.role === "user" ? senderName : "زنجي"}: ${m.text}`).join("\n");
@@ -1460,7 +1547,19 @@ function buildUserPrompt(senderName, question, userId) {
 ${histText ? `\nسياق المحادثة:\n${histText}\n` : ""}
 ${senderName}: ${question}
 
-رد بالعربي المصري فقط بشكل مختصر.`;
+تعليمات الرد:
+- رد بالعربي المصري فقط، مختصر وطبيعي.
+- استخدم إيموجيات في الرد بشكل طبيعي لما يناسب (مش في كل جملة — بس لما بتعبر فعلاً).
+- في آخر ردك، أضف سطر META بالشكل ده بالظبط:
+  [META:react=EMOJI,gif=CATEGORY]
+  - EMOJI: إيموجي واحد بس بيعبر عن ردة فعلك على رسالة الشخص
+  - CATEGORY: واحدة من دول (أو none لو مش محتاج GIF):
+    funny | sad | angry | love | hype | thinking | welcome | wow | facepalm | none
+  - بعت GIF بس لو الموقف يستدعي فعلاً (مش في كل رد).
+
+مثال على الشكل الصح:
+آه يسطا ده معروف 😂 بس برضو فيه ناس مش فاهماه.
+[META:react=😂,gif=funny]`;
 }
 
 const salaamCooldowns = new Map();
@@ -2020,10 +2119,25 @@ client.on("messageCreate", async (msg) => {
     const aiPromise   = geminiModel().generateContent(prompt);
     const svTimeout   = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000));
     const result      = await Promise.race([aiPromise, svTimeout]);
-    const reply       = result.response.text().trim();
+    const raw         = result.response.text().trim();
+
+    // فصل الـ META tags عن النص
+    const { text: replyText, reactionEmoji, gifCategory } = parseAiReply(raw);
+
     pushUserHistory(msg.author.id, "user", question);
-    pushUserHistory(msg.author.id, "bot",  reply);
-    await msg.reply(reply);
+    pushUserHistory(msg.author.id, "bot",  replyText);
+
+    // ريأكشن على رسالة اليوزر
+    if (reactionEmoji) msg.react(reactionEmoji).catch(() => {});
+
+    // إرسال الرد
+    await msg.reply(replyText);
+
+    // إرسال GIF لو في كاتيجوري
+    if (gifCategory) {
+      const gifUrl = pickGif(gifCategory);
+      if (gifUrl) msg.channel.send(gifUrl).catch(() => {});
+    }
   } catch (err) {
     logger.error("خطأ في الرد على الرسالة:", err);
     if (err.isQuotaError || err.message === "ALL_KEYS_EXHAUSTED") {
