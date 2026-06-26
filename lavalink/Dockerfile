@@ -21,12 +21,12 @@ COPY application.yml ./application.yml
 # إنشاء مجلد اللوجز
 RUN mkdir -p logs
 
-# Port
-EXPOSE 2333
+# Port — Railway يحدد الـ PORT تلقائياً، 2333 هو الافتراضي
+EXPOSE ${PORT:-2333}
 
-# Health Check
+# Health Check — يستخدم PORT لو موجود وإلا 2333
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:2333/version || exit 1
+  CMD curl -f http://localhost:${PORT:-2333}/version || exit 1
 
 # تشغيل Lavalink
 ENTRYPOINT ["java", \
