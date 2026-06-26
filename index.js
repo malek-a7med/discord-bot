@@ -606,6 +606,22 @@ const LEGACY_COMMANDS = [
   new ContextMenuCommandBuilder()
     .setName("✏️ تعديل رسالة")
     .setType(ApplicationCommandType.Message),
+  new SlashCommandBuilder()
+    .setName("إيمبد")
+    .setDescription("🎨 إنشاء إيمبد مخصصة جامدة وتبعتها لأي قناة [مشرف]")
+    .addStringOption(o => o.setName("عنوان").setDescription("عنوان الإيمبد"))
+    .addStringOption(o => o.setName("لون").setDescription("اللون — hex مثل #FF0000 أو: أحمر، أخضر، أزرق، ذهبي، بنفسجي، برتقالي، وردي، سماوي، أبيض، أسود"))
+    .addChannelOption(o => o.setName("قناة").setDescription("القناة اللي هتبعت فيها (الافتراضي: القناة الحالية)"))
+    .addStringOption(o => o.setName("صورة").setDescription("رابط الصورة الكبيرة (image)"))
+    .addStringOption(o => o.setName("مصغرة").setDescription("رابط الصورة المصغرة (thumbnail) — بتظهر على اليمين"))
+    .addStringOption(o => o.setName("أوثر").setDescription("اسم الكاتب — بيظهر فوق العنوان"))
+    .addStringOption(o => o.setName("أوثر-صورة").setDescription("رابط صورة الكاتب"))
+    .addStringOption(o => o.setName("أوثر-لينك").setDescription("لينك اسم الكاتب"))
+    .addStringOption(o => o.setName("فوتر").setDescription("نص الفوتر — بيظهر في الأسفل"))
+    .addStringOption(o => o.setName("فوتر-صورة").setDescription("رابط أيقونة الفوتر"))
+    .addStringOption(o => o.setName("لينك-عنوان").setDescription("لينك بيتفتح لما تضغط على العنوان"))
+    .addBooleanOption(o => o.setName("تاريخ").setDescription("إظهار التاريخ والوقت في الفوتر"))
+    .addBooleanOption(o => o.setName("معاينة").setDescription("معاينة الإيمبد قبل الإرسال (الافتراضي: نعم)")),
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -622,7 +638,7 @@ function validateLatestFeatures(allCommands) {
     // الأوامر الأساسية القديمة — موجودة قبل نظام /احدث-المميزات
     const skipList = [
       "ping","hello","roll","serverinfo","userinfo",
-      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة",
+      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة","إيمبد",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
@@ -2653,6 +2669,105 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
+      // ─── أمر إيمبد ────────────────────────────────────────────────
+      if (cmd === "إيمبد") {
+        if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
+          return interaction.reply({ content: "❌ الأمر ده للمشرفين بس!", ephemeral: true });
+        }
+
+        // ─── ألوان جاهزة بالعربي ─────────────────────────────────
+        const colorPresets = {
+          "أحمر": 0xe74c3c, "أخضر": 0x2ecc71, "أزرق": 0x3498db,
+          "ذهبي": 0xf1c40f, "بنفسجي": 0x9b59b6, "برتقالي": 0xe67e22,
+          "وردي": 0xff6b9d, "سماوي": 0x1abc9c, "أبيض": 0xffffff,
+          "أسود": 0x2c2f33, "رمادي": 0x95a5a6, "بني": 0xa0522d,
+        };
+
+        // ─── تخزين إعدادات الإيمبد مؤقتاً ───────────────────────
+        const embedId = `${interaction.user.id}_${Date.now()}`;
+
+        const rawColor = interaction.options.getString("لون");
+        let resolvedColor = 0x5865f2; // أزرق Discord افتراضي
+        if (rawColor) {
+          const presetKey = Object.keys(colorPresets).find(k => rawColor.includes(k));
+          if (presetKey) {
+            resolvedColor = colorPresets[presetKey];
+          } else {
+            const hex = rawColor.replace("#", "");
+            const parsed = parseInt(hex, 16);
+            if (!isNaN(parsed)) resolvedColor = parsed;
+          }
+        }
+
+        const targetChannel = interaction.options.getChannel("قناة") || interaction.channel;
+        const wantPreview   = interaction.options.getBoolean("معاينة") ?? true;
+
+        // حفظ البيانات مؤقتاً
+        const embedDraft = {
+          title:        interaction.options.getString("عنوان") || null,
+          color:        resolvedColor,
+          image:        interaction.options.getString("صورة") || null,
+          thumbnail:    interaction.options.getString("مصغرة") || null,
+          authorName:   interaction.options.getString("أوثر") || null,
+          authorIcon:   interaction.options.getString("أوثر-صورة") || null,
+          authorUrl:    interaction.options.getString("أوثر-لينك") || null,
+          footerText:   interaction.options.getString("فوتر") || null,
+          footerIcon:   interaction.options.getString("فوتر-صورة") || null,
+          titleUrl:     interaction.options.getString("لينك-عنوان") || null,
+          showTimestamp: interaction.options.getBoolean("تاريخ") ?? false,
+          channelId:    targetChannel.id,
+          wantPreview,
+        };
+        autoModLogs.set(`embed_${embedId}`, embedDraft); // نستخدم نفس الـ map المؤقت
+        setTimeout(() => autoModLogs.delete(`embed_${embedId}`), 30 * 60 * 1000);
+
+        // ─── فتح Modal للوصف والحقول ────────────────────────────
+        const modal = new ModalBuilder()
+          .setCustomId(`embed_modal_${embedId}`)
+          .setTitle("🎨 إيمبد Builder — تفاصيل المحتوى");
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_desc")
+              .setLabel("📝 الوصف (يدعم Markdown وكل الأسطر)")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(false)
+              .setMaxLength(4000)
+              .setPlaceholder("اكتب وصف الإيمبد هنا...\nتقدر تستخدم **بولد** و *إيطاليك* وكل حاجة")
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_field1")
+              .setLabel("📌 حقل 1 — اكتب بالشكل: العنوان | المحتوى")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setPlaceholder("مثال: 🎮 اللعبة | Minecraft أو اتركه فاضي")
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_field2")
+              .setLabel("📌 حقل 2 — اكتب بالشكل: العنوان | المحتوى")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setPlaceholder("مثال: 👥 الأعضاء | 500+ عضو أو اتركه فاضي")
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_field3")
+              .setLabel("📌 حقل 3 — اكتب بالشكل: العنوان | المحتوى")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setPlaceholder("مثال: 📅 التاريخ | كل جمعة 9م أو اتركه فاضي")
+          ),
+        );
+
+        return interaction.showModal(modal);
+      }
+
       // Quick Cleaning Tools
       if (cmd === "تنظيف_صورة") {
         return await handleWhitenUpload(interaction);
@@ -3737,6 +3852,46 @@ client.on("interactionCreate", async (interaction) => {
         return;
       }
 
+      // ─── أزرار إيمبد Builder ─────────────────────────────────────
+      if (interaction.customId.startsWith("embed_send_") || interaction.customId.startsWith("embed_cancel_")) {
+        const isCancel = interaction.customId.startsWith("embed_cancel_");
+        const embedId  = interaction.customId.replace("embed_send_", "").replace("embed_cancel_", "");
+        const draft    = autoModLogs.get(`embed_${embedId}`);
+
+        if (isCancel) {
+          autoModLogs.delete(`embed_${embedId}`);
+          return interaction.update({ content: "❌ تم إلغاء الإيمبد.", embeds: [], components: [] });
+        }
+
+        if (!draft) return interaction.update({ content: "❌ انتهت صلاحية الإيمبد!", embeds: [], components: [] });
+
+        // ─── بناء الإيمبد من الـ draft المحفوظ ──────────────────
+        const e = new EmbedBuilder().setColor(draft.color);
+        if (draft.title)         e.setTitle(draft.title);
+        if (draft.titleUrl && draft.title) e.setURL(draft.titleUrl);
+        if (draft.description)   e.setDescription(draft.description);
+        if (draft.image)         e.setImage(draft.image);
+        if (draft.thumbnail)     e.setThumbnail(draft.thumbnail);
+        if (draft.showTimestamp) e.setTimestamp();
+        if (draft.authorName)    e.setAuthor({ name: draft.authorName, iconURL: draft.authorIcon || undefined, url: draft.authorUrl || undefined });
+        if (draft.footerText)    e.setFooter({ text: draft.footerText, iconURL: draft.footerIcon || undefined });
+        if (draft.fields?.length > 0) e.addFields(draft.fields);
+
+        try {
+          const targetCh = await client.channels.fetch(draft.channelId).catch(() => null);
+          if (!targetCh) return interaction.update({ content: "❌ مش لاقي القناة!", embeds: [], components: [] });
+          await targetCh.send({ embeds: [e] });
+          autoModLogs.delete(`embed_${embedId}`);
+          return interaction.update({
+            content: `✅ **الإيمبد اتبعتت بنجاح في <#${draft.channelId}>!**`,
+            embeds: [],
+            components: [],
+          });
+        } catch (err) {
+          return interaction.update({ content: `❌ فشل الإرسال: ${err.message}`, embeds: [], components: [] });
+        }
+      }
+
       // ─── أزرار الألعاب الكلاسيكية ────────────────────────────────
       if (interaction.customId.startsWith("rlt_") ||
           interaction.customId.startsWith("maf_") ||
@@ -4513,6 +4668,81 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      // ─── مودال إيمبد Builder ───────────────────────────────────────
+      if (interaction.customId.startsWith("embed_modal_")) {
+        const embedId   = interaction.customId.replace("embed_modal_", "");
+        const draft     = autoModLogs.get(`embed_${embedId}`);
+        if (!draft) return interaction.reply({ content: "❌ انتهت صلاحية الإيمبد! شغّل الأمر تاني.", ephemeral: true });
+
+        const description = interaction.fields.getTextInputValue("embed_desc").trim() || null;
+        const field1raw   = interaction.fields.getTextInputValue("embed_field1").trim();
+        const field2raw   = interaction.fields.getTextInputValue("embed_field2").trim();
+        const field3raw   = interaction.fields.getTextInputValue("embed_field3").trim();
+
+        // ─── تحليل الحقول (العنوان | المحتوى) ──────────────────
+        function parseField(raw) {
+          if (!raw) return null;
+          const parts = raw.split("|");
+          if (parts.length >= 2) {
+            return { name: parts[0].trim(), value: parts.slice(1).join("|").trim(), inline: true };
+          }
+          return { name: "​", value: raw.trim(), inline: false };
+        }
+        const fields = [parseField(field1raw), parseField(field2raw), parseField(field3raw)].filter(Boolean);
+
+        // ─── بناء الإيمبد ────────────────────────────────────────
+        function buildFinalEmbed(d, desc, flds) {
+          const e = new EmbedBuilder().setColor(d.color);
+          if (d.title)       e.setTitle(d.title);
+          if (d.titleUrl && d.title) e.setURL(d.titleUrl);
+          if (desc)          e.setDescription(desc);
+          if (d.image)       e.setImage(d.image);
+          if (d.thumbnail)   e.setThumbnail(d.thumbnail);
+          if (d.showTimestamp) e.setTimestamp();
+          if (d.authorName)  e.setAuthor({ name: d.authorName, iconURL: d.authorIcon || undefined, url: d.authorUrl || undefined });
+          if (d.footerText)  e.setFooter({ text: d.footerText, iconURL: d.footerIcon || undefined });
+          if (flds.length > 0) e.addFields(flds);
+          return e;
+        }
+
+        const finalEmbed = buildFinalEmbed(draft, description, fields);
+        const targetCh   = await client.channels.fetch(draft.channelId).catch(() => null);
+        if (!targetCh) return interaction.reply({ content: "❌ مش لاقي القناة المختارة!", ephemeral: true });
+
+        if (draft.wantPreview) {
+          // ─── معاينة ephemeral + أزرار إرسال/إلغاء ──────────────
+          const previewRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`embed_send_${embedId}`)
+              .setLabel("✅ إرسال للقناة")
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId(`embed_cancel_${embedId}`)
+              .setLabel("❌ إلغاء")
+              .setStyle(ButtonStyle.Danger),
+          );
+          // حفظ الوصف والفيلدز مع الـ draft
+          draft.description = description;
+          draft.fields       = fields;
+          autoModLogs.set(`embed_${embedId}`, draft);
+
+          return interaction.reply({
+            content: `📋 **معاينة الإيمبد** — هتتبعت في <#${draft.channelId}>`,
+            embeds: [finalEmbed],
+            components: [previewRow],
+            ephemeral: true,
+          });
+        } else {
+          // ─── إرسال مباشر بدون معاينة ────────────────────────────
+          await targetCh.send({ embeds: [finalEmbed] });
+          autoModLogs.delete(`embed_${embedId}`);
+          return interaction.reply({
+            content: `✅ الإيمبد اتبعتت في <#${draft.channelId}> بنجاح!`,
+            ephemeral: true,
+          });
+        }
+      }
+
       // ─── مودالات بنك الادخار ─────────────────────────────────────
       if (interaction.customId.startsWith("bsav_modal_")) {
         return await handleBankModal(interaction, db);
