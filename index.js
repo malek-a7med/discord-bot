@@ -622,6 +622,21 @@ const LEGACY_COMMANDS = [
     .addStringOption(o => o.setName("لينك-عنوان").setDescription("لينك بيتفتح لما تضغط على العنوان"))
     .addBooleanOption(o => o.setName("تاريخ").setDescription("إظهار التاريخ والوقت في الفوتر"))
     .addBooleanOption(o => o.setName("معاينة").setDescription("معاينة الإيمبد قبل الإرسال (الافتراضي: نعم)")),
+  new SlashCommandBuilder()
+    .setName("إيمبد-تعديل")
+    .setDescription("✏️ تعديل إيمبد موجودة عن طريق الـ Message ID [مشرف]")
+    .addStringOption(o => o.setName("message_id").setDescription("الـ ID بتاع رسالة الإيمبد").setRequired(true))
+    .addChannelOption(o => o.setName("قناة").setDescription("القناة اللي فيها الإيمبد (الافتراضي: القناة الحالية)"))
+    .addStringOption(o => o.setName("عنوان").setDescription("عنوان جديد (اتركه فاضي يفضل زي ما هو)"))
+    .addStringOption(o => o.setName("لون").setDescription("لون جديد — hex أو: أحمر، أخضر، أزرق، ذهبي، بنفسجي، برتقالي، وردي، سماوي"))
+    .addStringOption(o => o.setName("صورة").setDescription("رابط صورة كبيرة جديدة (اكتب 'مسح' عشان تشيلها)"))
+    .addStringOption(o => o.setName("مصغرة").setDescription("رابط thumbnail جديد (اكتب 'مسح' عشان تشيلها)"))
+    .addStringOption(o => o.setName("أوثر").setDescription("اسم أوثر جديد (اكتب 'مسح' عشان تشيله)"))
+    .addStringOption(o => o.setName("أوثر-صورة").setDescription("رابط صورة الأوثر الجديدة"))
+    .addStringOption(o => o.setName("فوتر").setDescription("نص فوتر جديد (اكتب 'مسح' عشان تشيله)"))
+    .addStringOption(o => o.setName("فوتر-صورة").setDescription("رابط صورة الفوتر الجديدة"))
+    .addStringOption(o => o.setName("لينك-عنوان").setDescription("لينك العنوان الجديد (اكتب 'مسح' عشان تشيله)"))
+    .addBooleanOption(o => o.setName("تاريخ").setDescription("إظهار أو إخفاء التاريخ")),
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -638,7 +653,7 @@ function validateLatestFeatures(allCommands) {
     // الأوامر الأساسية القديمة — موجودة قبل نظام /احدث-المميزات
     const skipList = [
       "ping","hello","roll","serverinfo","userinfo",
-      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة","إيمبد",
+      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة","إيمبد","إيمبد-تعديل",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
@@ -2768,6 +2783,142 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.showModal(modal);
       }
 
+      // ─── أمر تعديل إيمبد ──────────────────────────────────────────
+      if (cmd === "إيمبد-تعديل") {
+        if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
+          return interaction.reply({ content: "❌ الأمر ده للمشرفين بس!", ephemeral: true });
+        }
+
+        const msgId     = interaction.options.getString("message_id")?.trim();
+        const targetCh  = interaction.options.getChannel("قناة") || interaction.channel;
+
+        if (!/^\d{17,20}$/.test(msgId)) {
+          return interaction.reply({ content: "❌ الـ Message ID مش صح! لازم يكون أرقام بس (17-20 رقم).", ephemeral: true });
+        }
+
+        // ─── نجيب الرسالة ────────────────────────────────────────
+        let targetMsg;
+        try {
+          targetMsg = await targetCh.messages.fetch(msgId);
+        } catch {
+          return interaction.reply({ content: `❌ مش لاقي الرسالة في <#${targetCh.id}>!\nتأكد من الـ ID أو اختار القناة الصح.`, ephemeral: true });
+        }
+
+        if (!targetMsg.author.bot || targetMsg.author.id !== client.user.id) {
+          return interaction.reply({ content: "❌ الرسالة دي مش بتاعة البوت — مينفعش أعدّلها!", ephemeral: true });
+        }
+
+        if (!targetMsg.embeds || targetMsg.embeds.length === 0) {
+          return interaction.reply({ content: "❌ الرسالة دي مفيهاش إيمبد!", ephemeral: true });
+        }
+
+        // ─── ألوان جاهزة بالعربي ─────────────────────────────────
+        const colorPresets = {
+          "أحمر": 0xe74c3c, "أخضر": 0x2ecc71, "أزرق": 0x3498db,
+          "ذهبي": 0xf1c40f, "بنفسجي": 0x9b59b6, "برتقالي": 0xe67e22,
+          "وردي": 0xff6b9d, "سماوي": 0x1abc9c, "أبيض": 0xffffff,
+          "أسود": 0x2c2f33, "رمادي": 0x95a5a6, "بني": 0xa0522d,
+        };
+
+        const oldEmbed  = targetMsg.embeds[0];
+        const editId    = `${interaction.user.id}_${Date.now()}`;
+
+        // ─── دمج الإعدادات القديمة مع الجديدة ───────────────────
+        function resolveColor(rawColor, fallback) {
+          if (!rawColor) return fallback;
+          const presetKey = Object.keys(colorPresets).find(k => rawColor.includes(k));
+          if (presetKey) return colorPresets[presetKey];
+          const parsed = parseInt(rawColor.replace("#", ""), 16);
+          return isNaN(parsed) ? fallback : parsed;
+        }
+        function resolveStr(newVal, oldVal) {
+          if (newVal === null) return oldVal ?? null;
+          if (newVal.trim().toLowerCase() === "مسح") return null;
+          return newVal.trim() || oldVal || null;
+        }
+
+        const rawNewTitle  = interaction.options.getString("عنوان");
+        const rawNewColor  = interaction.options.getString("لون");
+        const rawNewImg    = interaction.options.getString("صورة");
+        const rawNewThumb  = interaction.options.getString("مصغرة");
+        const rawNewAuthor = interaction.options.getString("أوثر");
+        const rawNewAuthImg= interaction.options.getString("أوثر-صورة");
+        const rawNewFooter = interaction.options.getString("فوتر");
+        const rawNewFtImg  = interaction.options.getString("فوتر-صورة");
+        const rawNewUrl    = interaction.options.getString("لينك-عنوان");
+        const newTimestamp = interaction.options.getBoolean("تاريخ");
+
+        const editDraft = {
+          messageId:    msgId,
+          channelId:    targetCh.id,
+          title:        resolveStr(rawNewTitle,  oldEmbed.title),
+          color:        resolveColor(rawNewColor, oldEmbed.color ?? 0x5865f2),
+          image:        resolveStr(rawNewImg,   oldEmbed.image?.url ?? null),
+          thumbnail:    resolveStr(rawNewThumb, oldEmbed.thumbnail?.url ?? null),
+          authorName:   resolveStr(rawNewAuthor, oldEmbed.author?.name ?? null),
+          authorIcon:   resolveStr(rawNewAuthImg, oldEmbed.author?.iconURL ?? null),
+          footerText:   resolveStr(rawNewFooter, oldEmbed.footer?.text ?? null),
+          footerIcon:   resolveStr(rawNewFtImg,  oldEmbed.footer?.iconURL ?? null),
+          titleUrl:     resolveStr(rawNewUrl,    oldEmbed.url ?? null),
+          showTimestamp: newTimestamp !== null ? newTimestamp : !!(oldEmbed.timestamp),
+          // نحتفظ بالحقول القديمة
+          oldFields:    oldEmbed.fields ?? [],
+          oldDesc:      oldEmbed.description ?? "",
+        };
+        autoModLogs.set(`embededit_${editId}`, editDraft);
+        setTimeout(() => autoModLogs.delete(`embededit_${editId}`), 30 * 60 * 1000);
+
+        // ─── Modal بالوصف والحقول مملوءة بالقيم القديمة ─────────
+        const oldField1 = oldEmbed.fields?.[0] ? `${oldEmbed.fields[0].name} | ${oldEmbed.fields[0].value}` : "";
+        const oldField2 = oldEmbed.fields?.[1] ? `${oldEmbed.fields[1].name} | ${oldEmbed.fields[1].value}` : "";
+        const oldField3 = oldEmbed.fields?.[2] ? `${oldEmbed.fields[2].name} | ${oldEmbed.fields[2].value}` : "";
+
+        const modal = new ModalBuilder()
+          .setCustomId(`embededit_modal_${editId}`)
+          .setTitle("✏️ تعديل الإيمبد — المحتوى");
+
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_desc")
+              .setLabel("📝 الوصف (اتركه فاضي يفضل زي ما هو — اكتب 'مسح' تشيله)")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(false)
+              .setMaxLength(4000)
+              .setValue(oldEmbed.description?.slice(0, 4000) ?? "")
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_field1")
+              .setLabel("📌 حقل 1 — العنوان | المحتوى (فاضي = مسح)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setValue(oldField1.slice(0, 500))
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_field2")
+              .setLabel("📌 حقل 2 — العنوان | المحتوى (فاضي = مسح)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setValue(oldField2.slice(0, 500))
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("embed_field3")
+              .setLabel("📌 حقل 3 — العنوان | المحتوى (فاضي = مسح)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setValue(oldField3.slice(0, 500))
+          ),
+        );
+
+        return interaction.showModal(modal);
+      }
+
       // Quick Cleaning Tools
       if (cmd === "تنظيف_صورة") {
         return await handleWhitenUpload(interaction);
@@ -4740,6 +4891,71 @@ client.on("interactionCreate", async (interaction) => {
             content: `✅ الإيمبد اتبعتت في <#${draft.channelId}> بنجاح!`,
             ephemeral: true,
           });
+        }
+      }
+
+      // ─── مودال تعديل إيمبد ────────────────────────────────────────
+      if (interaction.customId.startsWith("embededit_modal_")) {
+        const editId = interaction.customId.replace("embededit_modal_", "");
+        const draft  = autoModLogs.get(`embededit_${editId}`);
+        if (!draft) return interaction.reply({ content: "❌ انتهت صلاحية التعديل! شغّل الأمر تاني.", ephemeral: true });
+
+        const rawDesc   = interaction.fields.getTextInputValue("embed_desc");
+        const field1raw = interaction.fields.getTextInputValue("embed_field1").trim();
+        const field2raw = interaction.fields.getTextInputValue("embed_field2").trim();
+        const field3raw = interaction.fields.getTextInputValue("embed_field3").trim();
+
+        // ─── وصف: فاضي = يفضل زي ما هو، "مسح" = شيله ──────────
+        let newDesc;
+        if (rawDesc.trim().toLowerCase() === "مسح") {
+          newDesc = null;
+        } else if (rawDesc.trim() === "") {
+          newDesc = draft.oldDesc || null;
+        } else {
+          newDesc = rawDesc.trim();
+        }
+
+        // ─── تحليل الحقول ────────────────────────────────────────
+        function parseField(raw) {
+          if (!raw) return null;
+          const parts = raw.split("|");
+          if (parts.length >= 2) {
+            return { name: parts[0].trim(), value: parts.slice(1).join("|").trim(), inline: true };
+          }
+          return { name: "​", value: raw.trim(), inline: false };
+        }
+        const newFields = [parseField(field1raw), parseField(field2raw), parseField(field3raw)].filter(Boolean);
+
+        // ─── بناء الإيمبد المعدّل ────────────────────────────────
+        const e = new EmbedBuilder().setColor(draft.color);
+        if (draft.title)         e.setTitle(draft.title);
+        if (draft.titleUrl && draft.title) e.setURL(draft.titleUrl);
+        if (newDesc)             e.setDescription(newDesc);
+        if (draft.image)         e.setImage(draft.image);
+        if (draft.thumbnail)     e.setThumbnail(draft.thumbnail);
+        if (draft.showTimestamp) e.setTimestamp();
+        if (draft.authorName)    e.setAuthor({ name: draft.authorName, iconURL: draft.authorIcon || undefined, url: draft.authorUrl || undefined });
+        if (draft.footerText)    e.setFooter({ text: draft.footerText, iconURL: draft.footerIcon || undefined });
+        // الحقول: لو في جديدة يحطها، لو مفيش يفضل القديمة
+        const finalFields = newFields.length > 0 ? newFields : draft.oldFields ?? [];
+        if (finalFields.length > 0) e.addFields(finalFields);
+
+        // ─── تعديل الرسالة الأصلية ───────────────────────────────
+        try {
+          const targetCh  = await client.channels.fetch(draft.channelId).catch(() => null);
+          if (!targetCh) return interaction.reply({ content: "❌ مش لاقي القناة!", ephemeral: true });
+          const targetMsg = await targetCh.messages.fetch(draft.messageId).catch(() => null);
+          if (!targetMsg) return interaction.reply({ content: "❌ مش لاقي الرسالة — اتمسحت؟", ephemeral: true });
+
+          await targetMsg.edit({ embeds: [e] });
+          autoModLogs.delete(`embededit_${editId}`);
+
+          return interaction.reply({
+            content: `✅ **الإيمبد اتعدّلت بنجاح!**\n📍 <#${draft.channelId}> — [اضغط هنا للرسالة](https://discord.com/channels/${interaction.guildId}/${draft.channelId}/${draft.messageId})`,
+            ephemeral: true,
+          });
+        } catch (err) {
+          return interaction.reply({ content: `❌ فشل التعديل: ${err.message}`, ephemeral: true });
         }
       }
 
