@@ -5155,36 +5155,73 @@ const _autoCloseInterval = setInterval(() => {
 _autoCloseInterval.unref?.();
 
 // ─── Reaction Roles Events ────────────────────────────────────────
+/** مطابقة الإيموجي — يدعم unicode + custom + animated */
+function matchesStoredEmoji(reactionEmoji, stored) {
+  if (!stored) return false;
+  // unicode emoji مباشر
+  if (reactionEmoji.name === stored) return true;
+  // custom / animated: نبني الصيغتين ونتحقق من كلهم
+  if (reactionEmoji.id) {
+    const plain    = `<:${reactionEmoji.name}:${reactionEmoji.id}>`;
+    const animated = `<a:${reactionEmoji.name}:${reactionEmoji.id}>`;
+    if (plain === stored || animated === stored) return true;
+    // fallback: نفس الـ id بغض النظر عن الصيغة
+    const storedId = stored.match(/:(\d+)>$/)?.[1];
+    if (storedId && storedId === reactionEmoji.id) return true;
+  }
+  return false;
+}
+
 client.on("messageReactionAdd", async (reaction, user) => {
-  if (user.partial) { try { await user.fetch(); } catch { return; } }
-  if (user.bot) return;
-  if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
-  if (reaction.message.partial) { try { await reaction.message.fetch(); } catch { return; } }
-  const data = reactionRoles[reaction.message.id];
-  if (!data) return;
-  const emojiKey = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
-  if (emojiKey !== data.emoji && reaction.emoji.name !== data.emoji) return;
-  const guild = await client.guilds.fetch(data.guildId).catch(() => null);
-  if (!guild) return;
-  const member = await guild.members.fetch(user.id).catch(() => null);
-  if (!member) return;
-  await member.roles.add(data.roleId).catch(() => {});
+  try {
+    if (user.partial) await user.fetch();
+    if (user.bot) return;
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.message.partial) await reaction.message.fetch();
+
+    const data = reactionRoles[reaction.message.id];
+    if (!data) return;
+    if (!matchesStoredEmoji(reaction.emoji, data.emoji)) return;
+
+    const guild = client.guilds.cache.get(data.guildId)
+      ?? await client.guilds.fetch(data.guildId).catch(() => null);
+    if (!guild) return;
+
+    const member = await guild.members.fetch({ user: user.id, force: true }).catch(() => null);
+    if (!member) return;
+
+    await member.roles.add(data.roleId).catch(err => {
+      logger.warn(`[ReactionRole] فشل إضافة رول ${data.roleId} لـ ${user.id}: ${err.message}`);
+    });
+  } catch (err) {
+    logger.error("[ReactionRole] خطأ في messageReactionAdd:", err.message);
+  }
 });
 
 client.on("messageReactionRemove", async (reaction, user) => {
-  if (user.partial) { try { await user.fetch(); } catch { return; } }
-  if (user.bot) return;
-  if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
-  if (reaction.message.partial) { try { await reaction.message.fetch(); } catch { return; } }
-  const data = reactionRoles[reaction.message.id];
-  if (!data) return;
-  const emojiKey = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
-  if (emojiKey !== data.emoji && reaction.emoji.name !== data.emoji) return;
-  const guild = await client.guilds.fetch(data.guildId).catch(() => null);
-  if (!guild) return;
-  const member = await guild.members.fetch(user.id).catch(() => null);
-  if (!member) return;
-  await member.roles.remove(data.roleId).catch(() => {});
+  try {
+    if (user.partial) await user.fetch();
+    if (user.bot) return;
+    if (reaction.partial) await reaction.fetch();
+    if (reaction.message.partial) await reaction.message.fetch();
+
+    const data = reactionRoles[reaction.message.id];
+    if (!data) return;
+    if (!matchesStoredEmoji(reaction.emoji, data.emoji)) return;
+
+    const guild = client.guilds.cache.get(data.guildId)
+      ?? await client.guilds.fetch(data.guildId).catch(() => null);
+    if (!guild) return;
+
+    const member = await guild.members.fetch({ user: user.id, force: true }).catch(() => null);
+    if (!member) return;
+
+    await member.roles.remove(data.roleId).catch(err => {
+      logger.warn(`[ReactionRole] فشل إزالة رول ${data.roleId} من ${user.id}: ${err.message}`);
+    });
+  } catch (err) {
+    logger.error("[ReactionRole] خطأ في messageReactionRemove:", err.message);
+  }
 });
 
 client.login(process.env.DISCORD_TOKEN);
