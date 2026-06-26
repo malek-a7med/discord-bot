@@ -508,11 +508,28 @@ const LEGACY_COMMANDS = [
     ),
   new SlashCommandBuilder()
     .setName("رول-ريأكشن")
-    .setDescription("📌 ابعت رسالة — اللي يعمل ريأكشن عليها ياخد رول تلقائي")
+    .setDescription("📌 ابعت رسائل — اللي يعمل ريأكشن عليها ياخد رول تلقائي (حتى 5 أزواج)")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
-    .addRoleOption(o => o.setName("رول").setDescription("الرول اللي هيتدي للناس").setRequired(true))
-    .addStringOption(o => o.setName("إيموجي").setDescription("الإيموجي اللي لازم يعملوا عليه ريأكشن").setRequired(true))
-    .addStringOption(o => o.setName("رسالة").setDescription("نص الرسالة (اختياري)").setRequired(false)),
+    // ── الزوج الأول (مطلوب) ──
+    .addRoleOption(o => o.setName("رول-1").setDescription("الرول الأول").setRequired(true))
+    .addStringOption(o => o.setName("إيموجي-1").setDescription("الإيموجي للرسالة الأولى").setRequired(true))
+    .addStringOption(o => o.setName("رسالة-1").setDescription("نص الرسالة الأولى (اختياري)").setRequired(false))
+    // ── الزوج الثاني ──
+    .addRoleOption(o => o.setName("رول-2").setDescription("الرول الثاني (اختياري)").setRequired(false))
+    .addStringOption(o => o.setName("إيموجي-2").setDescription("الإيموجي للرسالة الثانية").setRequired(false))
+    .addStringOption(o => o.setName("رسالة-2").setDescription("نص الرسالة الثانية (اختياري)").setRequired(false))
+    // ── الزوج الثالث ──
+    .addRoleOption(o => o.setName("رول-3").setDescription("الرول الثالث (اختياري)").setRequired(false))
+    .addStringOption(o => o.setName("إيموجي-3").setDescription("الإيموجي للرسالة الثالثة").setRequired(false))
+    .addStringOption(o => o.setName("رسالة-3").setDescription("نص الرسالة الثالثة (اختياري)").setRequired(false))
+    // ── الزوج الرابع ──
+    .addRoleOption(o => o.setName("رول-4").setDescription("الرول الرابع (اختياري)").setRequired(false))
+    .addStringOption(o => o.setName("إيموجي-4").setDescription("الإيموجي للرسالة الرابعة").setRequired(false))
+    .addStringOption(o => o.setName("رسالة-4").setDescription("نص الرسالة الرابعة (اختياري)").setRequired(false))
+    // ── الزوج الخامس ──
+    .addRoleOption(o => o.setName("رول-5").setDescription("الرول الخامس (اختياري)").setRequired(false))
+    .addStringOption(o => o.setName("إيموجي-5").setDescription("الإيموجي للرسالة الخامسة").setRequired(false))
+    .addStringOption(o => o.setName("رسالة-5").setDescription("نص الرسالة الخامسة (اختياري)").setRequired(false)),
   // ✅ دمج: رفع-بلوك/قائمة-مبلوكين بقوا subcommands تحت /بلوك
   new SlashCommandBuilder()
     .setName("بلوك")
@@ -2149,14 +2166,36 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "رول-ريأكشن") {
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles))
           return interaction.reply({ content: "❌ محتاج صلاحية **إدارة الأدوار** عشان تستخدم الأمر ده!", ephemeral: true });
-        const role    = interaction.options.getRole("رول");
-        const emoji   = interaction.options.getString("إيموجي").trim();
-        const msgText = interaction.options.getString("رسالة") || `👇 اعمل ريأكشن بـ ${emoji} عشان تاخد رول **${role.name}**!`;
-        const sentMsg = await channel.send(msgText);
-        await sentMsg.react(emoji).catch(() => {});
-        reactionRoles[sentMsg.id] = { emoji, roleId: role.id, guildId: interaction.guildId };
+
+        // اجمع الأزواج الصالحة (رول + إيموجي مطلوبين لكل زوج)
+        const pairs = [];
+        for (let i = 1; i <= 5; i++) {
+          const role  = interaction.options.getRole(`رول-${i}`);
+          const emoji = interaction.options.getString(`إيموجي-${i}`)?.trim();
+          if (!role || !emoji) continue;
+          const msgText = interaction.options.getString(`رسالة-${i}`) || `👇 اعمل ريأكشن بـ ${emoji} عشان تاخد رول **${role.name}**!`;
+          pairs.push({ role, emoji, msgText });
+        }
+
+        if (pairs.length === 0)
+          return interaction.reply({ content: "❌ لازم تحط رول وإيموجي على الأقل للزوج الأول!", ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const results = [];
+        for (const pair of pairs) {
+          try {
+            const sentMsg = await channel.send(pair.msgText);
+            await sentMsg.react(pair.emoji).catch(() => {});
+            reactionRoles[sentMsg.id] = { emoji: pair.emoji, roleId: pair.role.id, guildId: interaction.guildId };
+            results.push(`✅ ${pair.emoji} → **${pair.role.name}**`);
+          } catch (e) {
+            results.push(`❌ فشل ${pair.emoji} → **${pair.role.name}** (${e.message})`);
+          }
+        }
+
         saveReactionRoles();
-        return interaction.reply({ content: `✅ تم! الرسالة اتبعتت — اللي يعمل ريأكشن بـ ${emoji} هياخد رول **${role.name}** تلقائياً.`, ephemeral: true });
+        return interaction.editReply({ content: `**رول-ريأكشن — النتيجة:**\n${results.join("\n")}` });
       }
 
       // ─── رتب المستويات ────────────────────────────────────────────
