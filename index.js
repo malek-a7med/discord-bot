@@ -1759,44 +1759,95 @@ client.on("messageCreate", async (msg) => {
     if (amResult?.triggered) {
       // ── إرسال إمبيد التقرير في قناة اللوج ──────────────────
       if (amResult.logData) {
-        const ld     = amResult.logData;
-        const logId  = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        const ld        = amResult.logData;
+        const isLogOnly = amResult.action === "log_only" || amResult.action === "soft_warn";
+        const logId     = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         autoModLogs.set(logId, ld);
         setTimeout(() => autoModLogs.delete(logId), 24 * 60 * 60 * 1000);
 
+        // ألوان حسب مستوى الخطورة
+        const levelColors = {
+          LOW:      0xf39c12,
+          MEDIUM:   0xe67e22,
+          HIGH:     0xe74c3c,
+          CRITICAL: 0x8e0000,
+        };
+        const levelEmojis = {
+          LOW:      "🟡",
+          MEDIUM:   "🟠",
+          HIGH:     "🔴",
+          CRITICAL: "⛔",
+        };
+        const categoryLabels = {
+          HARASSMENT:     "مضايقة",
+          THREAT:         "تهديد",
+          HATE_SPEECH:    "خطاب كراهية",
+          EXPLICIT:       "محتوى صريح",
+          DANGEROUS_INFO: "معلومات خطيرة",
+          EXTREMISM:      "تطرف",
+          NONE:           "عام",
+        };
+
+        const aiLevel    = ld.aiLevel    || "HIGH";
+        const aiCategory = ld.aiCategory || "NONE";
+        const embedColor = levelColors[aiLevel]  || 0xe74c3c;
+        const levelEmoji = levelEmojis[aiLevel]  || "🔴";
+        const catLabel   = categoryLabels[aiCategory] || aiCategory;
+
+        const actionLabels = {
+          log_only:    "📋 تسجيل فقط",
+          soft_warn:   "💬 تنبيه هادئ",
+          warn:        "⚠️ تحذير رسمي",
+          timeout:     "🔇 إسكات ساعتين",
+          timeout_24h: "🔇 إسكات 24 ساعة",
+          kick:        "👢 طرد",
+          ban:         "🔨 حظر",
+          owner_report:"🚨 بُلّغت الإدارة",
+        };
+        const actionLabel = actionLabels[amResult.action] || amResult.action;
+
         client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID).then(async logCh => {
           const embed = new EmbedBuilder()
-            .setColor(0xe74c3c)
-            .setTitle("🛡️ Auto-Mod | رسالة محذوفة")
+            .setColor(embedColor)
+            .setTitle(`${levelEmoji} Auto-Mod AI | ${isLogOnly ? "رصد" : "رسالة محذوفة"}`)
             .setThumbnail(ld.userAvatar)
             .addFields(
-              { name: "👤 المستخدم",      value: `<@${ld.userId}>\n\`${ld.username}\``,    inline: true },
-              { name: "📍 القناة",          value: `<#${ld.channelId}>\n\`${ld.channelName}\``, inline: true },
-              { name: "⚠️ السبب",           value: `\`${ld.reason}\``,                        inline: true },
-              { name: "🔢 التحذيرات",      value: `**${amResult.warnCount}** تحذير`,         inline: true },
-              { name: "🕐 الوقت",           value: `<t:${Math.floor(ld.timestamp / 1000)}:R>`, inline: true },
-              { name: "🆔 User ID",         value: `\`${ld.userId}\``,                        inline: true },
-              {
-                name:  "📝 محتوى الرسالة",
-                value: ld.savedContent
-                  ? `\`\`\`${ld.savedContent.slice(0, 900)}\`\`\``
-                  : "*(لا يوجد نص)*",
-              },
+              { name: "👤 المستخدم",     value: `<@${ld.userId}>\n\`${ld.username}\``,         inline: true },
+              { name: "📍 القناة",        value: `<#${ld.channelId}>\n\`${ld.channelName}\``,   inline: true },
+              { name: "🤖 مستوى الذكاء", value: `${levelEmoji} \`${aiLevel}\``,                inline: true },
+              { name: "🏷️ التصنيف",     value: `\`${catLabel}\``,                              inline: true },
+              { name: "⚡ الإجراء",      value: `${actionLabel}`,                               inline: true },
+              { name: "🔢 التحذيرات",   value: `**${amResult.warnCount ?? 0}** تحذير`,         inline: true },
+              { name: "🕐 الوقت",        value: `<t:${Math.floor(ld.timestamp / 1000)}:R>`,    inline: true },
+              { name: "🆔 User ID",      value: `\`${ld.userId}\``,                             inline: true },
+              { name: "⚠️ السبب (AI)",   value: `\`\`\`${(ld.reason || "—").slice(0, 300)}\`\`\``, },
             )
-            .setFooter({ text: `زنجي Auto-Mod • ${ld.guildName}` })
+            .setFooter({ text: `زنجي Auto-Mod v3 • ${ld.guildName}` })
             .setTimestamp();
 
-          if (ld.savedAttachments.length > 0) {
+          if (ld.savedContent) {
+            embed.addFields({
+              name:  "📝 محتوى الرسالة",
+              value: `\`\`\`${ld.savedContent.slice(0, 900)}\`\`\``,
+            });
+          }
+          if (ld.savedAttachments?.length > 0) {
             embed.addFields({
               name:  "🖼️ المرفقات",
               value: ld.savedAttachments.map((u, i) => `[مرفق ${i + 1}](${u})`).join("\n"),
             });
           }
 
-          const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`aml_restore_${logId}`).setLabel("↩️ رجاع الرسالة").setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(`aml_confirm_${logId}`).setLabel("✅ تأكيد الحذف").setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`aml_warn_${logId}`).setLabel("⚠️ تحذير فقط").setStyle(ButtonStyle.Primary),
+          // أزرار الإجراءات (بدون restore لو مش متحذفة)
+          const row1Components = [];
+          if (!isLogOnly) {
+            row1Components.push(
+              new ButtonBuilder().setCustomId(`aml_restore_${logId}`).setLabel("↩️ رجاع الرسالة").setStyle(ButtonStyle.Secondary),
+            );
+          }
+          row1Components.push(
+            new ButtonBuilder().setCustomId(`aml_confirm_${logId}`).setLabel("✅ تأكيد").setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`aml_warn_${logId}`).setLabel("⚠️ تحذير").setStyle(ButtonStyle.Primary),
           );
           const row2 = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`aml_mute_${logId}`).setLabel("🔇 إسكات").setStyle(ButtonStyle.Primary),
@@ -1804,10 +1855,13 @@ client.on("messageCreate", async (msg) => {
             new ButtonBuilder().setCustomId(`aml_ban_${logId}`).setLabel("🔨 حظر").setStyle(ButtonStyle.Danger),
           );
 
-          await logCh.send({ embeds: [embed], components: [row1, row2] }).catch(() => {});
+          const rows = [new ActionRowBuilder().addComponents(...row1Components), row2];
+          await logCh.send({ embeds: [embed], components: rows }).catch(() => {});
         }).catch(() => {});
       }
-      return;
+
+      // لو log_only أو soft_warn — ما نوقفش معالجة الرسالة (XP + غيره)
+      if (amResult.action !== "log_only" && amResult.action !== "soft_warn") return;
     }
 
     // 🕌 رد على السلام عليكم (كولداون 60 ثانية لكل قناة)
