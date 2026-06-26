@@ -2082,13 +2082,37 @@ client.on("messageCreate", async (msg) => {
     return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
   }
 
-  const question = msg.content.replace(/<@!?\d+>/g, "").trim();
+  const rawText = msg.content.replace(/<@!?\d+>/g, "").trim();
 
-  // لو المحتوى مجرد رابط GIF/صورة أو المرسل بعت attachment بدون نص → تجاهل
-  const isOnlyUrl = /^https?:\/\/\S+$/i.test(question);
-  const isTenorGiphy = /tenor\.com|giphy\.com|media\.tenor|i\.imgur/i.test(question);
-  const hasNoText = !question && msg.attachments.size > 0;
-  if (isOnlyUrl || isTenorGiphy || hasNoText) return;
+  // ── تحديد نوع المحتوى ────────────────────────────────────────
+  const isTenorGiphy = /tenor\.com|giphy\.com|media\.tenor/i.test(rawText);
+  const isOnlyUrl    = /^https?:\/\/\S+$/i.test(rawText);
+  const hasAttachment = msg.attachments.size > 0;
+  const firstAttach  = hasAttachment ? msg.attachments.first() : null;
+  const isImageAttach = firstAttach && /\.(png|jpe?g|gif|webp)$/i.test(firstAttach.name ?? "");
+
+  // بناء الـ question الذكي حسب نوع المحتوى
+  let question = rawText;
+  let visionPayload = null; // { url, mimeType } لو هنبعت للـ vision model
+
+  if (isTenorGiphy && isOnlyUrl) {
+    // GIF link → وصف للـ AI
+    question = `[بعتلك GIF — رد عليه بشكل طبيعي كأنك واحد شايف GIF في محادثة]`;
+  } else if (isImageAttach && !rawText) {
+    // صورة بدون نص → vision
+    visionPayload = { url: firstAttach.url, mimeType: firstAttach.contentType ?? "image/png" };
+    question = `[بعتلك صورة — رد عليها بشكل طبيعي]`;
+  } else if (isImageAttach && rawText) {
+    // صورة مع نص → vision + النص
+    visionPayload = { url: firstAttach.url, mimeType: firstAttach.contentType ?? "image/png" };
+    // question يفضل النص الأصلي
+  } else if (!rawText && hasAttachment) {
+    // ملف مش صورة أو attachment غير معروف
+    question = `[بعتلك ملف/مرفق بدون نص]`;
+  } else if (isOnlyUrl && !isTenorGiphy) {
+    // رابط عادي → خليه يتعامل معه طبيعي
+    question = rawText;
+  }
 
   if (!question || !_geminiReady) return;
 
@@ -2123,7 +2147,21 @@ client.on("messageCreate", async (msg) => {
   try {
     const senderName  = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
     const prompt      = buildUserPrompt(senderName, question, msg.author.id);
-    const aiPromise   = geminiModel().generateContent(prompt);
+
+    let aiPromise;
+    if (visionPayload) {
+      // جلب الصورة وتحويلها لـ base64
+      const imgResp   = await fetch(visionPayload.url);
+      const imgBuffer = await imgResp.arrayBuffer();
+      const imgB64    = Buffer.from(imgBuffer).toString("base64");
+      aiPromise = geminiImageModel().generateContent([
+        prompt,
+        { inlineData: { mimeType: visionPayload.mimeType, data: imgB64 } },
+      ]);
+    } else {
+      aiPromise = geminiModel().generateContent(prompt);
+    }
+
     const svTimeout   = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000));
     const result      = await Promise.race([aiPromise, svTimeout]);
     const raw         = result.response.text().trim();
