@@ -2136,7 +2136,10 @@ client.on("messageCreate", async (msg) => {
     // إرسال GIF لو في كاتيجوري
     if (gifCategory) {
       const gifUrl = pickGif(gifCategory);
-      if (gifUrl) msg.channel.send(gifUrl).catch(() => {});
+      if (gifUrl) {
+        const gifEmbed = new EmbedBuilder().setImage(gifUrl).setColor(0x2b2d31);
+        msg.channel.send({ embeds: [gifEmbed] }).catch(() => {});
+      }
     }
   } catch (err) {
     logger.error("خطأ في الرد على الرسالة:", err);
