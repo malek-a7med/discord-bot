@@ -784,7 +784,7 @@ const client = new Client({
     GatewayIntentBits.DirectMessageReactions,
     GatewayIntentBits.GuildMessageReactions,
   ],
-  partials: [Partials.Channel, Partials.Message, Partials.Reaction],
+  partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User, Partials.GuildMember],
   failIfNotExists: false,
   rest: { timeout: 15_000, retries: 3 },
   sweepers: {
@@ -5156,8 +5156,10 @@ _autoCloseInterval.unref?.();
 
 // ─── Reaction Roles Events ────────────────────────────────────────
 client.on("messageReactionAdd", async (reaction, user) => {
+  if (user.partial) { try { await user.fetch(); } catch { return; } }
   if (user.bot) return;
   if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
+  if (reaction.message.partial) { try { await reaction.message.fetch(); } catch { return; } }
   const data = reactionRoles[reaction.message.id];
   if (!data) return;
   const emojiKey = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
@@ -5170,8 +5172,10 @@ client.on("messageReactionAdd", async (reaction, user) => {
 });
 
 client.on("messageReactionRemove", async (reaction, user) => {
+  if (user.partial) { try { await user.fetch(); } catch { return; } }
   if (user.bot) return;
   if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
+  if (reaction.message.partial) { try { await reaction.message.fetch(); } catch { return; } }
   const data = reactionRoles[reaction.message.id];
   if (!data) return;
   const emojiKey = reaction.emoji.id ? `<:${reaction.emoji.name}:${reaction.emoji.id}>` : reaction.emoji.name;
