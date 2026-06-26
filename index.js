@@ -2083,6 +2083,13 @@ client.on("messageCreate", async (msg) => {
   }
 
   const question = msg.content.replace(/<@!?\d+>/g, "").trim();
+
+  // لو المحتوى مجرد رابط GIF/صورة أو المرسل بعت attachment بدون نص → تجاهل
+  const isOnlyUrl = /^https?:\/\/\S+$/i.test(question);
+  const isTenorGiphy = /tenor\.com|giphy\.com|media\.tenor|i\.imgur/i.test(question);
+  const hasNoText = !question && msg.attachments.size > 0;
+  if (isOnlyUrl || isTenorGiphy || hasNoText) return;
+
   if (!question || !_geminiReady) return;
 
   const now = Date.now();
