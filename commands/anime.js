@@ -51,8 +51,93 @@ async function cachedJikan(key, path, params = {}) {
   return data;
 }
 
-// ─── مواقع المشاهدة العربية ────────────────────────────────────
-function buildWatchLinks(title, epNum) {
+// ─── Headers مشتركة للطلبات ───────────────────────────────────
+const SCRAPE_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "ar,en-US;q=0.7,en;q=0.3",
+};
+
+// ─── جيب رابط الحلقة المباشر من WitAnime عبر RSS ─────────────
+async function getWitanimeDirectLink(title, epNum) {
+  try {
+    // نظّف الاسم ونعمله slug
+    const slug = title.toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+
+    // أولاً: جرب رابط مباشر بدون RSS
+    const arabicEp = encodeURIComponent("الحلقة");
+    const directUrl = `https://witanime.life/episode/${slug}-${arabicEp}-${epNum}/`;
+    try {
+      const r = await fetch(directUrl, {
+        method: "HEAD", headers: SCRAPE_HEADERS,
+        signal: AbortSignal.timeout(4_000),
+      });
+      if (r.ok) return directUrl;
+    } catch {}
+
+    // ثانياً: ابحث في RSS وجيب الـ slug الصح
+    const searchQ = encodeURIComponent(slug.replace(/-/g, " "));
+    const rssUrl = `https://witanime.life/search/${searchQ}/feed/rss2/`;
+    const rssRes = await fetch(rssUrl, {
+      headers: SCRAPE_HEADERS,
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!rssRes.ok) return null;
+
+    const xml = await rssRes.text();
+
+    // جيب روابط الحلقات من RSS
+    const epLinks = [...xml.matchAll(/<link>([^<]+)<\/link>/g)]
+      .map(m => decodeURIComponent(m[1]))
+      .filter(u => u.includes("/episode/") && u.includes("الحلقة"));
+
+    if (!epLinks.length) return null;
+
+    // دوّر على أقرب slug للعنوان المطلوب
+    const titleWords = title.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    let bestSlug = null;
+
+    for (const link of epLinks) {
+      const m = link.match(/\/episode\/(.+?)-الحلقة-\d+\/?$/);
+      if (!m) continue;
+      const animeSlug = m[1];
+      const slugWords = animeSlug.toLowerCase().split("-");
+      if (titleWords.some(w => slugWords.includes(w))) {
+        bestSlug = animeSlug;
+        break;
+      }
+    }
+
+    // لو ملقيناش تطابق، استخدم أول نتيجة
+    if (!bestSlug) {
+      const m = epLinks[0].match(/\/episode\/(.+?)-الحلقة-\d+\/?$/);
+      if (m) bestSlug = m[1];
+    }
+
+    if (!bestSlug) return null;
+
+    // ابنِ رابط الحلقة المطلوبة وتحقق منه
+    const epUrl = `https://witanime.life/episode/${bestSlug}-الحلقة-${epNum}/`;
+    try {
+      const r = await fetch(epUrl, {
+        method: "HEAD", headers: SCRAPE_HEADERS,
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (r.ok) return epUrl;
+    } catch {}
+
+    // ارجع الرابط حتى لو ما تأكدناش — أفضل من لا شيء
+    return epUrl;
+  } catch {
+    return null;
+  }
+}
+
+// ─── روابط بحث احتياطية لو ما لقيناش رابط مباشر ──────────────
+function buildFallbackLinks(title) {
   const titleEnc = encodeURIComponent(title);
   return [
     { name: "🔴 Anime Phoenix",  url: `https://anime-phoenix.com/?s=${titleEnc}` },
@@ -61,6 +146,11 @@ function buildWatchLinks(title, epNum) {
     { name: "🔵 WitAnime",       url: `https://witanime.life/?s=${titleEnc}` },
     { name: "🟡 Anime4Up",       url: `https://anime4up.bond/?s=${titleEnc}` },
   ];
+}
+
+// ─── للاستخدام في نظام الأخبار ────────────────────────────────
+function buildWatchLinks(title) {
+  return buildFallbackLinks(title);
 }
 
 // ─── Session store (نتائج البحث + صفحة الأنمي + حلقات) ─────
@@ -587,7 +677,7 @@ export async function handleAnimeEpisodes(interaction, db, malId) {
   }
 }
 
-// ─── اختيار حلقة وإرسال روابط المشاهدة العربية مباشرةً ─────
+// ─── اختيار حلقة وإرسال رابط مباشر في الخاص ────────────────
 export async function handleAnimeSelectEpisode(interaction, db) {
   await interaction.deferUpdate();
 
@@ -601,35 +691,60 @@ export async function handleAnimeSelectEpisode(interaction, db) {
     const anime     = animeData.data;
     const title     = anime.title_english || anime.title;
 
-    // تحديث progress في قايمة المستخدم
+    // تحديث progress
     db.updateAnimeProgress(interaction.user.id, malId, epNum, anime.episodes || 0);
 
-    const links = buildWatchLinks(title, epNum);
+    // جرب تجيب رابط مباشر من WitAnime
+    const directUrl = await getWitanimeDirectLink(title, epNum);
 
-    const embed = new EmbedBuilder()
-      .setColor(scoreColor(anime.score))
-      .setTitle(`▶️ ${title} — حلقة ${epNum}`)
-      .setDescription(
-        `📺 **روابط مشاهدة الحلقة ${epNum}${anime.episodes ? ` من ${anime.episodes}` : ""}:**\n\n` +
-        links.map(l => `• [${l.name}](${l.url})`).join("\n") +
-        `\n\n📈 تقدمك: حلقة **${epNum}**/${anime.episodes || "?"}`
-      )
-      .setThumbnail(anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url)
-      .addFields(
-        { name: "📊 التقييم",        value: anime.score ? `⭐ ${anime.score}/10` : "—", inline: true },
-        { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`,            inline: true },
-      )
-      .setFooter({ text: `MAL ID: ${malId} • زنجي Bot 🎌` })
-      .setTimestamp();
+    let embed;
+    if (directUrl) {
+      // ✅ وجدنا رابط مباشر
+      embed = new EmbedBuilder()
+        .setColor(0x2ecc71)
+        .setTitle(`▶️ ${title} — حلقة ${epNum}`)
+        .setDescription(
+          `✅ **وجدنا رابط الحلقة مباشرةً على WitAnime!**\n\n` +
+          `🔗 [**اضغط هنا لمشاهدة الحلقة ${epNum}**](${directUrl})\n\n` +
+          `📈 تقدمك: حلقة **${epNum}**/${anime.episodes || "?"}`
+        )
+        .setThumbnail(anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url)
+        .addFields(
+          { name: "📊 التقييم",        value: anime.score ? `⭐ ${anime.score}/10` : "—", inline: true },
+          { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`,            inline: true },
+        )
+        .setFooter({ text: `WitAnime • زنجي Bot 🎌` })
+        .setTimestamp();
+    } else {
+      // ⚠️ ما لقيناش رابط مباشر — روابط بحث احتياطية
+      const fallback = buildFallbackLinks(title);
+      embed = new EmbedBuilder()
+        .setColor(scoreColor(anime.score))
+        .setTitle(`▶️ ${title} — حلقة ${epNum}`)
+        .setDescription(
+          `📺 **روابط مشاهدة الحلقة ${epNum}:**\n\n` +
+          fallback.map(l => `• [${l.name}](${l.url})`).join("\n") +
+          `\n\n📈 تقدمك: حلقة **${epNum}**/${anime.episodes || "?"}`
+        )
+        .setThumbnail(anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url)
+        .addFields(
+          { name: "📊 التقييم",        value: anime.score ? `⭐ ${anime.score}/10` : "—", inline: true },
+          { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`,            inline: true },
+        )
+        .setFooter({ text: `MAL ID: ${malId} • زنجي Bot 🎌` })
+        .setTimestamp();
+    }
 
+    // ابعت في الخاص، لو مغلق ابعت في المحادثة
     try {
       await interaction.user.send({ embeds: [embed] });
       await interaction.followUp({
-        content: `✅ **تم إرسال روابط الحلقة ${epNum} في الخاص!** 📬\nتقدمك اتسجّل تلقائياً.`,
+        content: directUrl
+          ? `✅ **تم إرسال رابط الحلقة ${epNum} في الخاص!** 📬`
+          : `✅ **تم إرسال الروابط في الخاص!** 📬\nتقدمك اتسجّل تلقائياً.`,
         ephemeral: true,
       });
     } catch {
-      // لو الـ DM مغلق، نرد في نفس المكان
       await interaction.followUp({ embeds: [embed], ephemeral: true });
     }
   } catch (e) {
