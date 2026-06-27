@@ -75,6 +75,7 @@ import {
   AttachmentBuilder,
   ContextMenuCommandBuilder,
   ApplicationCommandType,
+  MessageFlags,
 } from "discord.js";
 import {
   joinVoiceChannel,
@@ -1071,7 +1072,7 @@ async function handleAdminSuggestionAction(interaction, statusKey) {
   if (!isSuggestionAdmin(interaction)) {
     return interaction.reply({
       content: "❌ هذا الزر مخصص للإدارة فقط.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -1079,7 +1080,7 @@ async function handleAdminSuggestionAction(interaction, statusKey) {
   if (!reference) {
     return interaction.reply({
       content: "❌ تعذر ربط هذا الاقتراح بالرسالة الأصلية.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -1116,7 +1117,7 @@ async function handleAdminReplyModalSubmit(interaction) {
   if (!isSuggestionAdmin(interaction)) {
     return interaction.reply({
       content: "❌ هذا الرد مخصص للإدارة فقط.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -1126,7 +1127,7 @@ async function handleAdminReplyModalSubmit(interaction) {
   if (!replyText) {
     return interaction.reply({
       content: "❌ لا يمكن إرسال رد فارغ.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -1137,7 +1138,7 @@ async function handleAdminReplyModalSubmit(interaction) {
   if (!suggestionsChannel?.isTextBased()) {
     return interaction.reply({
       content: "❌ روم الاقتراحات غير متاح حالياً.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -1160,7 +1161,7 @@ async function handleAdminReplyModalSubmit(interaction) {
 
   return interaction.reply({
     content: "✅ تم إرسال رد الإدارة للعضو في روم الاقتراحات.",
-    ephemeral: true,
+    flags: MessageFlags.Ephemeral,
   });
 }
 
@@ -1252,7 +1253,7 @@ async function ensureSuggestionsPanel(clientInstance, force = false) {
 async function handleSuggestionModalSubmit(interaction, suggestionText) {
   // deferReply فوراً قبل أي عملية ثقيلة
   if (!interaction.deferred && !interaction.replied) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   }
 
   const trimmedText = suggestionText?.trim();
@@ -2286,7 +2287,7 @@ client.on("interactionCreate", async (interaction) => {
       // ✅ دمج: /بلوك رفع|قائمة
       if (cmd === "بلوك") {
         if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
         const blockSub = interaction.options.getSubcommand();
 
@@ -2299,11 +2300,11 @@ client.on("interactionCreate", async (interaction) => {
               return `<@${uid}> — فاضل **${mins} دقيقة**`;
             });
           if (blocked.length === 0) {
-            return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", ephemeral: true });
+            return interaction.reply({ content: "✅ مفيش حد مبلوك دلوقتي.", flags: MessageFlags.Ephemeral });
           }
           return interaction.reply({
             content: `🚫 **اليوزرز المبلوكين (${blocked.length}):**\n${blocked.join("\n")}`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -2311,20 +2312,20 @@ client.on("interactionCreate", async (interaction) => {
           const target = interaction.options.getUser("يوزر");
           const entry  = spamData.get(target.id);
           if (!entry || entry.blockedUntil <= Date.now()) {
-            return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, ephemeral: true });
+            return interaction.reply({ content: `✅ **${target.username}** مش مبلوك أصلاً.`, flags: MessageFlags.Ephemeral });
           }
           entry.blockedUntil = 0;
           entry.timestamps   = [];
-          return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, ephemeral: true });
+          return interaction.reply({ content: `✅ اترفع البلوك عن **${target.username}** بنجاح.`, flags: MessageFlags.Ephemeral });
         }
       }
 
       // ─── حالة البوت (بقت subcommand تحت /بوت) ────────────────────
       if (cmd === "بوت" && interaction.options.getSubcommand() === "حالة") {
         if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const uptimeSec  = Math.floor(process.uptime());
         const uptimeMin  = Math.floor(uptimeSec / 60);
@@ -2362,10 +2363,10 @@ client.on("interactionCreate", async (interaction) => {
       // ── مفاتيح-جيميني ──────────────────────────────────────────────
       if (cmd === "مفاتيح-جيميني") {
         if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
         const sub = interaction.options.getSubcommand();
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         if (sub === "عرض") {
           const stats = getKeyStats();
@@ -2443,7 +2444,7 @@ client.on("interactionCreate", async (interaction) => {
       // ─── رول-ريأكشن ───────────────────────────────────────────────
       if (cmd === "رول-ريأكشن") {
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles))
-          return interaction.reply({ content: "❌ محتاج صلاحية **إدارة الأدوار** عشان تستخدم الأمر ده!", ephemeral: true });
+          return interaction.reply({ content: "❌ محتاج صلاحية **إدارة الأدوار** عشان تستخدم الأمر ده!", flags: MessageFlags.Ephemeral });
 
         // اجمع الأزواج الصالحة (رول + إيموجي مطلوبين لكل زوج)
         const pairs = [];
@@ -2456,9 +2457,9 @@ client.on("interactionCreate", async (interaction) => {
         }
 
         if (pairs.length === 0)
-          return interaction.reply({ content: "❌ لازم تحط رول وإيموجي على الأقل للزوج الأول!", ephemeral: true });
+          return interaction.reply({ content: "❌ لازم تحط رول وإيموجي على الأقل للزوج الأول!", flags: MessageFlags.Ephemeral });
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const results = [];
         for (const pair of pairs) {
@@ -2479,10 +2480,10 @@ client.on("interactionCreate", async (interaction) => {
       // ─── رتب المستويات ────────────────────────────────────────────
       if (cmd === "رتب-المستويات") {
         if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
         const sub = interaction.options.getSubcommand();
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         // ── عرض ──
         if (sub === "عرض") {
@@ -2579,7 +2580,7 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "حياة")          return await handleBankLifeCommand(interaction, db);
       if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
       if (cmd === "تغيير-طريقة-الكلام") {
-        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         const mode = interaction.options.getString("أسلوب");
         botSpeechMode = mode;
         const modeLabel = mode === "free" ? "😈 باد بوي — البوت بيشتم بس لو شتموه هو"
@@ -2590,12 +2591,12 @@ client.on("interactionCreate", async (interaction) => {
           embeds: [new EmbedBuilder().setColor(modeColor).setTitle("💬 تم تغيير أسلوب الكلام")
             .setDescription(`أسلوب البوت دلوقتي: **${modeLabel}**\n\n*التغيير فوري على كل الردود الجديدة*`)
             .setTimestamp()],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (cmd === "auto-mod") {
-        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         const state = interaction.options.getString("حالة");
         autoModEnabled = state === "on";
         moderation.setEnabled(autoModEnabled);
@@ -2608,12 +2609,12 @@ client.on("interactionCreate", async (interaction) => {
                 ? "نظام Auto-Mod **شغال** دلوقتي — الرسايل المخالفة هتتحذف تلقائياً.\n🔒 الأنتي سبام والأنتي لينك والأنتي رايد كلهم **شغالين**."
                 : "نظام Auto-Mod **متوقف** — مفيش حاجة هتتعمل تلقائياً.\n🔓 تم إيقاف: مسح الرسايل، الحظر التلقائي، الباند، الطرد، الأنتي سبام، الأنتي لينك، الأنتي رايد — كل حاجة وقفت."
             ).setTimestamp()],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (cmd === "حالة-الحماية") {
-        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
 
         const amStatus   = autoModEnabled;
         const raidOk     = !!(config.OWNER_ID && config.ADMIN_CHANNEL_ID);
@@ -2640,12 +2641,12 @@ client.on("interactionCreate", async (interaction) => {
           )
           .setFooter({ text: 'استخدم /auto-mod on/off للتحكم في كل الأنظمة' })
           .setTimestamp();
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
       }
 
       if (cmd === "قائمة-الباند") {
         if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
-          return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تشوف القايمة دي!", ephemeral: true });
+          return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تشوف القايمة دي!", flags: MessageFlags.Ephemeral });
         }
         const banList = db.getBanList();
         const entries = Object.values(banList);
@@ -2654,7 +2655,7 @@ client.on("interactionCreate", async (interaction) => {
             embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("📋 قائمة الباند")
               .setDescription("✅ القائمة فاضية — مفيش حد متبند دلوقتي.")
               .setTimestamp()],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
         const fields = entries.slice(0, 20).map((entry, i) => ({
@@ -2667,7 +2668,7 @@ client.on("interactionCreate", async (interaction) => {
             .setDescription(entries.length > 20 ? `⚠️ بيظهر أول 20 فقط من إجمالي ${entries.length}` : null)
             .addFields(fields)
             .setTimestamp()],
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -2676,16 +2677,16 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "رفع-باند") {
         if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
-          return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تستخدم الأمر ده!", ephemeral: true });
+          return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تستخدم الأمر ده!", flags: MessageFlags.Ephemeral });
         }
         const targetId = interaction.options.getString("id")?.trim();
         const reason   = interaction.options.getString("سبب") ?? "مش محدد";
 
         if (!/^\d{17,20}$/.test(targetId)) {
-          return interaction.reply({ content: "❌ الـ ID مش صح! لازم يكون أرقام بس (17-20 رقم).", ephemeral: true });
+          return interaction.reply({ content: "❌ الـ ID مش صح! لازم يكون أرقام بس (17-20 رقم).", flags: MessageFlags.Ephemeral });
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
           await guild.bans.remove(targetId, reason);
@@ -2715,7 +2716,7 @@ client.on("interactionCreate", async (interaction) => {
       // ─── أمر إيمبد ────────────────────────────────────────────────
       if (cmd === "إيمبد") {
         if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
-          return interaction.reply({ content: "❌ الأمر ده للمشرفين بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للمشرفين بس!", flags: MessageFlags.Ephemeral });
         }
 
         // ─── ألوان جاهزة بالعربي ─────────────────────────────────
@@ -2814,14 +2815,14 @@ client.on("interactionCreate", async (interaction) => {
       // ─── أمر تعديل إيمبد ──────────────────────────────────────────
       if (cmd === "إيمبد-تعديل") {
         if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
-          return interaction.reply({ content: "❌ الأمر ده للمشرفين بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للمشرفين بس!", flags: MessageFlags.Ephemeral });
         }
 
         const msgId     = interaction.options.getString("message_id")?.trim();
         const targetCh  = interaction.options.getChannel("قناة") || interaction.channel;
 
         if (!/^\d{17,20}$/.test(msgId)) {
-          return interaction.reply({ content: "❌ الـ Message ID مش صح! لازم يكون أرقام بس (17-20 رقم).", ephemeral: true });
+          return interaction.reply({ content: "❌ الـ Message ID مش صح! لازم يكون أرقام بس (17-20 رقم).", flags: MessageFlags.Ephemeral });
         }
 
         // ─── نجيب الرسالة ────────────────────────────────────────
@@ -2829,15 +2830,15 @@ client.on("interactionCreate", async (interaction) => {
         try {
           targetMsg = await targetCh.messages.fetch(msgId);
         } catch {
-          return interaction.reply({ content: `❌ مش لاقي الرسالة في <#${targetCh.id}>!\nتأكد من الـ ID أو اختار القناة الصح.`, ephemeral: true });
+          return interaction.reply({ content: `❌ مش لاقي الرسالة في <#${targetCh.id}>!\nتأكد من الـ ID أو اختار القناة الصح.`, flags: MessageFlags.Ephemeral });
         }
 
         if (!targetMsg.author.bot || targetMsg.author.id !== client.user.id) {
-          return interaction.reply({ content: "❌ الرسالة دي مش بتاعة البوت — مينفعش أعدّلها!", ephemeral: true });
+          return interaction.reply({ content: "❌ الرسالة دي مش بتاعة البوت — مينفعش أعدّلها!", flags: MessageFlags.Ephemeral });
         }
 
         if (!targetMsg.embeds || targetMsg.embeds.length === 0) {
-          return interaction.reply({ content: "❌ الرسالة دي مفيهاش إيمبد!", ephemeral: true });
+          return interaction.reply({ content: "❌ الرسالة دي مفيهاش إيمبد!", flags: MessageFlags.Ephemeral });
         }
 
         // ─── ألوان جاهزة بالعربي ─────────────────────────────────
@@ -3009,7 +3010,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "serverinfo") {
-        if (!guild) return interaction.reply({ content: "❌ الأمر ده في السيرفرات بس يسطا!", ephemeral: true });
+        if (!guild) return interaction.reply({ content: "❌ الأمر ده في السيرفرات بس يسطا!", flags: MessageFlags.Ephemeral });
         await interaction.deferReply();
         await guild.members.fetch().catch(() => {});
         await guild.emojis.fetch().catch(() => {});
@@ -3253,10 +3254,10 @@ client.on("interactionCreate", async (interaction) => {
           const choice = interaction.options.getString("الرتبة");
           const uData = db.getUser(user.id);
           const prices = { golden: 5000, silver: 2500, bronze: 1000 };
-          if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية يا غالي!", ephemeral: true });
+          if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية يا غالي!", flags: MessageFlags.Ephemeral });
 
           const role = guild.roles.cache.find(r => r.name.toLowerCase() === choice);
-          if (!role) return interaction.reply({ content: "❌ الرتبة مش متأسسة بنفس الاسم في السيرفر ده!", ephemeral: true });
+          if (!role) return interaction.reply({ content: "❌ الرتبة مش متأسسة بنفس الاسم في السيرفر ده!", flags: MessageFlags.Ephemeral });
 
           const member = await guild.members.fetch(user.id);
           await member.roles.add(role);
@@ -3268,7 +3269,7 @@ client.on("interactionCreate", async (interaction) => {
           // ✅ ملحوظة: Discord مش بيسمح بـ default permissions مختلفة لكل subcommand،
           //   فبنعمل فحص يدوي هنا للصلاحية بدل الاعتماد على setDefaultMemberPermissions
           if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-            return interaction.reply({ content: "❌ الأمر ده للإدارة بس!", ephemeral: true });
+            return interaction.reply({ content: "❌ الأمر ده للإدارة بس!", flags: MessageFlags.Ephemeral });
           }
           const target = interaction.options.getUser("عضو");
           const amount = interaction.options.getInteger("كمية");
@@ -3280,7 +3281,7 @@ client.on("interactionCreate", async (interaction) => {
         if (econSub === "يومي") {
           const uData = db.getUser(user.id);
           const now = Date.now();
-          if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت المكافأة بتاعتك النهاردة خلاص يسطا تعالي بكره!", ephemeral: true });
+          if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت المكافأة بتاعتك النهاردة خلاص يسطا تعالي بكره!", flags: MessageFlags.Ephemeral });
           db.updateUser(user.id, { coins: uData.coins + 200, lastDaily: now });
           return interaction.reply({ content: "🎁 أخدت الـ **200 كوينز** اليومية بتاعتك بنجاح! نوّرت المحفظة." });
         }
@@ -3292,7 +3293,7 @@ client.on("interactionCreate", async (interaction) => {
 
         if (mSub === "إنشاء") {
           const name = interaction.options.getString("الاسم");
-          if (db.getManhwaDict(name) && Object.keys(db.getManhwaDict(name)).length > 0) return interaction.reply({ content: "❌ القاموس ده موجود بالفعل يسطا!", ephemeral: true });
+          if (db.getManhwaDict(name) && Object.keys(db.getManhwaDict(name)).length > 0) return interaction.reply({ content: "❌ القاموس ده موجود بالفعل يسطا!", flags: MessageFlags.Ephemeral });
           db.addManhwaTerm(name, "_init", "_init");
           return interaction.reply({ content: `✅ تم إنشاء قاموس مانهوا جديد باسم: **${name}**` });
         }
@@ -3301,7 +3302,7 @@ client.on("interactionCreate", async (interaction) => {
           const mName = interaction.options.getString("المانهوا");
           const eng = interaction.options.getString("الإنجليزي");
           const arb = interaction.options.getString("العربي");
-          if (!db.getManhwaDict(mName) || Object.keys(db.getManhwaDict(mName)).length === 0) return interaction.reply({ content: "❌ القاموس ده مش موجود، اعمله الأول!", ephemeral: true });
+          if (!db.getManhwaDict(mName) || Object.keys(db.getManhwaDict(mName)).length === 0) return interaction.reply({ content: "❌ القاموس ده مش موجود، اعمله الأول!", flags: MessageFlags.Ephemeral });
           db.addManhwaTerm(mName, eng, arb);
           return interaction.reply({ content: `✅ تم إضافة المصطلح بنجاح في قاموس **${mName}**.` });
         }
@@ -3310,7 +3311,7 @@ client.on("interactionCreate", async (interaction) => {
           const mName = interaction.options.getString("المانهوا");
           if (mName) {
             const dict = db.getManhwaDict(mName);
-            if (!dict || Object.keys(dict).length === 0) return interaction.reply({ content: "❌ مش موجود القاموس ده!", ephemeral: true });
+            if (!dict || Object.keys(dict).length === 0) return interaction.reply({ content: "❌ مش موجود القاموس ده!", flags: MessageFlags.Ephemeral });
             let txt = `📖 **مصطلحات مانهوا [ ${mName} ]:**\n`;
             Object.keys(dict).forEach(k => { if (k !== "_init") txt += `• \`${k}\` ➡️ \`${dict[k]}\` \n`; });
             return interaction.reply({ content: txt });
@@ -3324,10 +3325,10 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "مسح") {
         if (isFromDM) {
-          return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** 🤖", ephemeral: true });
+          return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** 🤖", flags: MessageFlags.Ephemeral });
         }
         const num = interaction.options.getInteger("عدد");
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         try {
           // تأكد إن البوت عنده صلاحية ManageMessages في القناة دي
           const botMember = interaction.guild?.members?.me;
@@ -3361,7 +3362,7 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "مسح-الكل") {
         if (isFromDM) {
-          return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
+          return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", flags: MessageFlags.Ephemeral });
         }
         const confirmRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
@@ -3381,16 +3382,16 @@ client.on("interactionCreate", async (interaction) => {
               .setDescription(`هتمسح **كل** رسايل الروم ${channel} بما فيها اللي فوق 14 يوم!\n\nمتقدرش ترجعها، متأكد؟`)
           ],
           components: [confirmRow],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       // ─── تعديل إعلان (2-Step: اعرض المحتوى → زر → موداال ممليء) ──
       if (cmd === "تعديل-إعلان") {
         if (!isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         try {
           const msgId   = interaction.options.getString("message_id")?.trim();
           const pos     = interaction.options.getInteger("موضع") ?? 1;
@@ -3442,7 +3443,7 @@ client.on("interactionCreate", async (interaction) => {
         const roleSub = interaction.options.getSubcommand();
 
         if (roleSub === "انشاء") {
-          await interaction.deferReply({ ephemeral: true });
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
           const roleName  = interaction.options.getString("الاسم");
           const roleType  = interaction.options.getString("نوع");
           const roleColor = interaction.options.getString("لون");
@@ -3478,7 +3479,7 @@ client.on("interactionCreate", async (interaction) => {
         }
 
         if (roleSub === "تعديل") {
-          await interaction.deferReply({ ephemeral: true });
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
           const targetRole = interaction.options.getRole("الرول");
           const roleType   = interaction.options.getString("نوع");
           const newName    = interaction.options.getString("اسم");
@@ -3544,25 +3545,25 @@ client.on("interactionCreate", async (interaction) => {
 
         if (modSub === "تحذير" || modSub === "اسكات") {
           if (!interaction.memberPermissions?.has(PermissionFlagsBits.ModerateMembers)) {
-            return interaction.reply({ content: "❌ محتاج صلاحية Moderate Members عشان تستخدم الأمر ده!", ephemeral: true });
+            return interaction.reply({ content: "❌ محتاج صلاحية Moderate Members عشان تستخدم الأمر ده!", flags: MessageFlags.Ephemeral });
           }
         }
         if (modSub === "طرد") {
           if (!interaction.memberPermissions?.has(PermissionFlagsBits.KickMembers)) {
-            return interaction.reply({ content: "❌ محتاج صلاحية Kick Members عشان تستخدم الأمر ده!", ephemeral: true });
+            return interaction.reply({ content: "❌ محتاج صلاحية Kick Members عشان تستخدم الأمر ده!", flags: MessageFlags.Ephemeral });
           }
         }
         if (modSub === "تبنيد") {
           if (!interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
-            return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تستخدم الأمر ده!", ephemeral: true });
+            return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تستخدم الأمر ده!", flags: MessageFlags.Ephemeral });
           }
         }
 
         if (modSub === "تحذير") {
           const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", flags: MessageFlags.Ephemeral });
           const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, flags: MessageFlags.Ephemeral });
           const reason = interaction.options.getString("السبب");
           const actionId = `modwarn_${Date.now()}_${user.id}`;
           pendingModActions.set(actionId, { type: "warn", targetId: target.id, reason, modId: user.id, guildId: guild.id });
@@ -3575,15 +3576,15 @@ client.on("interactionCreate", async (interaction) => {
               new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التحذير").setStyle(ButtonStyle.Danger),
               new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
             )],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
         if (modSub === "اسكات") {
           const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", flags: MessageFlags.Ephemeral });
           const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, flags: MessageFlags.Ephemeral });
           const dur = interaction.options.getInteger("مدة");
           const reason = interaction.options.getString("السبب") ?? "غير محدد";
           const actionId = `modmute_${Date.now()}_${user.id}`;
@@ -3597,15 +3598,15 @@ client.on("interactionCreate", async (interaction) => {
               new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الإسكات").setStyle(ButtonStyle.Danger),
               new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
             )],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
         if (modSub === "طرد") {
           const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", flags: MessageFlags.Ephemeral });
           const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, flags: MessageFlags.Ephemeral });
           const reason = interaction.options.getString("السبب") ?? "غير محدد";
           const actionId = `modkick_${Date.now()}_${user.id}`;
           pendingModActions.set(actionId, { type: "kick", targetId: target.id, reason, modId: user.id, guildId: guild.id });
@@ -3618,15 +3619,15 @@ client.on("interactionCreate", async (interaction) => {
               new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق الطرد").setStyle(ButtonStyle.Danger),
               new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
             )],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
         if (modSub === "تبنيد") {
           const targetUser = interaction.options.getUser("عضو");
-          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", ephemeral: true });
+          if (!targetUser) return interaction.reply({ content: "❌ لازم تختار عضو!", flags: MessageFlags.Ephemeral });
           const target = await guild.members.fetch(targetUser.id).catch(() => null);
-          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, ephemeral: true });
+          if (!target) return interaction.reply({ content: `❌ العضو <@${targetUser.id}> مش في السيرفر ده!`, flags: MessageFlags.Ephemeral });
           const reason = interaction.options.getString("السبب") ?? "غير محدد";
           const actionId = `modban_${Date.now()}_${user.id}`;
           pendingModActions.set(actionId, { type: "ban", targetId: target.id, reason, modId: user.id, guildId: guild.id });
@@ -3639,7 +3640,7 @@ client.on("interactionCreate", async (interaction) => {
               new ButtonBuilder().setCustomId(`modyes_${actionId}`).setLabel("✅ طبّق التبنيد").setStyle(ButtonStyle.Danger),
               new ButtonBuilder().setCustomId(`modno_${actionId}`).setLabel("❌ إلغاء").setStyle(ButtonStyle.Secondary),
             )],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
 
@@ -3649,7 +3650,7 @@ client.on("interactionCreate", async (interaction) => {
           let targetUser = user;
           if (nameOrId) {
             targetMember = await resolveMember(guild, nameOrId);
-            if (!targetMember) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, ephemeral: true });
+            if (!targetMember) return interaction.reply({ content: `❌ ما لقيتش عضو بالاسم أو الـ ID: **${nameOrId}**`, flags: MessageFlags.Ephemeral });
             targetUser = targetMember.user;
           }
           const warns = db.getWarnings(targetUser.id);
@@ -3658,7 +3659,7 @@ client.on("interactionCreate", async (interaction) => {
               embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("😇 سجل أبيض!")
                 .setDescription(`<@${targetUser.id}> ما عندهوش أي تحذيرات 🌟`)
                 .setThumbnail(targetUser.displayAvatarURL())],
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           }
           const warnFields = warns.slice(-10).reverse().map((w, i) => ({
@@ -3669,7 +3670,7 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.reply({
             embeds: [new EmbedBuilder().setColor(0xf39c12).setTitle(`⚠️ تحذيرات ${targetUser.username} (${warns.length})`)
               .addFields(warnFields).setThumbnail(targetUser.displayAvatarURL()).setTimestamp()],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -3713,18 +3714,18 @@ client.on("interactionCreate", async (interaction) => {
           if (!posted) {
             return interaction.reply({
               content: "❌ لم أجد روم الاقتراحات! تأكد من صحة معرف القناة.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           }
           return interaction.reply({
             content: "✅ تم إرسال لوحة الاقتراحات بنجاح في روم الاقتراحات!",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch (err) {
           logger.error("خطأ في إرسال لوحة الاقتراحات:", err);
           return interaction.reply({
             content: "معلش يسطا ثواني بس",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -3736,12 +3737,12 @@ client.on("interactionCreate", async (interaction) => {
             .setTitle("❌ ميزة غير متاحة")
             .setDescription("توليد الصور بالذكاء الاصطناعي غير متاح حالياً.\nهذه الميزة تحتاج نموذج Gemini متخصص لتوليد الصور وهو غير مفعّل في هذا البوت.")
             .setFooter({ text: "استخدم /زنجي لطلب أي حاجة تانية 😊" })],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (cmd === "نسخة-احتياطية") {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         try {
           const allData = db.getAllData();
           const now = new Date();
@@ -3770,7 +3771,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "استرجاع") {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         try {
           const attachment = interaction.options.getAttachment("ملف");
           if (!attachment.name.endsWith(".json")) {
@@ -3816,9 +3817,9 @@ client.on("interactionCreate", async (interaction) => {
         const type = interaction.options.getString("نوع");
         const WELCOME_CHANNEL_ID = "1486100560494203183";
         const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
-        if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", ephemeral: true });
+        if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", flags: MessageFlags.Ephemeral });
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         if (type === "welcome") {
           const imagePath = path.join(__dirname, 'welcome.png');
@@ -3864,7 +3865,7 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "قناة-اللوجز") {
         if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
         const ch = interaction.options.getChannel("قناة");
         if (!db.data.settings) db.data.settings = {};
@@ -3878,16 +3879,16 @@ client.on("interactionCreate", async (interaction) => {
               .setDescription(`كل أوامر الأونر هتتسجل في ${ch} من دلوقتي ✅`)
               .setTimestamp()
           ],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (cmd === "رسالة-جماعية") {
         if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const نوع = interaction.options.getString("نوع");
         const نص = interaction.options.getString("نص");
@@ -3988,7 +3989,7 @@ client.on("interactionCreate", async (interaction) => {
         const channelId = interaction.options.getString("id").trim();
         const ch = await guild.channels.fetch(channelId).catch(() => null);
         if (!ch) {
-          return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, ephemeral: true });
+          return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, flags: MessageFlags.Ephemeral });
         }
         if (!db.data.settings) db.data.settings = {};
         db.data.settings.backupChannelId = ch.id;
@@ -4003,25 +4004,25 @@ client.on("interactionCreate", async (interaction) => {
               .setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" })
               .setTimestamp()
           ],
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       if (cmd === "لوحة-dm") {
         if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
         const g = guild || client.guilds.cache.first();
         const panel = buildDMControlPanel(g);
         if (isFromDM) {
           return interaction.reply(panel);
         }
-        return interaction.reply({ ...panel, ephemeral: true });
+        return interaction.reply({ ...panel, flags: MessageFlags.Ephemeral });
       }
 
     } catch (err) {
       logger.error("خطأ في تنفيذ الأمر:", err);
-      return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
+      return interaction.reply({ content: "معلش يسطا ثواني بس", flags: MessageFlags.Ephemeral }).catch(() => {});
     }
   }
 
@@ -4041,10 +4042,10 @@ client.on("interactionCreate", async (interaction) => {
         if (id === "music_lyrics")     return await handleLyrics(interaction);
         if (id === "music_vol_up" || id === "music_vol_down") {
           const q = musicHandler.getQueue(interaction.guildId);
-          if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+          if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
           const next = id === "music_vol_up" ? Math.min(q.volume + 10, 100) : Math.max(q.volume - 10, 0);
           await musicHandler.setVolume(interaction.guildId, next / 100);
-          return interaction.reply({ content: `🔊 الصوت: **${next}%**`, ephemeral: true });
+          return interaction.reply({ content: `🔊 الصوت: **${next}%**`, flags: MessageFlags.Ephemeral });
         }
         return;
       }
@@ -4244,7 +4245,7 @@ client.on("interactionCreate", async (interaction) => {
         //   مفيد لو فيه ألعاب عالقة من قبل أو محتاج تنضيف شامل
         if (gid === "ghub_closeall") {
           if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !config.isOwner(interaction.user.id))
-            return interaction.reply({ content: "❌ الزرار ده للإدارة بس!", ephemeral: true });
+            return interaction.reply({ content: "❌ الزرار ده للإدارة بس!", flags: MessageFlags.Ephemeral });
           let count = 0;
           channelGames.forEach((_, cid)    => { channelGames.delete(cid); count++; });
           rouletteGames.forEach((_, gid2)  => { rouletteGames.delete(gid2); });
@@ -4256,7 +4257,7 @@ client.on("interactionCreate", async (interaction) => {
           memeChannelMap.forEach((mId, cid)     => { memeGames.delete(mId);   memeChannelMap.delete(cid); count++; });
           luckChannelMap.forEach((lId, cid)     => { luckGames.delete(lId);   luckChannelMap.delete(cid); count++; });
           quizChannelMap.clear();
-          return interaction.reply({ content: `🛑 تم إقفال **${count}** لعبة من كل الرومات!`, ephemeral: true });
+          return interaction.reply({ content: `🛑 تم إقفال **${count}** لعبة من كل الرومات!`, flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -4270,7 +4271,7 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("⏰ انتهى الوقت").setDescription("انتهت مهلة هذا الإجراء — أعد الأمر مرة تانية.")], components: [] });
         }
         if (interaction.user.id !== action.modId) {
-          return interaction.reply({ content: "❌ الزرار ده للشخص اللي نفّذ الأمر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الزرار ده للشخص اللي نفّذ الأمر بس!", flags: MessageFlags.Ephemeral });
         }
 
         pendingModActions.delete(actionId);
@@ -4324,7 +4325,7 @@ client.on("interactionCreate", async (interaction) => {
       // ─── أزرار لوحة تحكم الأونر ──────────────────────────────────
       if (interaction.customId.startsWith("dmp_")) {
         if (!config.isOwner(interaction.user.id)) {
-          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", flags: MessageFlags.Ephemeral });
         }
         const g = interaction.guild || client.guilds.cache.first();
         if (g) await g.members.fetch().catch(() => {});
@@ -4347,7 +4348,7 @@ client.on("interactionCreate", async (interaction) => {
                 { name: "🤖 الأوامر",        value: `\`${LEGACY_COMMANDS.length + 14} أمر\``, inline: true }
               )
               .setTimestamp()],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
           });
         }
 
@@ -4357,12 +4358,12 @@ client.on("interactionCreate", async (interaction) => {
           const sorted = Object.entries(allUsers).sort((a, b) => b[1].coins - a[1].coins).slice(0, 5);
           let txt = "🏆 **أفضل 5 أعضاء بالكوينز:**\n";
           sorted.forEach(([id, d], i) => txt += `**#${i+1}** <@${id}> — 🪙 \`${d.coins}\`\n`);
-          return interaction.reply({ content: txt, ephemeral: true });
+          return interaction.reply({ content: txt, flags: MessageFlags.Ephemeral });
         }
 
         // 💾 نسخة احتياطية
         if (interaction.customId === "dmp_backup") {
-          await interaction.deferReply({ ephemeral: true });
+          await interaction.deferReply({ flags: MessageFlags.Ephemeral });
           const allData = db.getAllData();
           const now = new Date();
           const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
@@ -4377,15 +4378,15 @@ client.on("interactionCreate", async (interaction) => {
         // 🎵 قائمة الميوزك
         if (interaction.customId === "dmp_queue") {
           const q = musicHandler?.getQueue?.(g?.id);
-          if (!q || !q.songs?.length) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", ephemeral: true });
+          if (!q || !q.songs?.length) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", flags: MessageFlags.Ephemeral });
           const txt = q.songs.slice(0, 5).map((s, i) => `**${i+1}.** ${s.title || s.name}`).join("\n");
-          return interaction.reply({ content: `🎵 **قائمة التشغيل:**\n${txt}`, ephemeral: true });
+          return interaction.reply({ content: `🎵 **قائمة التشغيل:**\n${txt}`, flags: MessageFlags.Ephemeral });
         }
 
         // ⏹️ إيقاف الميوزك
         if (interaction.customId === "dmp_stop") {
           await musicHandler?.stop?.(g?.id).catch(() => {});
-          return interaction.reply({ content: "⏹️ تم إيقاف الميوزك!", ephemeral: true });
+          return interaction.reply({ content: "⏹️ تم إيقاف الميوزك!", flags: MessageFlags.Ephemeral });
         }
 
         // 🔲 موودالات المودريشن
@@ -4412,7 +4413,7 @@ client.on("interactionCreate", async (interaction) => {
       // ── أزرار Auto-Mod Log Channel ───────────────────────────────
       if (interaction.customId.startsWith("aml_")) {
         if (!config.isOwner(interaction.user.id) && !interaction.member?.permissions?.has(PermissionFlagsBits.ModerateMembers)) {
-          return interaction.reply({ content: "❌ الأزرار دي للمشرفين بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ الأزرار دي للمشرفين بس!", flags: MessageFlags.Ephemeral });
         }
 
         const parts  = interaction.customId.split("_");
@@ -4422,16 +4423,16 @@ client.on("interactionCreate", async (interaction) => {
 
         // ↩️ رجاع الرسالة
         if (action === "restore") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت أو منتحجتش!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت أو منتحجتش!", flags: MessageFlags.Ephemeral });
           try {
             const ch = await client.channels.fetch(ld.channelId).catch(() => null);
-            if (!ch) return interaction.reply({ content: "❌ مش لاقي القناة!", ephemeral: true });
+            if (!ch) return interaction.reply({ content: "❌ مش لاقي القناة!", flags: MessageFlags.Ephemeral });
             await ch.send({
               content: `📨 **رسالة مرجّعة من Auto-Mod** — <@${ld.userId}>:\n${ld.savedContent || "*(محتوى فارغ)*"}`,
             });
-            await interaction.reply({ content: "✅ الرسالة اترجعت في القناة!", ephemeral: true });
+            await interaction.reply({ content: "✅ الرسالة اترجعت في القناة!", flags: MessageFlags.Ephemeral });
           } catch (e) {
-            await interaction.reply({ content: `❌ فشلت: ${e.message}`, ephemeral: true });
+            await interaction.reply({ content: `❌ فشلت: ${e.message}`, flags: MessageFlags.Ephemeral });
           }
           return;
         }
@@ -4442,14 +4443,14 @@ client.on("interactionCreate", async (interaction) => {
             embeds: interaction.message.embeds,
             components: [],
           }).catch(() => {});
-          await interaction.followUp({ content: "✅ تم تأكيد الحذف. الرسالة اتمسحت ومش هترجع.", ephemeral: true });
+          await interaction.followUp({ content: "✅ تم تأكيد الحذف. الرسالة اتمسحت ومش هترجع.", flags: MessageFlags.Ephemeral });
           autoModLogs.delete(logId);
           return;
         }
 
         // ⚠️ تحذير فقط
         if (action === "warn") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
           db.addWarning(ld.userId, ld.reason, interaction.user.username);
           const warns = db.getWarnings(ld.userId);
           await interaction.reply({
@@ -4458,18 +4459,18 @@ client.on("interactionCreate", async (interaction) => {
               .setTitle("⚠️ تم التحذير")
               .setDescription(`<@${ld.userId}> أخد تحذير إضافي\nإجمالي التحذيرات: **${warns.length}**\nالسبب: ${ld.reason}`)
               .setTimestamp()],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
 
         // 👢 طرد
         if (action === "kick") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
           try {
             await interaction.guild.members.fetch(ld.userId);
             const member = interaction.guild.members.cache.get(ld.userId);
-            if (!member) return interaction.reply({ content: "❌ العضو مش في السيرفر!", ephemeral: true });
+            if (!member) return interaction.reply({ content: "❌ العضو مش في السيرفر!", flags: MessageFlags.Ephemeral });
             await member.kick(`Auto-Mod Log — ${ld.reason}`);
             await interaction.reply({
               embeds: [new EmbedBuilder()
@@ -4477,17 +4478,17 @@ client.on("interactionCreate", async (interaction) => {
                 .setTitle("👢 تم الطرد")
                 .setDescription(`**${ld.username}** اتطرد\nالسبب: ${ld.reason}`)
                 .setTimestamp()],
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           } catch (e) {
-            await interaction.reply({ content: `❌ فشل الطرد: ${e.message}`, ephemeral: true });
+            await interaction.reply({ content: `❌ فشل الطرد: ${e.message}`, flags: MessageFlags.Ephemeral });
           }
           return;
         }
 
         // 🔇 إسكات — بيفتح مودال
         if (action === "mute") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
           const modal = new ModalBuilder()
             .setCustomId(`aml_mute_modal_${logId}`)
             .setTitle("🔇 إسكات العضو");
@@ -4514,7 +4515,7 @@ client.on("interactionCreate", async (interaction) => {
 
         // 🔨 حظر — بيفتح مودال
         if (action === "ban") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
           const modal = new ModalBuilder()
             .setCustomId(`aml_ban_modal_${logId}`)
             .setTitle("🔨 حظر العضو");
@@ -4541,10 +4542,10 @@ client.on("interactionCreate", async (interaction) => {
 
         // ❌ شيل التحذير — بيشيل آخر تحذير من العضو
         if (action === "unwarn") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
           const warnings = db.getWarnings(ld.userId);
           if (!warnings || warnings.length === 0) {
-            return interaction.reply({ content: "ℹ️ العضو ده معندوش تحذيرات أصلاً!", ephemeral: true });
+            return interaction.reply({ content: "ℹ️ العضو ده معندوش تحذيرات أصلاً!", flags: MessageFlags.Ephemeral });
           }
           db.removeLastWarning(ld.userId);
           const newWarnings = db.getWarnings(ld.userId);
@@ -4554,20 +4555,20 @@ client.on("interactionCreate", async (interaction) => {
               .setTitle("❌ تم شيل التحذير")
               .setDescription(`<@${ld.userId}> اتشال منه تحذير واحد\nالتحذيرات المتبقية: **${newWarnings.length}**`)
               .setTimestamp()],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
 
         // 🔊 شيل الإسكات — بيرفع الـ timeout فوراً
         if (action === "unmute") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
           try {
             await interaction.guild.members.fetch(ld.userId);
             const member = interaction.guild.members.cache.get(ld.userId);
-            if (!member) return interaction.reply({ content: "❌ العضو مش في السيرفر!", ephemeral: true });
+            if (!member) return interaction.reply({ content: "❌ العضو مش في السيرفر!", flags: MessageFlags.Ephemeral });
             if (!member.isCommunicationDisabled()) {
-              return interaction.reply({ content: "ℹ️ العضو ده مش متساكت أصلاً!", ephemeral: true });
+              return interaction.reply({ content: "ℹ️ العضو ده مش متساكت أصلاً!", flags: MessageFlags.Ephemeral });
             }
             await member.timeout(null, `Auto-Mod Log — رفع الإسكات بواسطة ${interaction.user.username}`);
             await interaction.reply({
@@ -4576,17 +4577,17 @@ client.on("interactionCreate", async (interaction) => {
                 .setTitle("🔊 تم رفع الإسكات")
                 .setDescription(`<@${ld.userId}> اترفع منه الإسكات\nبواسطة: ${interaction.user.username}`)
                 .setTimestamp()],
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           } catch (e) {
-            await interaction.reply({ content: `❌ فشل رفع الإسكات: ${e.message}`, ephemeral: true });
+            await interaction.reply({ content: `❌ فشل رفع الإسكات: ${e.message}`, flags: MessageFlags.Ephemeral });
           }
           return;
         }
 
         // 🔓 رفع الحظر — بيرفع البان عن العضو
         if (action === "unban") {
-          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+          if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
           try {
             await interaction.guild.bans.fetch(ld.userId).catch(() => null);
             await interaction.guild.members.unban(ld.userId, `Auto-Mod Log — رفع الحظر بواسطة ${interaction.user.username}`);
@@ -4597,13 +4598,13 @@ client.on("interactionCreate", async (interaction) => {
                 .setTitle("🔓 تم رفع الحظر")
                 .setDescription(`<@${ld.userId}> (${ld.username}) اترفع عنه الحظر\nبواسطة: ${interaction.user.username}`)
                 .setTimestamp()],
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
           } catch (e) {
             const msg = e.code === 10026
               ? "ℹ️ العضو ده مش محظور أصلاً!"
               : `❌ فشل رفع الحظر: ${e.message}`;
-            await interaction.reply({ content: msg, ephemeral: true });
+            await interaction.reply({ content: msg, flags: MessageFlags.Ephemeral });
           }
           return;
         }
@@ -4615,7 +4616,7 @@ client.on("interactionCreate", async (interaction) => {
       // ── أزرار قرار طرد Auto-Mod ───────────────────────────────────
       if (interaction.customId.startsWith("automod_kick_yes_") || interaction.customId.startsWith("automod_kick_no_")) {
         if (!config.isOwner(interaction.user.id)) {
-          return interaction.reply({ content: "❌ القرار ده للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ القرار ده للأونر بس!", flags: MessageFlags.Ephemeral });
         }
         const targetId = interaction.customId.replace("automod_kick_yes_", "").replace("automod_kick_no_", "");
         const isKick   = interaction.customId.startsWith("automod_kick_yes_");
@@ -4629,15 +4630,15 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.update({ components: [disabledRow] }).catch(() => {});
 
         if (!isKick) {
-          return interaction.followUp({ content: "✅ تمام، سيبناه المرة دي. لو كررها هيجيلك تقرير تاني.", ephemeral: true });
+          return interaction.followUp({ content: "✅ تمام، سيبناه المرة دي. لو كررها هيجيلك تقرير تاني.", flags: MessageFlags.Ephemeral });
         }
 
-        if (!guild) return interaction.followUp({ content: "❌ مش لاقي السيرفر!", ephemeral: true });
+        if (!guild) return interaction.followUp({ content: "❌ مش لاقي السيرفر!", flags: MessageFlags.Ephemeral });
 
         try {
           await guild.members.fetch().catch(() => {});
           const member = guild.members.cache.get(targetId);
-          if (!member) return interaction.followUp({ content: "❌ العضو مش موجود أو طلع بنفسه!", ephemeral: true });
+          if (!member) return interaction.followUp({ content: "❌ العضو مش موجود أو طلع بنفسه!", flags: MessageFlags.Ephemeral });
 
           await member.kick("Auto-Mod: قرار الأونر بالطرد");
           return interaction.followUp({
@@ -4646,10 +4647,10 @@ client.on("interactionCreate", async (interaction) => {
               .setTitle("👢 تم الطرد")
               .setDescription(`**${member.user.username}** اتطرد بناءً على قرارك.\nالسبب: Auto-Mod + قرار الأونر`)
               .setTimestamp()],
-            ephemeral: true
+            flags: MessageFlags.Ephemeral
           });
         } catch (err) {
-          return interaction.followUp({ content: `❌ فشلت في الطرد: ${err.message}`, ephemeral: true });
+          return interaction.followUp({ content: `❌ فشلت في الطرد: ${err.message}`, flags: MessageFlags.Ephemeral });
         }
       }
       // ─────────────────────────────────────────────────────────────
@@ -4772,11 +4773,11 @@ client.on("interactionCreate", async (interaction) => {
         activeGames.clear();
         return await interaction.reply({
           content: "🧹 تم مسح وتصفير قائمة الألعاب النشطة كلها بنجاح!",
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
       if (interaction.customId === "refresh_suggestions_board") {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         const posted = await ensureSuggestionsPanel(client, true);
         return await interaction.editReply({
           content: posted
@@ -4797,14 +4798,14 @@ client.on("interactionCreate", async (interaction) => {
         if (!isSuggestionAdmin(interaction)) {
           return interaction.reply({
             content: "❌ هذا الزر مخصص للإدارة فقط.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
         const reference = parseSuggestionReference(interaction.message.embeds[0]);
         if (!reference) {
           return interaction.reply({
             content: "❌ تعذر ربط هذا الاقتراح بالرسالة الأصلية.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
         return await showAdminReplyModal(interaction, reference);
@@ -4814,11 +4815,11 @@ client.on("interactionCreate", async (interaction) => {
       }
       if (interaction.customId === "admin_notify") {
         if (!isSuggestionAdmin(interaction)) {
-          return interaction.reply({ content: "❌ هذا الزر مخصص للإدارة فقط.", ephemeral: true });
+          return interaction.reply({ content: "❌ هذا الزر مخصص للإدارة فقط.", flags: MessageFlags.Ephemeral });
         }
         const reference = parseSuggestionReference(interaction.message.embeds[0]);
         if (!reference) {
-          return interaction.reply({ content: "❌ تعذر ربط هذا الاقتراح بالرسالة الأصلية.", ephemeral: true });
+          return interaction.reply({ content: "❌ تعذر ربط هذا الاقتراح بالرسالة الأصلية.", flags: MessageFlags.Ephemeral });
         }
         // استخرج الحالة الحالية من الإمبيد
         const statusField = interaction.message.embeds[0]?.fields?.find(f => f.name === "📊 الحالة");
@@ -4829,7 +4830,7 @@ client.on("interactionCreate", async (interaction) => {
         try { authorUser = await interaction.client.users.fetch(reference.authorUserId); } catch { /* مش لاقي اليوزر */ }
 
         if (!authorUser) {
-          return interaction.reply({ content: "❌ ما قدرتش أجيب بيانات صاحب الاقتراح.", ephemeral: true });
+          return interaction.reply({ content: "❌ ما قدرتش أجيب بيانات صاحب الاقتراح.", flags: MessageFlags.Ephemeral });
         }
 
         const dmEmbed = new EmbedBuilder()
@@ -4854,14 +4855,14 @@ client.on("interactionCreate", async (interaction) => {
           content: sent
             ? `✅ تم إشعار **${authorUser.globalName || authorUser.username}** بالحالة الحالية عن طريق الـ DM!`
             : `❌ ما قدرتش أبعت DM لـ **${authorUser.globalName || authorUser.username}** — غالباً عنده الـ DMs مقفولة.`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
     } catch (err) {
       logger.error("خطأ في معالجة الزر:", err);
       return interaction.reply({
         content: "معلش يسطا ثواني بس",
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       }).catch(() => {});
     }
   }
@@ -4911,7 +4912,7 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId.startsWith("embed_modal_")) {
         const embedId   = interaction.customId.replace("embed_modal_", "");
         const draft     = autoModLogs.get(`embed_${embedId}`);
-        if (!draft) return interaction.reply({ content: "❌ انتهت صلاحية الإيمبد! شغّل الأمر تاني.", ephemeral: true });
+        if (!draft) return interaction.reply({ content: "❌ انتهت صلاحية الإيمبد! شغّل الأمر تاني.", flags: MessageFlags.Ephemeral });
 
         const description = interaction.fields.getTextInputValue("embed_desc").trim() || null;
         const field1raw   = interaction.fields.getTextInputValue("embed_field1").trim();
@@ -4946,7 +4947,7 @@ client.on("interactionCreate", async (interaction) => {
 
         const finalEmbed = buildFinalEmbed(draft, description, fields);
         const targetCh   = await client.channels.fetch(draft.channelId).catch(() => null);
-        if (!targetCh) return interaction.reply({ content: "❌ مش لاقي القناة المختارة!", ephemeral: true });
+        if (!targetCh) return interaction.reply({ content: "❌ مش لاقي القناة المختارة!", flags: MessageFlags.Ephemeral });
 
         if (draft.wantPreview) {
           // ─── معاينة ephemeral + أزرار إرسال/إلغاء ──────────────
@@ -4969,7 +4970,7 @@ client.on("interactionCreate", async (interaction) => {
             content: `📋 **معاينة الإيمبد** — هتتبعت في <#${draft.channelId}>`,
             embeds: [finalEmbed],
             components: [previewRow],
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } else {
           // ─── إرسال مباشر بدون معاينة ────────────────────────────
@@ -4977,7 +4978,7 @@ client.on("interactionCreate", async (interaction) => {
           autoModLogs.delete(`embed_${embedId}`);
           return interaction.reply({
             content: `✅ الإيمبد اتبعتت في <#${draft.channelId}> بنجاح!`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -4986,7 +4987,7 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId.startsWith("embededit_modal_")) {
         const editId = interaction.customId.replace("embededit_modal_", "");
         const draft  = autoModLogs.get(`embededit_${editId}`);
-        if (!draft) return interaction.reply({ content: "❌ انتهت صلاحية التعديل! شغّل الأمر تاني.", ephemeral: true });
+        if (!draft) return interaction.reply({ content: "❌ انتهت صلاحية التعديل! شغّل الأمر تاني.", flags: MessageFlags.Ephemeral });
 
         const rawDesc   = interaction.fields.getTextInputValue("embed_desc");
         const field1raw = interaction.fields.getTextInputValue("embed_field1").trim();
@@ -5031,19 +5032,19 @@ client.on("interactionCreate", async (interaction) => {
         // ─── تعديل الرسالة الأصلية ───────────────────────────────
         try {
           const targetCh  = await client.channels.fetch(draft.channelId).catch(() => null);
-          if (!targetCh) return interaction.reply({ content: "❌ مش لاقي القناة!", ephemeral: true });
+          if (!targetCh) return interaction.reply({ content: "❌ مش لاقي القناة!", flags: MessageFlags.Ephemeral });
           const targetMsg = await targetCh.messages.fetch(draft.messageId).catch(() => null);
-          if (!targetMsg) return interaction.reply({ content: "❌ مش لاقي الرسالة — اتمسحت؟", ephemeral: true });
+          if (!targetMsg) return interaction.reply({ content: "❌ مش لاقي الرسالة — اتمسحت؟", flags: MessageFlags.Ephemeral });
 
           await targetMsg.edit({ embeds: [e] });
           autoModLogs.delete(`embededit_${editId}`);
 
           return interaction.reply({
             content: `✅ **الإيمبد اتعدّلت بنجاح!**\n📍 <#${draft.channelId}> — [اضغط هنا للرسالة](https://discord.com/channels/${interaction.guildId}/${draft.channelId}/${draft.messageId})`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         } catch (err) {
-          return interaction.reply({ content: `❌ فشل التعديل: ${err.message}`, ephemeral: true });
+          return interaction.reply({ content: `❌ فشل التعديل: ${err.message}`, flags: MessageFlags.Ephemeral });
         }
       }
 
@@ -5223,7 +5224,7 @@ client.on("interactionCreate", async (interaction) => {
         const messageId = parts[3];
         const newText   = interaction.fields.getTextInputValue("editmsg_content");
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
           const ch  = await client.channels.fetch(channelId);
@@ -5261,7 +5262,7 @@ client.on("interactionCreate", async (interaction) => {
         const targetMsgId = interaction.customId.split("|")[1];
         const newContent  = interaction.fields.getTextInputValue("announce_content");
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
           const stored     = pendingAnnounceEdits.get(targetMsgId);
@@ -5293,9 +5294,9 @@ client.on("interactionCreate", async (interaction) => {
         const isBan = interaction.customId.startsWith("aml_ban_modal_");
         const logId = interaction.customId.replace(isBan ? "aml_ban_modal_" : "aml_mute_modal_", "");
         const ld    = autoModLogs.get(logId);
-        if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", ephemeral: true });
+        if (!ld) return interaction.reply({ content: "❌ البيانات انتهت!", flags: MessageFlags.Ephemeral });
 
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         try {
           await interaction.guild.members.fetch(ld.userId).catch(() => {});
@@ -5345,9 +5346,9 @@ client.on("interactionCreate", async (interaction) => {
       // ─── موودالات لوحة تحكم الأونر ────────────────────────────────
       if (["dmmod_warn","dmmod_mute","dmmod_kick","dmmod_ban","dmmod_coins"].includes(interaction.customId)) {
         if (!config.isOwner(interaction.user.id)) {
-          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", ephemeral: true });
+          return interaction.reply({ content: "❌ اللوحة دي للأونر بس!", flags: MessageFlags.Ephemeral });
         }
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         const g = interaction.guild || client.guilds.cache.first();
         if (g) await g.members.fetch().catch(() => {});
@@ -5419,7 +5420,7 @@ client.on("interactionCreate", async (interaction) => {
       logger.error("خطأ في معالجة الـ Modal:", err);
       return interaction.reply({
         content: "معلش يسطا ثواني بس",
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       }).catch(() => {});
     }
   }
@@ -5443,7 +5444,7 @@ client.on("interactionCreate", async (interaction) => {
       logger.error("خطأ في معالجة القائمة:", err);
       return interaction.reply({
         content: "معلش يسطا ثواني بس",
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       }).catch(() => {});
     }
   }

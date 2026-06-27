@@ -6,7 +6,7 @@
 //           بحث نصي → YouTube مباشرة
 // ════════════════════════════════════════════════════════════════
 
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { DisTube } from 'distube';
 import { SpotifyPlugin } from '@distube/spotify';
 import { YtDlpPlugin } from '@distube/yt-dlp';
@@ -40,8 +40,8 @@ export function initMusicSystem(client) {
           ? { api: { clientId: process.env.SPOTIFY_CLIENT_ID, clientSecret: process.env.SPOTIFY_CLIENT_SECRET } }
           : {}
       ),
-      new YtDlpPlugin({ update: false }),
       new SoundCloudPlugin(),
+      new YtDlpPlugin({ update: false }),
     ],
   });
 
@@ -297,13 +297,13 @@ export async function registerMusicCommands() {
 // ─── handlePlay ────────────────────────────────────────────────
 export async function handlePlay(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال! كلم الأونر.', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال! كلم الأونر.', flags: MessageFlags.Ephemeral });
 
     const query = interaction.options?.getString('اغنية') || interaction.options?.getString('query') || '';
     const voiceChannel = interaction.member?.voice?.channel;
 
-    if (!voiceChannel) return interaction.reply({ content: '❌ لازم تكون في قناة صوتية الأول!', ephemeral: true });
-    if (!query) return interaction.reply({ content: '❌ اكتب اسم الأغنية أو رابطها!', ephemeral: true });
+    if (!voiceChannel) return interaction.reply({ content: '❌ لازم تكون في قناة صوتية الأول!', flags: MessageFlags.Ephemeral });
+    if (!query) return interaction.reply({ content: '❌ اكتب اسم الأغنية أو رابطها!', flags: MessageFlags.Ephemeral });
 
     await interaction.deferReply();
 
@@ -389,21 +389,21 @@ export async function handlePlay(interaction) {
       msg = `❌ حصل خطأ: \`${errMsg.slice(0, 300)}\``;
 
     try { await interaction.editReply({ content: msg }); }
-    catch { await interaction.reply({ content: msg, ephemeral: true }).catch(() => {}); }
+    catch { await interaction.reply({ content: msg, flags: MessageFlags.Ephemeral }).catch(() => {}); }
   }
 }
 
 // ─── handleSkip ────────────────────────────────────────────────
 export async function handleSkip(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
-    if (q.songs.length <= 1) return interaction.reply({ content: '❌ مفيش أغنية تانية في القائمة!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
+    if (q.songs.length <= 1) return interaction.reply({ content: '❌ مفيش أغنية تانية في القائمة!', flags: MessageFlags.Ephemeral });
     await distube.skip(interaction.guildId);
-    await interaction.reply({ content: '⏭️ اتخطت الأغنية!', ephemeral: true });
+    await interaction.reply({ content: '⏭️ اتخطت الأغنية!', flags: MessageFlags.Ephemeral });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
@@ -414,7 +414,7 @@ export async function handleStop(interaction) {
     if (isButton) await interaction.deferUpdate().catch(() => {});
 
     if (!distube) {
-      if (!isButton) await interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+      if (!isButton) await interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
       return;
     }
 
@@ -440,12 +440,12 @@ export async function handleStop(interaction) {
     } catch {}
 
     if (!isButton) {
-      await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });
+      await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', flags: MessageFlags.Ephemeral });
     }
   } catch (e) {
     try {
       if (!interaction.replied && !interaction.deferred)
-        await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true });
+        await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral });
     } catch {}
   }
 }
@@ -453,9 +453,9 @@ export async function handleStop(interaction) {
 // ─── handleQueue ───────────────────────────────────────────────
 export async function handleQueue(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q || !q.songs.length) return interaction.reply({ content: '❌ القائمة فاضية!', ephemeral: true });
+    if (!q || !q.songs.length) return interaction.reply({ content: '❌ القائمة فاضية!', flags: MessageFlags.Ephemeral });
 
     const page = interaction.options?.getInteger('صفحة') || 1;
     const perPage = 10;
@@ -476,44 +476,44 @@ export async function handleQueue(interaction) {
         .setTimestamp()],
     });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handlePause ───────────────────────────────────────────────
 export async function handlePause(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
-    if (q.paused) return interaction.reply({ content: '⏸️ الأغنية موقوفة أصلاً!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
+    if (q.paused) return interaction.reply({ content: '⏸️ الأغنية موقوفة أصلاً!', flags: MessageFlags.Ephemeral });
     distube.pause(interaction.guildId);
-    await interaction.reply({ content: '⏸️ اتوقفت مؤقتاً!', ephemeral: true });
+    await interaction.reply({ content: '⏸️ اتوقفت مؤقتاً!', flags: MessageFlags.Ephemeral });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleResume ──────────────────────────────────────────────
 export async function handleResume(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
-    if (!q.paused) return interaction.reply({ content: '▶️ الأغنية شغالة مش موقوفة!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
+    if (!q.paused) return interaction.reply({ content: '▶️ الأغنية شغالة مش موقوفة!', flags: MessageFlags.Ephemeral });
     distube.resume(interaction.guildId);
-    await interaction.reply({ content: '▶️ كملت التشغيل!', ephemeral: true });
+    await interaction.reply({ content: '▶️ كملت التشغيل!', flags: MessageFlags.Ephemeral });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleNowPlaying ──────────────────────────────────────────
 export async function handleNowPlaying(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q || !q.songs[0]) return interaction.reply({ content: '❌ مفيش أغنية شغالة دلوقتي!', ephemeral: true });
+    if (!q || !q.songs[0]) return interaction.reply({ content: '❌ مفيش أغنية شغالة دلوقتي!', flags: MessageFlags.Ephemeral });
 
     const song = q.songs[0];
     const cur = Math.floor(q.currentTime);
@@ -538,47 +538,47 @@ export async function handleNowPlaying(interaction) {
         .setTimestamp()],
     });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleVolume ──────────────────────────────────────────────
 export async function handleVolume(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
     const level = interaction.options?.getInteger('مستوى') ?? interaction.options?.getInteger('level');
-    if (level == null) return interaction.reply({ content: '❌ ادخل مستوى الصوت!', ephemeral: true });
+    if (level == null) return interaction.reply({ content: '❌ ادخل مستوى الصوت!', flags: MessageFlags.Ephemeral });
     distube.setVolume(interaction.guildId, level);
-    await interaction.reply({ content: `🔊 الصوت اتضبط على **${level}%**`, ephemeral: true });
+    await interaction.reply({ content: `🔊 الصوت اتضبط على **${level}%**`, flags: MessageFlags.Ephemeral });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleRepeat ──────────────────────────────────────────────
 export async function handleRepeat(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
     const next = q.repeatMode === 0 ? 1 : q.repeatMode === 1 ? 2 : 0;
     distube.setRepeatMode(interaction.guildId, next);
     const labels = ['❌ التكرار اتوقف', '🔂 بيكرر الأغنية', '🔁 بيكرر القائمة'];
-    await interaction.reply({ content: labels[next], ephemeral: true });
+    await interaction.reply({ content: labels[next], flags: MessageFlags.Ephemeral });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleShuffle ─────────────────────────────────────────────
 export async function handleShuffle(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
-    if (q.songs.length <= 1) return interaction.reply({ content: '❌ مفيش أغاني كفاية في القائمة عشان تتخلط!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
+    if (q.songs.length <= 1) return interaction.reply({ content: '❌ مفيش أغاني كفاية في القائمة عشان تتخلط!', flags: MessageFlags.Ephemeral });
     const current = q.songs[0];
     const rest = q.songs.slice(1);
     for (let i = rest.length - 1; i > 0; i--) {
@@ -590,53 +590,53 @@ export async function handleShuffle(interaction) {
       embeds: [new EmbedBuilder().setColor(0x9b59b6).setDescription(`🔀 اتخلطت القائمة! (${rest.length} أغنية)`)],
     });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleJump ────────────────────────────────────────────────
 export async function handleJump(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
     const num = interaction.options.getInteger('رقم');
-    if (num < 1 || num > q.songs.length) return interaction.reply({ content: `❌ الرقم لازم يكون بين 1 و${q.songs.length}!`, ephemeral: true });
-    if (num === 1) return interaction.reply({ content: '⏩ الأغنية دي شغالة أصلاً!', ephemeral: true });
+    if (num < 1 || num > q.songs.length) return interaction.reply({ content: `❌ الرقم لازم يكون بين 1 و${q.songs.length}!`, flags: MessageFlags.Ephemeral });
+    if (num === 1) return interaction.reply({ content: '⏩ الأغنية دي شغالة أصلاً!', flags: MessageFlags.Ephemeral });
     const targetSong = q.songs[num - 1];
     await distube.jump(interaction.guildId, num - 1);
     await interaction.reply({
       embeds: [new EmbedBuilder().setColor(0x66FCF1).setDescription(`⏩ بتخطى لـ **${targetSong.name}**`)],
     });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleRemove ──────────────────────────────────────────────
 export async function handleRemove(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', flags: MessageFlags.Ephemeral });
     const num = interaction.options.getInteger('رقم');
-    if (num < 2) return interaction.reply({ content: '❌ مش ممكن تحذف الأغنية الشغالة — استخدم `/تخطي`!', ephemeral: true });
-    if (num > q.songs.length) return interaction.reply({ content: `❌ مفيش رقم ${num} في القائمة!`, ephemeral: true });
+    if (num < 2) return interaction.reply({ content: '❌ مش ممكن تحذف الأغنية الشغالة — استخدم `/تخطي`!', flags: MessageFlags.Ephemeral });
+    if (num > q.songs.length) return interaction.reply({ content: `❌ مفيش رقم ${num} في القائمة!`, flags: MessageFlags.Ephemeral });
     const removed = q.songs.splice(num - 1, 1)[0];
     await interaction.reply({
       embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription(`🗑️ اتشالت من القائمة: **${removed.name}**`)],
     });
   } catch (e) {
-    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+    await interaction.reply({ content: `❌ ${e.message}`, flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 }
 
 // ─── handleLyrics ──────────────────────────────────────────────
 export async function handleLyrics(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', flags: MessageFlags.Ephemeral });
     const q = distube.getQueue(interaction.guildId);
-    if (!q || !q.songs[0]) return interaction.reply({ content: '❌ مفيش أغنية شغالة دلوقتي!', ephemeral: true });
+    if (!q || !q.songs[0]) return interaction.reply({ content: '❌ مفيش أغنية شغالة دلوقتي!', flags: MessageFlags.Ephemeral });
 
     await interaction.deferReply();
 
