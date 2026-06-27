@@ -45,44 +45,57 @@ export function initMusicSystem(client) {
     ],
   });
 
-  const pausedAt = new Map();
-  const STREAM_MAX_AGE = 2 * 60 * 60 * 1000;
+  // منع تنفيذ auto-leave مرتين في نفس الوقت
+  const autoLeavingGuilds = new Set();
 
   client.on('voiceStateUpdate', async (oldState, newState) => {
     try {
-      const q = distube.getQueue(newState.guild.id || oldState.guild.id);
+      const guildId = newState.guild?.id || oldState.guild?.id;
+      if (!guildId) return;
+
+      // تجاهل events البوت نفسه
+      if (newState.member?.user?.bot || oldState.member?.user?.bot) return;
+
+      const q = distube.getQueue(guildId);
       if (!q) return;
       const botVoiceChannel = q.voice?.channel;
       if (!botVoiceChannel) return;
-      const humans = botVoiceChannel.members.filter(m => !m.user.bot).size;
 
-      if (humans === 0) {
-        if (!q.paused) {
-          q.pause();
-          pausedAt.set(q.id, Date.now());
-          q.textChannel?.send({
-            embeds: [new EmbedBuilder().setColor(0xf39c12).setDescription('⏸️ القناة الصوتية فاضية — الموسيقى اتوقفت تلقائياً')],
-          }).catch(() => {});
-        }
-      } else {
-        if (q.paused && pausedAt.has(q.id)) {
-          const pausedTime = Date.now() - pausedAt.get(q.id);
-          pausedAt.delete(q.id);
-          if (pausedTime > STREAM_MAX_AGE) {
-            q.textChannel?.send({
-              embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription('⏭️ الأغنية موقوفة من أكتر من ساعتين — الرابط انتهت صلاحيته، بتخطى للتالية!')],
-            }).catch(() => {});
-            if (q.songs.length > 1) await distube.skip(q.id).catch(() => {});
-            else await distube.stop(q.id).catch(() => {});
-          } else {
-            q.resume();
-            q.textChannel?.send({
-              embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription('▶️ حد رجع! بكمل الموسيقى 🎵')],
-            }).catch(() => {});
-          }
-        }
+      // تأكد إن الحدث متعلق بالقناة اللي البوت فيها
+      const affectedChannelId = oldState.channelId || newState.channelId;
+      if (affectedChannelId !== botVoiceChannel.id) return;
+
+      // فعلاً خرج من القناة دي؟
+      if (oldState.channelId !== botVoiceChannel.id) return;
+
+      const humans = botVoiceChannel.members.filter(m => !m.user.bot).size;
+      if (humans > 0) return;
+
+      // تجنب التنفيذ المزدوج
+      if (autoLeavingGuilds.has(guildId)) return;
+      autoLeavingGuilds.add(guildId);
+
+      // آخر واحد خرج — البوت يخرج تلقائياً
+      q.textChannel?.send({
+        embeds: [new EmbedBuilder().setColor(0x9b59b6).setDescription('👋 القناة الصوتية فاضية — خرجت تلقائياً')],
+      }).catch(() => {});
+      if (q.currentMessage) {
+        await q.currentMessage.delete().catch(() => {});
+        q.currentMessage = null;
       }
-    } catch {}
+      await distube.stop(guildId).catch(() => {});
+      // فصل الاتصال الصوتي بشكل صريح لو لسه موصول
+      try {
+        const { getVoiceConnection } = await import('@discordjs/voice');
+        const conn = getVoiceConnection(guildId);
+        if (conn) conn.destroy();
+      } catch {}
+
+      autoLeavingGuilds.delete(guildId);
+    } catch (e) {
+      const gId = newState.guild?.id || oldState.guild?.id;
+      if (gId) autoLeavingGuilds.delete(gId);
+    }
   });
 
   distube.on('playSong', async (queue, song) => {
@@ -265,7 +278,15 @@ export async function handlePlay(interaction) {
 
     if (sourceType === 'spotify_track') {
       // ── رابط أغنية Spotify منفردة ──
-      // نجيب اسمها عن طريق Spotify API ونبحث عليها على YouTube
+      const hasSpotifyCreds = !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
+
+      if (!hasSpotifyCreds) {
+        // مفيش credentials — نحاول نستخرج اسم الأغنية من الـ URL مباشرة
+        return interaction.editReply({
+          content: '❌ مفيش Spotify API credentials مضبوطة!\n💡 كلم الأونر يضبط `SPOTIFY_CLIENT_ID` و `SPOTIFY_CLIENT_SECRET` في الـ environment variables.',
+        });
+      }
+
       try {
         const trackId = query.match(/track\/([a-zA-Z0-9]+)/)?.[1];
         if (!trackId) throw new Error('رابط Spotify غير صحيح');
@@ -277,31 +298,34 @@ export async function handlePlay(interaction) {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: `grant_type=client_credentials&client_id=${process.env.SPOTIFY_CLIENT_ID}&client_secret=${process.env.SPOTIFY_CLIENT_SECRET}`,
         });
-        const { access_token } = await tokenRes.json();
+        const tokenJson = await tokenRes.json();
+        if (!tokenJson.access_token) throw new Error(`Spotify token فشل: ${tokenJson.error || 'unknown'}`);
+        const { access_token } = tokenJson;
 
         const trackRes = await fetch(`https://api.spotify.com/v1/tracks/${trackId}`, {
           headers: { Authorization: `Bearer ${access_token}` },
         });
         const track = await trackRes.json();
-        if (!track?.name) throw new Error('مش لاقي بيانات الأغنية');
+        if (!track?.name) throw new Error('مش لاقي بيانات الأغنية من Spotify');
 
-        const searchQuery = `${track.artists[0].name} ${track.name}`;
+        const searchQuery = `${track.artists[0]?.name || ''} ${track.name}`.trim();
         await interaction.editReply({ content: `🔍 جاري البحث عن: **${searchQuery}**...` });
         await distube.play(voiceChannel, searchQuery, playOptions);
 
       } catch (spErr) {
         console.error('❌ [Music] Spotify API فشل:', spErr.message);
-        // fallback: جرب SpotifyPlugin مباشرة
-        try {
-          await interaction.editReply({ content: '🎵 جاري التحميل من Spotify...' });
-          await distube.play(voiceChannel, query, playOptions);
-        } catch (fbErr) {
-          return interaction.editReply({ content: `❌ فشل تحميل الأغنية: ${fbErr.message.slice(0, 200)}` });
-        }
+        return interaction.editReply({
+          content: `❌ فشل جلب بيانات الأغنية من Spotify\n\`${spErr.message.slice(0, 200)}\`\n💡 تأكد إن الـ Spotify credentials صح أو ابحث بالاسم بدل الرابط`,
+        });
       }
 
     } else if (sourceType === 'spotify_playlist') {
       // ── بلاي ليست / ألبوم Spotify ──
+      if (!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET)) {
+        return interaction.editReply({
+          content: '❌ مفيش Spotify API credentials!\n💡 كلم الأونر يضبط `SPOTIFY_CLIENT_ID` و `SPOTIFY_CLIENT_SECRET`.',
+        });
+      }
       await interaction.editReply({ content: '🎵 جاري تحميل البلاي ليست من Spotify...' });
       await distube.play(voiceChannel, query, playOptions);
 
@@ -355,8 +379,15 @@ export async function handleStop(interaction) {
     const isButton = interaction.isButton?.();
     if (isButton) await interaction.deferUpdate().catch(() => {});
 
-    const q = distube.getQueue(interaction.guildId);
+    if (!distube) {
+      if (!isButton) await interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+      return;
+    }
 
+    const guildId = interaction.guildId;
+    const q = distube.getQueue(guildId);
+
+    // حذف رسالة الكارد
     const dashMsg = isButton ? interaction.message : q?.currentMessage;
     if (dashMsg) await dashMsg.delete().catch(() => {});
     if (q?.currentMessage && q.currentMessage.id !== dashMsg?.id) {
@@ -364,7 +395,15 @@ export async function handleStop(interaction) {
     }
     if (q) q.currentMessage = null;
 
-    if (q) await distube.stop(interaction.guildId);
+    // إيقاف DisTube
+    if (q) await distube.stop(guildId).catch(() => {});
+
+    // فصل الاتصال الصوتي بشكل صريح (يضمن الخروج حتى لو distube.stop ما اشتغلش)
+    try {
+      const { getVoiceConnection } = await import('@discordjs/voice');
+      const conn = getVoiceConnection(guildId);
+      if (conn) conn.destroy();
+    } catch {}
 
     if (!isButton) {
       await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });

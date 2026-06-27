@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════
 //  Music Card Generator — بوت زنجي
-//  مبني على Wick Player، معدّل ومنسوب لـ 𝒎𝒂𝒍𝒆𝒌
+//  تصميم فراعنة — خلفية السيرفر + ألوان بنفسجي/ذهبي
 // ════════════════════════════════════════════════════════════════
 
 import { createCanvas, loadImage, registerFont } from 'canvas';
@@ -15,7 +15,11 @@ import {
 } from 'discord.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const FONTS_DIR = join(__dirname, '..', 'data', 'fonts');
+const FONTS_DIR  = join(__dirname, '..', 'data', 'fonts');
+const BG_PATH    = join(__dirname, '..', 'data', 'music-bg.png');
+
+// ─── الكارد الأبعاد ───────────────────────────────────────────
+const W = 1200, H = 420;
 
 let fontsRegistered = false;
 function ensureFonts() {
@@ -31,8 +35,8 @@ function ensureFonts() {
 }
 
 function formatTime(sec) {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60).toString().padStart(2, '0');
+  const m = Math.floor((sec || 0) / 60);
+  const s = Math.floor((sec || 0) % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 }
 
@@ -52,21 +56,20 @@ function drawRoundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function wrapTruncate(ctx, text, x, y, maxW, maxChars, lineH) {
-  if (text.length > maxChars) text = text.slice(0, maxChars - 3) + '...';
-  const words = text.split(' ');
-  let line = '';
-  for (let i = 0; i < words.length; i++) {
-    const test = line + words[i] + ' ';
-    if (ctx.measureText(test).width > maxW && i > 0) {
-      ctx.fillText(line.trim(), x, y);
-      line = words[i] + ' ';
-      y += lineH;
-    } else {
-      line = test;
-    }
+// رسم دائرة مقصوصة
+function drawCircleClip(ctx, cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.closePath();
+}
+
+// نص مع قطع لو طويل
+function truncate(ctx, text, maxW) {
+  if (!text) return '';
+  while (ctx.measureText(text).width > maxW && text.length > 3) {
+    text = text.slice(0, -4) + '...';
   }
-  ctx.fillText(line.trim(), x, y);
+  return text;
 }
 
 async function getThumb(url) {
@@ -76,7 +79,23 @@ async function getThumb(url) {
     const res = await fetch(url, { timeout: 5000 });
     if (!res.ok) throw new Error('bad response');
     const buf = await res.buffer();
-    return await sharp(buf).jpeg().toBuffer();
+    return await sharp(buf).resize(300, 300, { fit: 'cover' }).jpeg().toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+// تحميل صورة الخلفية مرة واحدة
+let cachedBg = null;
+async function loadBg() {
+  if (cachedBg) return cachedBg;
+  try {
+    const buf = await sharp(BG_PATH)
+      .resize(W, H, { fit: 'cover', position: 'centre' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    cachedBg = buf;
+    return buf;
   } catch {
     return null;
   }
@@ -85,96 +104,170 @@ async function getThumb(url) {
 async function generateMusicCard(song, currentTime = 0, queue = null) {
   ensureFonts();
   try {
-    const W = 1200, H = 500;
     const canvas = createCanvas(W, H);
     const ctx = canvas.getContext('2d');
     ctx.antialias = 'subpixel';
 
-    // خلفية
-    const bg = ctx.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#141E30');
-    bg.addColorStop(1, '#243B55');
-    ctx.fillStyle = bg;
+    // ── الخلفية ──────────────────────────────────────────────
+    const bgBuf = await loadBg();
+    if (bgBuf) {
+      const bgImg = await loadImage(bgBuf);
+      ctx.drawImage(bgImg, 0, 0, W, H);
+    } else {
+      // fallback gradient
+      const fallback = ctx.createLinearGradient(0, 0, W, H);
+      fallback.addColorStop(0, '#0d0015');
+      fallback.addColorStop(1, '#1a003a');
+      ctx.fillStyle = fallback;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // طبقة غامقة فوق الخلفية عشان النصوص تظهر
+    const overlay = ctx.createLinearGradient(0, 0, W, 0);
+    overlay.addColorStop(0,   'rgba(0,0,0,0.88)');
+    overlay.addColorStop(0.4, 'rgba(0,0,0,0.78)');
+    overlay.addColorStop(0.7, 'rgba(0,0,0,0.55)');
+    overlay.addColorStop(1,   'rgba(0,0,0,0.30)');
+    ctx.fillStyle = overlay;
     ctx.fillRect(0, 0, W, H);
 
-    // صورة مصغرة
-    const thumbSize = 300;
-    const thumbX = 50, thumbY = (H - thumbSize) / 2;
+    // ── إطار خارجي ذهبي ──────────────────────────────────────
+    ctx.strokeStyle = '#C9A227';
+    ctx.lineWidth = 4;
+    drawRoundedRect(ctx, 10, 10, W - 20, H - 20, 22);
+    ctx.stroke();
+
+    // خط ذهبي داخلي خفيف
+    ctx.strokeStyle = 'rgba(201,162,39,0.3)';
+    ctx.lineWidth = 1;
+    drawRoundedRect(ctx, 16, 16, W - 32, H - 32, 18);
+    ctx.stroke();
+
+    // ── صورة الأغنية (دائرة) ─────────────────────────────────
+    const thumbR = 160;
+    const thumbCX = 60 + thumbR;
+    const thumbCY = H / 2;
     const thumbBuf = await getThumb(song.thumbnail);
 
+    // ظل/توهج بنفسجي خلف الدائرة
+    ctx.save();
+    ctx.shadowColor = 'rgba(147,51,234,0.8)';
+    ctx.shadowBlur = 40;
+    ctx.strokeStyle = '#9333EA';
+    ctx.lineWidth = 5;
+    drawCircleClip(ctx, thumbCX, thumbCY, thumbR + 5);
+    ctx.stroke();
+    ctx.restore();
+
+    // الدائرة نفسها
+    ctx.save();
+    drawCircleClip(ctx, thumbCX, thumbCY, thumbR);
+    ctx.clip();
     if (thumbBuf) {
       const img = await loadImage(thumbBuf);
-      ctx.save();
-      drawRoundedRect(ctx, thumbX, thumbY, thumbSize, thumbSize, 20);
-      ctx.clip();
-      ctx.drawImage(img, thumbX, thumbY, thumbSize, thumbSize);
-      ctx.restore();
+      ctx.drawImage(img, thumbCX - thumbR, thumbCY - thumbR, thumbR * 2, thumbR * 2);
     } else {
-      ctx.fillStyle = '#2c3e50';
-      drawRoundedRect(ctx, thumbX, thumbY, thumbSize, thumbSize, 20);
+      // fallback لو مفيش صورة
+      const grad = ctx.createRadialGradient(thumbCX, thumbCY, 0, thumbCX, thumbCY, thumbR);
+      grad.addColorStop(0, '#3B0764');
+      grad.addColorStop(1, '#1a003a');
+      ctx.fillStyle = grad;
       ctx.fill();
+      ctx.fillStyle = 'rgba(201,162,39,0.5)';
+      ctx.font = `bold ${thumbR}px Roboto`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('♪', thumbCX, thumbCY);
     }
+    ctx.restore();
 
-    // إطار الصورة
-    ctx.strokeStyle = '#66FCF1';
-    ctx.lineWidth = 5;
-    drawRoundedRect(ctx, thumbX, thumbY, thumbSize, thumbSize, 20);
+    // إطار الدائرة
+    ctx.strokeStyle = '#C9A227';
+    ctx.lineWidth = 4;
+    drawCircleClip(ctx, thumbCX, thumbCY, thumbR);
     ctx.stroke();
 
-    const textX = thumbX + thumbSize + 40;
-    const textW = W - textX - 40;
-
-    // اسم الأغنية — DisTube بيستخدم song.name
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 50px Roboto';
+    // ── النصوص ───────────────────────────────────────────────
+    const textX  = thumbCX + thumbR + 50;
+    const textW  = W - textX - 40;
     ctx.textBaseline = 'top';
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 10;
-    wrapTruncate(ctx, song.name || song.title || 'أغنية', textX, 50, textW, 50, 60);
-    ctx.shadowColor = 'transparent';
+
+    // اسم الأغنية
+    ctx.font = 'bold 46px Roboto';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur = 12;
+    const songTitle = truncate(ctx, song.name || song.title || 'أغنية', textW);
+    ctx.fillText(songTitle, textX, 60);
     ctx.shadowBlur = 0;
 
-    // طالب الأغنية
-    ctx.fillStyle = '#66FCF1';
-    ctx.font = '28px Roboto';
-    const requester = song.user ? `طلبها: ${song.user.username}` : '';
-    if (requester) wrapTruncate(ctx, requester, textX, 290, textW, 40, 35);
+    // اسم الفنان / الرافع
+    const artistName = song.uploader?.name || song.artist || '';
+    if (artistName) {
+      ctx.font = '28px Roboto';
+      ctx.fillStyle = '#C9A227';
+      ctx.fillText(truncate(ctx, artistName, textW), textX, 118);
+    }
 
-    // شريط التقدم
-    const totalTime = song.duration || 1;
-    const barX = textX, barY = 330, barW = textW, barH = 30;
+    // طلبها
+    const requester = song.user?.username ? `طلبها: ${song.user.username}` : '';
+    if (requester) {
+      ctx.font = '24px Roboto';
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.fillText(requester, textX, artistName ? 158 : 118);
+    }
 
-    ctx.fillStyle = '#3A3B3C';
-    drawRoundedRect(ctx, barX, barY, barW, barH, 15);
+    // ── شريط التقدم ───────────────────────────────────────────
+    const totalTime = Math.max(song.duration || 1, 1);
+    const barX = textX, barY = H - 130, barW = textW, barH = 22;
+
+    // خلفية الشريط
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    drawRoundedRect(ctx, barX, barY, barW, barH, 11);
     ctx.fill();
 
+    // الجزء المكتمل
     const progress = Math.min(currentTime / totalTime, 1) * barW;
-    if (progress > 0) {
+    if (progress > 2) {
       const pg = ctx.createLinearGradient(barX, 0, barX + progress, 0);
-      pg.addColorStop(0, '#66FCF1');
-      pg.addColorStop(1, '#45A29E');
+      pg.addColorStop(0, '#9333EA');
+      pg.addColorStop(0.5, '#C084FC');
+      pg.addColorStop(1, '#C9A227');
       ctx.fillStyle = pg;
-      drawRoundedRect(ctx, barX, barY, Math.max(progress, 2), barH, 15);
+      drawRoundedRect(ctx, barX, barY, Math.max(progress, 4), barH, 11);
       ctx.fill();
+
+      // نقطة التقدم
+      const dotX = barX + progress;
+      ctx.beginPath();
+      ctx.arc(dotX, barY + barH / 2, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = '#C9A227';
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
 
-    // وقت
-    ctx.fillStyle = '#C5C6C7';
-    ctx.font = '20px Roboto';
-    ctx.fillText(`${formatTime(currentTime)} / ${formatTime(totalTime)}`, barX, barY + barH + 10);
+    // الوقت
+    ctx.font = '22px Roboto';
+    ctx.fillStyle = 'rgba(255,255,255,0.80)';
+    ctx.fillText(formatTime(currentTime), barX, barY + barH + 12);
+    ctx.textAlign = 'right';
+    ctx.fillText(formatTime(totalTime), barX + barW, barY + barH + 12);
+    ctx.textAlign = 'left';
 
-    // صوت وتكرار
+    // ── معلومات إضافية (صوت / تكرار) ─────────────────────────
     if (queue) {
-      const repeatLabel = queue.repeatMode === 0 ? 'إيقاف' : queue.repeatMode === 1 ? 'تكرار أغنية' : 'تكرار قائمة';
-      ctx.fillText(`🔊 ${queue.volume}%`, barX, barY + barH + 38);
-      ctx.fillText(`🔁 ${repeatLabel}`, barX + 200, barY + barH + 38);
+      const repeatLabel = queue.repeatMode === 0 ? 'لا تكرار' : queue.repeatMode === 1 ? '🔂 أغنية' : '🔁 قائمة';
+      ctx.font = '20px Roboto';
+      ctx.fillStyle = 'rgba(201,162,39,0.85)';
+      ctx.fillText(`🔊 ${queue.volume}%`, barX, barY + barH + 44);
+      ctx.fillText(repeatLabel, barX + 160, barY + barH + 44);
+      if (queue.songs?.length > 1) {
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.fillText(`${queue.songs.length} أغنية في القائمة`, barX + 320, barY + barH + 44);
+      }
     }
-
-    // إطار خارجي
-    ctx.strokeStyle = '#66FCF1';
-    ctx.lineWidth = 5;
-    drawRoundedRect(ctx, 20, 20, W - 40, H - 40, 25);
-    ctx.stroke();
 
     return canvas.toBuffer('image/png');
   } catch (e) {
@@ -195,7 +288,14 @@ function buildMusicRows(song) {
     new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉-').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_repeat').setLabel('🔁 تكرار').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setLabel('🔗 افتح في Spotify').setStyle(ButtonStyle.Link).setURL(song.url || 'https://open.spotify.com'),
+    new ButtonBuilder()
+      .setLabel('🔗 افتح في Spotify')
+      .setStyle(ButtonStyle.Link)
+      .setURL(
+        song.url && song.url.startsWith('http') && !song.url.includes('youtube') && !song.url.includes('soundcloud')
+          ? song.url
+          : 'https://open.spotify.com',
+      ),
   );
   return [row1, row2];
 }
@@ -217,15 +317,19 @@ export async function sendMusicCard(queue, song, textChannel) {
     queue.currentMessage = msg;
     queue.initiatorId = song.user?.id;
 
-    // تحديث كل 5 ثواني عشان منضغطش على Discord API
+    // تحديث كل 5 ثواني
     const interval = setInterval(async () => {
       try {
-        if (!queue || queue.paused || queue.destroyed || !queue.currentMessage) {
+        // لو الـ queue اتدمر أو الرسالة اتمسحت — وقف الـ interval
+        if (!queue || queue.destroyed || !queue.currentMessage) {
           clearInterval(interval);
           return;
         }
+        // لو موقف مؤقتاً — خليه يكمل في التيك الجاي (لا توقف الـ interval)
+        if (queue.paused) return;
+
         currentTime = Math.floor(queue.currentTime || 0);
-        const total = song.duration || 1;
+        const total = Math.max(song.duration || 1, 1);
         if (currentTime > total) currentTime = total;
 
         const updated = await generateMusicCard(song, currentTime, queue);
@@ -236,6 +340,7 @@ export async function sendMusicCard(queue, song, textChannel) {
           components: rows,
         });
 
+        // وصل لنهاية الأغنية — DisTube هيعدي للتالية، الـ playSong event هيعمل clearInterval
         if (currentTime >= total) clearInterval(interval);
       } catch {
         clearInterval(interval);
