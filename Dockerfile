@@ -1,27 +1,24 @@
-FROM node:22-bookworm-slim
+FROM node:22-slim
 
+# تثبيت الأدوات المطلوبة
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
     pkg-config \
     libvips-dev \
     build-essential \
-    ca-certificates \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
+# تفعيل yarn عن طريق corepack
+RUN corepack enable && corepack prepare yarn@stable --activate
+
 WORKDIR /app
 
-RUN npm install -g npm@latest
+COPY package*.json ./
 
-RUN npm config set registry https://registry.npmjs.org/
-
-COPY package.json ./
-
-RUN npm install --omit=dev --no-audit --no-fund \
-    --fetch-retries=5 \
-    --fetch-retry-mintimeout=20000 \
-    --fetch-retry-maxtimeout=120000
+# yarn بدل npm عشان نتجنب باج npm v10 "Exit handler never called"
+RUN yarn install --non-interactive
 
 COPY . .
 

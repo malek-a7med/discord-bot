@@ -63,11 +63,11 @@ async function jikan(path, params = {}, _retries = 3) {
   return res.json();
 }
 
-// ─── مخزن مؤقت للبيانات (cache 10 دقايق) ──────────────────
+// ─── مخزن مؤقت للبيانات — TTL متغير حسب الطلب ─────────────
 const _cache = new Map();
-async function cachedJikan(key, path, params = {}) {
+async function cachedJikan(key, path, params = {}, ttlMs = 10 * 60_000) {
   const hit = _cache.get(key);
-  if (hit && Date.now() - hit.ts < 10 * 60_000) return hit.data;
+  if (hit && Date.now() - hit.ts < ttlMs) return hit.data;
   const data = await jikan(path, params);
   _cache.set(key, { data, ts: Date.now() });
   return data;
@@ -499,7 +499,8 @@ export async function handleAnimeTrending(interaction) {
 export async function handleAnimeSeason(interaction) {
   await interaction.deferReply({ ephemeral: true });
   try {
-    const data = await cachedJikan("season_now", "/seasons/now", { limit: 12 });
+    // TTL 6 ساعات — الموسم بيتغير كل 3 شهور، مفيش داعي نعيد جلبه كتير
+    const data = await cachedJikan("season_now", "/seasons/now", { limit: 10, page: 1 }, 6 * 60 * 60_000);
     const list = (data.data || []).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
 
     const now     = new Date();
