@@ -31,6 +31,63 @@ import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
 import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan, getSettings as amGetSettings, setFeature as amSetFeature, getAllFeatures as amGetAllFeatures } from "./helpers/auto-mod.js";
 
+// ─── قناة لوج الأوتو مود per-guild ─────────────────────────────
+const _amLogChannels = new Map(); // guildId → channelId
+function setAmLogChannel(guildId, channelId) { _amLogChannels.set(guildId, channelId); }
+function getAmLogChannel(guildId) { return _amLogChannels.get(guildId) || null; }
+
+async function sendAmLog(guild, client, amResult) {
+  if (!amResult?.triggered || !guild) return;
+  const logChannelId = getAmLogChannel(guild.id);
+  if (!logChannelId) return;
+  const logCh = guild.channels.cache.get(logChannelId);
+  if (!logCh) return;
+  const d = amResult.logData;
+  if (!d) return;
+
+  const actionLabels = {
+    ban:          "🔨 باند تلقائي",
+    kick:         "👢 طرد",
+    timeout_24h:  "🔇 إسكات 24 ساعة",
+    timeout:      "🔇 إسكات ساعتين",
+    timeout_spam: "🔇 إسكات (سبام)",
+    soft_warn:    "💬 تنبيه ناعم",
+    warn:         "⚠️ تحذير رسمي",
+    log_only:     "📋 تسجيل فقط",
+    owner_report: "🚨 بُلّغت الإدارة",
+  };
+
+  const colorMap = {
+    ban: 0xe74c3c, kick: 0xe67e22, timeout_24h: 0x9b59b6,
+    timeout: 0x9b59b6, timeout_spam: 0x9b59b6,
+    soft_warn: 0xf39c12, warn: 0xf39c12,
+    log_only: 0x95a5a6, owner_report: 0xe74c3c,
+  };
+
+  const embed = new EmbedBuilder()
+    .setColor(colorMap[amResult.action] || 0x95a5a6)
+    .setAuthor({ name: `${d.username} (${d.userId})`, iconURL: d.userAvatar })
+    .setTitle(`🛡️ أوتو مود — ${actionLabels[amResult.action] || amResult.action}`)
+    .addFields(
+      { name: "📌 السبب",   value: d.reason    || "—",        inline: false },
+      { name: "🏷️ الفئة",  value: d.category  || "—",        inline: true  },
+      { name: "⚡ المستوى", value: d.aiLevel   || "—",        inline: true  },
+      { name: "📢 الروم",   value: `<#${d.channelId}>`,       inline: true  },
+      { name: "⚠️ تحذيرات",value: String(d.warnCount || 0),   inline: true  },
+    )
+    .setFooter({ text: `ID: ${d.userId}` })
+    .setTimestamp(d.timestamp ? new Date(d.timestamp) : new Date());
+
+  if (d.savedContent) {
+    embed.addFields({ name: "💬 الرسالة المحذوفة", value: d.savedContent.slice(0, 1024) });
+  }
+  if (d.savedAttachments?.length) {
+    embed.addFields({ name: "🖼️ مرفقات", value: d.savedAttachments.join("\n").slice(0, 512) });
+  }
+
+  logCh.send({ embeds: [embed] }).catch(() => {});
+}
+
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
 // ───────────────────────────────────────────────────────────────
@@ -359,6 +416,12 @@ const LEGACY_COMMANDS = [
     .setName("قائمة-مبلوكين")
     .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
   battleCommand,
+  new SlashCommandBuilder()
+    .setName("اوتومود-لوج")
+    .setDescription("تعيين قناة لوج الأوتو مود [أونر فقط]")
+    .addChannelOption(opt =>
+      opt.setName("قناة").setDescription("القناة اللي هتتسجل فيها إجراءات الأوتو مود").setRequired(true)
+    ),
   new SlashCommandBuilder()
     .setName("اوتومود")
     .setDescription("تحكم في إعدادات الأوتو مود [أونر فقط]")
@@ -1225,7 +1288,10 @@ client.on("messageCreate", async (msg) => {
     };
 
     const amResult = await autoModScan(msg, db, geminiImageModel(), notifyOwner).catch(() => ({}));
-    if (amResult?.triggered) return;
+    if (amResult?.triggered) {
+      sendAmLog(msg.guild, client, amResult).catch(() => {});
+      return;
+    }
 
     // Autonomous Moderation Scanning (spam + links)
     if (moderation.isEnabled()) {
@@ -1359,6 +1425,22 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     try {
+      // ─── اوتومود-لوج — تعيين قناة اللوج ────────────────────────
+      if (cmd === "اوتومود-لوج") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: 64 });
+        }
+        const ch = interaction.options.getChannel("قناة");
+        const gId = guild?.id || "global";
+        setAmLogChannel(gId, ch.id);
+        const embed = new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle("✅ تم تعيين قناة لوج الأوتو مود")
+          .setDescription(`كل إجراءات الأوتو مود هتتسجل في ${ch}\n\nهيظهر فيها: الباند / الإسكات / التحذيرات / السبام / الهاكر`)
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed], flags: 64 });
+      }
+
       // ─── اوتومود — تحكم في الإعدادات ────────────────────────────
       if (cmd === "اوتومود") {
         if (!config.isOwner(user.id)) {
