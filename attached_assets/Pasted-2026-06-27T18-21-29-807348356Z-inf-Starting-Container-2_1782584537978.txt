@@ -1,0 +1,31 @@
+2026-06-27T18:21:29.807348356Z [inf]  Starting Container
+2026-06-27T18:21:30.453110053Z [inf]  
+2026-06-27T18:21:30.453114584Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-06-27T18:21:30.453118944Z [inf]  > node index.js
+2026-06-27T18:21:30.453126684Z [inf]  
+2026-06-27T18:21:30.453131574Z [err]  ⚠️ تنبيه! المتغير GOOGLE_CLIENT_ID مفقود - بعض الميزات ما تشتغل
+2026-06-27T18:21:30.453136344Z [err]  ⚠️ تنبيه! المتغير GOOGLE_CLIENT_SECRET مفقود - بعض الميزات ما تشتغل
+2026-06-27T18:21:30.453140814Z [err]  ⚠️ تنبيه! المتغير GOOGLE_REFRESH_TOKEN مفقود - بعض الميزات ما تشتغل
+2026-06-27T18:21:30.453144504Z [err]  ⚠️ تنبيه! المتغير YOUTUBE_API_KEY مفقود - بعض الميزات ما تشتغل
+2026-06-27T18:21:30.748287311Z [inf]  ◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+2026-06-27T18:21:30.748296311Z [inf]  ✅ [GeminiKeys] 8 مفتاح جاهز (~12000 طلب/يوم)
+2026-06-27T18:21:30.754502417Z [inf]  ℹ️ [٦:٢١:٣٠ م] 🤖 Gemini AI جاهز!
+2026-06-27T18:21:30.754506867Z [inf]  🔄 [Keep-Alive] شغّال — ping كل 2 دقيقة | مراقبة كل دقيقة | /status للإحصائيات
+2026-06-27T18:21:30.765772870Z [inf]  ✅ Server is ready and listening on port 8080
+2026-06-27T18:21:31.490358083Z [inf]  ℹ️ [٦:٢١:٣١ م] 🔄 رفع 72 أمر على ديسكورد...
+2026-06-27T18:21:31.490439162Z [inf]  ✅ [٦:٢١:٣١ م] نجح: تسجيل الدخول بـ: زنجي#4425
+2026-06-27T18:21:31.541542261Z [err]  ❌ [٦:٢١:٣١ م] خطأ: خطأ في رفع الأوامر:
+2026-06-27T18:21:31.541549781Z [err]     تفاصيل: Invalid Form Body
+2026-06-27T18:21:31.541616890Z [err]  56[APPLICATION_COMMANDS_DUPLICATE_NAME]: Application command names must be unique
+2026-06-27T18:21:31.541624090Z [err]     Stack: DiscordAPIError[50035]: Invalid Form Body
+2026-06-27T18:21:31.541629600Z [err]  56[APPLICATION_COMMANDS_DUPLICATE_NAME]: Application command names must be unique
+2026-06-27T18:21:31.541634540Z [err]      at handleErrors (/app/node_modules/@discordjs/rest/dist/index.js:762:13)
+2026-06-27T18:21:31.541639380Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+2026-06-27T18:21:31.541643500Z [err]      at async SequentialHandler.runRequest (/app/node_modules/@discordjs/rest/dist/index.js:1163:23)
+2026-06-27T18:21:31.541647550Z [err]      at async SequentialHandler.queueRequest (/app/node_modules/@discordjs/rest/dist/index.js:994:14)
+2026-06-27T18:21:31.541651590Z [err]      at async _REST.request (/app/node_modules/@discordjs/rest/dist/index.js:1307:22)
+2026-06-27T18:21:31.541655970Z [err]      at async deployCommands (file:///app/index.js:547:5)
+2026-06-27T18:21:31.541660960Z [err]      at async Client.<anonymous> (file:///app/index.js:1090:3)
+2026-06-27T18:21:31.783705546Z [inf]  ℹ️ [٦:٢١:٣١ م] ℹ️ لوحة الاقتراحات الثابتة موجودة بالفعل — لن نرسل نسخة جديدة
+2026-06-27T18:21:31.783712996Z [inf]  ℹ️ [٦:٢١:٣١ م] ⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز
+2026-06-27T18:21:31.783728076Z [inf]  ℹ️ [٦:٢١:٣١ م] 👑 البوت عنده Admin بالفعل في: ✨الفࢪا؏ـنة👑

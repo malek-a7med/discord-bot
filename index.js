@@ -303,7 +303,6 @@ const LEGACY_COMMANDS = [
     .setDescription("تشغيل أغنية من يوتيوب أو سبوتيفاي / Play a song")
     .addStringOption((o) => o.setName("بحث").setDescription("رابط أو اسم الأغنية").setRequired(true)),
   new SlashCommandBuilder().setName("إيقاف").setDescription("إيقاف الموسيقى وإخراج البوت / Stop music and leave"),
-  new SlashCommandBuilder().setName("تخطي").setDescription("تخطي الأغنية الحالية / Skip current song"),
   new SlashCommandBuilder().setName("قائمة-تشغيل").setDescription("عرض قائمة الأغاني الحالية / Show music queue"),
   new SlashCommandBuilder().setName("توقف-مؤقت").setDescription("إيقاف مؤقت / Pause music"),
   new SlashCommandBuilder().setName("استئناف").setDescription("استئناف التشغيل / Resume music"),
