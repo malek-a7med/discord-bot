@@ -39,6 +39,17 @@ import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/d
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand, LATEST_FEATURES } from "./commands/games-hub.js";
 import { bankSavingsCommand, handleBankButton, handleBankModal } from "./commands/bank-savings.js";
 import { bankLuckEgCommand, handleBankLuckEgButton, handleBankLuckEgModal } from "./commands/bank-luck-eg.js";
+import {
+  animeRoomCommand, animeSearchCommand, animeSessions,
+  buildAnimePanel,
+  handleAnimeSearchBtn, handleAnimeSearchModal,
+  handleAnimeSelectResult, handleAnimeTrending, handleAnimeSeason,
+  handleAnimeMyList, handleAnimeProfile,
+  handleAnimeEpisodes, handleAnimeSelectEpisode,
+  handleAnimeRate, handleAnimeRateModal,
+  handleAnimeListAction, handleAnimeTrailer,
+  handleAnimeRoomCommand, handleAnimeSearchCommand,
+} from "./commands/anime.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -600,6 +611,8 @@ const LEGACY_COMMANDS = [
   pollCommand,
   bankLifeCommand,
   bankLuckEgCommand.data,
+  animeRoomCommand,
+  animeSearchCommand,
   new SlashCommandBuilder()
     .setName("حالة-الحماية")
     .setDescription("🛡️ عرض حالة كل أنظمة الحماية في البوت [أونر فقط]"),
@@ -667,6 +680,7 @@ function validateLatestFeatures(allCommands) {
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
       "قائمة-الباند","رفع-باند",
+      "أنمي-روم","أنمي",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -2646,6 +2660,10 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
+      // ── نظام الأنمي ────────────────────────────────────────────
+      if (cmd === "أنمي-روم") return await handleAnimeRoomCommand(interaction);
+      if (cmd === "أنمي")     return await handleAnimeSearchCommand(interaction, db);
+
       if (cmd === "رفع-باند") {
         if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
           return interaction.reply({ content: "❌ محتاج صلاحية Ban Members عشان تستخدم الأمر ده!", ephemeral: true });
@@ -4115,6 +4133,38 @@ client.on("interactionCreate", async (interaction) => {
         return await handleBankLuckEgButton(interaction, db);
       }
 
+      // ─── أزرار نظام الأنمي ────────────────────────────────────────
+      if (interaction.customId === "anime_search_btn")   return await handleAnimeSearchBtn(interaction);
+      if (interaction.customId === "anime_trending_btn") return await handleAnimeTrending(interaction);
+      if (interaction.customId === "anime_season_btn")   return await handleAnimeSeason(interaction);
+      if (interaction.customId === "anime_mylist_btn")   return await handleAnimeMyList(interaction, db);
+      if (interaction.customId === "anime_profile_btn")  return await handleAnimeProfile(interaction, db);
+
+      if (interaction.customId.startsWith("anime_eps_")) {
+        const malId = parseInt(interaction.customId.replace("anime_eps_", ""));
+        return await handleAnimeEpisodes(interaction, db, malId);
+      }
+      if (interaction.customId.startsWith("anime_watch_")) {
+        const malId = parseInt(interaction.customId.replace("anime_watch_", ""));
+        return await handleAnimeEpisodes(interaction, db, malId);
+      }
+      if (interaction.customId.startsWith("anime_rate_") && !interaction.customId.startsWith("anime_rate_modal_")) {
+        const malId = parseInt(interaction.customId.replace("anime_rate_", ""));
+        return await handleAnimeRate(interaction, db, malId);
+      }
+      if (interaction.customId.startsWith("anime_trailer_")) {
+        const malId = parseInt(interaction.customId.replace("anime_trailer_", ""));
+        return await handleAnimeTrailer(interaction, malId);
+      }
+      if (interaction.customId.startsWith("anime_list_")) {
+        // anime_list_watching_12345  /  anime_list_remove_12345
+        const withoutPrefix = interaction.customId.replace("anime_list_", "");
+        const lastUnderscore = withoutPrefix.lastIndexOf("_");
+        const status = withoutPrefix.slice(0, lastUnderscore);
+        const malId  = parseInt(withoutPrefix.slice(lastUnderscore + 1));
+        return await handleAnimeListAction(interaction, db, status, malId);
+      }
+
       // ─── أزرار تجديد اللعبة ───────────────────────────────────────
       // ✅ FIX: شلنا "life" من هنا — لعبة الحياة الجديدة (نظام مستمر) مالها
       //   "جلسة" تتجدد أصلاً، البروفايل دايمًا موجود ومستمر
@@ -4819,6 +4869,14 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      // ─── مودالات نظام الأنمي ───────────────────────────────────────
+      if (interaction.customId === "anime_search_modal") {
+        return await handleAnimeSearchModal(interaction, db);
+      }
+      if (interaction.customId.startsWith("anime_rate_modal_")) {
+        return await handleAnimeRateModal(interaction, db);
+      }
+
       // ─── مودال إيمبد Builder ───────────────────────────────────────
       if (interaction.customId.startsWith("embed_modal_")) {
         const embedId   = interaction.customId.replace("embed_modal_", "");
@@ -5339,6 +5397,14 @@ client.on("interactionCreate", async (interaction) => {
   // ─── قوائم الاختيار (Select Menus) ──────────────────────────────
   if (interaction.isStringSelectMenu()) {
     try {
+      // ─── قوائم نظام الأنمي ─────────────────────────────────────────
+      if (interaction.customId === "anime_select_result") {
+        return await handleAnimeSelectResult(interaction, db);
+      }
+      if (interaction.customId === "anime_select_episode") {
+        return await handleAnimeSelectEpisode(interaction, db);
+      }
+
       // ─── قائمة اختيار وضع AI Spymaster في كود نيمز ────────────────
       if (interaction.customId.startsWith("cdn_aiset_")) {
         return await handleCodenamesAISelect(interaction);

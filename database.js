@@ -340,6 +340,97 @@ class Database {
     return this.data.lifeProfiles[guildId];
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  //  🎌 نظام الأنمي — Anime Profile
+  // ═══════════════════════════════════════════════════════════════
+  _ensureAnime(userId) {
+    this.ensureUser(userId);
+    if (!this.data.users[userId].anime) {
+      this.data.users[userId].anime = {
+        watching:   [],
+        completed:  [],
+        planToWatch:[],
+        dropped:    [],
+        ratings:    {},
+      };
+    }
+    return this.data.users[userId].anime;
+  }
+
+  getAnimeProfile(userId) {
+    return this._ensureAnime(userId);
+  }
+
+  getAnimeStatus(userId, malId) {
+    const p = this._ensureAnime(userId);
+    const id = parseInt(malId);
+    if (p.watching.find(a => a.malId === id))    return "watching";
+    if (p.completed.find(a => a.malId === id))   return "completed";
+    if (p.planToWatch.find(a => a.malId === id)) return "plan";
+    if (p.dropped.find(a => a.malId === id))     return "dropped";
+    return null;
+  }
+
+  setAnimeStatus(userId, malId, title, status, totalEps = 0, image = null) {
+    const p  = this._ensureAnime(userId);
+    const id = parseInt(malId);
+    const entry = { malId: id, title, totalEps, image, addedAt: Date.now(), progress: 0 };
+
+    // شيل من كل القوايم الأول
+    for (const key of ["watching", "completed", "planToWatch", "dropped"]) {
+      p[key] = p[key].filter(a => a.malId !== id);
+    }
+
+    const listMap = { watching: "watching", completed: "completed", plan: "planToWatch", dropped: "dropped" };
+    const list = listMap[status];
+    if (list) {
+      if (status === "completed") entry.progress = totalEps || entry.progress;
+      p[list].push(entry);
+    }
+    this.save();
+  }
+
+  updateAnimeProgress(userId, malId, episode, totalEps = 0) {
+    const p  = this._ensureAnime(userId);
+    const id = parseInt(malId);
+    let found = false;
+    for (const key of ["watching", "completed", "planToWatch", "dropped"]) {
+      const idx = p[key].findIndex(a => a.malId === id);
+      if (idx >= 0) {
+        p[key][idx].progress = episode;
+        if (totalEps > 0) p[key][idx].totalEps = totalEps;
+        found = true;
+        break;
+      }
+    }
+    // لو مش في أي قايمة، أضفه لـ watching تلقائياً
+    if (!found) {
+      p.watching.push({ malId: id, title: "", totalEps, image: null, addedAt: Date.now(), progress: episode });
+    }
+    this.save();
+  }
+
+  rateAnime(userId, malId, score, title = "") {
+    const p  = this._ensureAnime(userId);
+    const id = parseInt(malId);
+    p.ratings[id] = score;
+    // نضيف لـ completed لو مش موجود
+    if (!this.getAnimeStatus(userId, id)) {
+      p.completed.push({ malId: id, title, totalEps: 0, image: null, addedAt: Date.now(), progress: 0 });
+    }
+    this.save();
+  }
+
+  removeFromAnimeList(userId, malId) {
+    const p  = this._ensureAnime(userId);
+    const id = parseInt(malId);
+    for (const key of ["watching", "completed", "planToWatch", "dropped"]) {
+      p[key] = p[key].filter(a => a.malId !== id);
+    }
+    delete p.ratings[id];
+    this.save();
+  }
+
   // ─── قائمة الباند ────────────────────────────────────────────
   addBan(userId, reason, moderatorId = 'SYSTEM') {
     if (!this.data.banList) this.data.banList = {};

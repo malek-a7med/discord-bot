@@ -1,0 +1,63 @@
+cd discord-bot-main
+
+# تأكد إن الحزم الأساسية موجودة
+npm install genius-lyrics opusscript @distube/yt-dlp @distube/spotify --save
+npm uninstall play-dl 2>/dev/null; true
+
+# استبدل handlePlay كاملة بنسخة مضمونة
+node --input-type=module << 'SCRIPT'
+import { readFileSync, writeFileSync } from 'fs';
+let code = readFileSync('commands/music.js', 'utf8');
+
+// استبدل SpotifyPlugin بنسخة مع credentials لو موجودة
+const oldPlugin = `new SpotifyPlugin(),`;
+const newPlugin = `new SpotifyPlugin(
+        process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET
+          ? { api: { clientId: process.env.SPOTIFY_CLIENT_ID, clientSecret: process.env.SPOTIFY_CLIENT_SECRET } }
+          : {}
+      ),`;
+code = code.replace(oldPlugin, newPlugin);
+
+// استبدل الـ handlePlay بنسخة مضمونة
+const oldPlay = `    if (isDirectUrl(sourceType)) {
+      // ─── رابط Spotify مباشر: أغنية أو بلاي ليست أو ألبوم — DisTube+SpotifyPlugin بيتعامل معاه ───
+      await distube.play(voiceChannel, query, playOptions);
+    } else {
+      // ─── بحث نصي — Spotify مباشرة عبر spsearch: prefix ───
+      try {
+        await distube.play(voiceChannel, \`spsearch:\${query}\`, playOptions);
+      } catch (e) {
+        const errMsg = e?.message || String(e) || 'خطأ مجهول';
+        console.error('❌ [Music] Spotify search فشل:', errMsg);
+
+        if (/no result|not found/i.test(errMsg)) {
+          return interaction.editReply({
+            content: \`❌ مش لاقي الأغنية دي على Spotify!\\n💡 جرب ترفق رابط مباشر من: \\\`open.spotify.com\\\`\`,
+          });
+        }
+        return interaction.editReply({
+          content: \`❌ حصل خطأ: \\\`\${errMsg.slice(0, 300)}\\\`\`,
+        });
+      }
+    }`;
+
+const newPlay = `    if (isDirectUrl(sourceType)) {
+      if (sourceType === 'spotify') {
+        // أغنية Spotify منفردة → Spotify API يجيب الاسم → YouTube يشغلها
+        try {
+          const trackId = query.match(/track\\/([a-zA-Z0-9]+)/)?.[1];
+          if (!trackId) throw new Error('رابط Spotify غير صحيح');
+          const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: \`grant_type=client_credentials&client_id=\${process.env.SPOTIFY_CLIENT_ID}&client_secret=\${process.env.SPOTIFY_CLIENT_SECRET}\`,
+          });
+          const { access_token } = await tokenRes.json();
+          const trackRes = await fetch(\`https://api.spotify.com/v1/tracks/\${trackId}\`, {
+            headers: { Authorization: \`Bearer \${access_token}\` },
+          });
+          const track = await trackRes.json();
+          if (!track.name) throw new Error('مش لاقي بيانات الأغنية');
+          const searchQuery = \`\${track.artists[0].name} \${track.name}\`;
+          await interaction.editReply({ content: \`🔍 جاري البحث عن: **\${searchQuery}**...\` });
+          await distube.play(voiceChannel, searchQuery,
