@@ -3328,17 +3328,35 @@ client.on("interactionCreate", async (interaction) => {
         }
         const num = interaction.options.getInteger("عدد");
         await interaction.deferReply({ ephemeral: true });
-        let remaining = num;
-        let totalDeleted = 0;
-        while (remaining > 0) {
-          const batch = Math.min(remaining, 100);
-          const deleted = await channel.bulkDelete(batch, true);
-          totalDeleted += deleted.size;
-          remaining -= batch;
-          if (deleted.size < batch) break;
+        try {
+          // تأكد إن البوت عنده صلاحية ManageMessages في القناة دي
+          const botMember = interaction.guild?.members?.me;
+          if (botMember && !channel.permissionsFor(botMember)?.has(PermissionFlagsBits.ManageMessages)) {
+            return interaction.editReply({ content: "❌ البوت مش عنده صلاحية **Manage Messages** في القناة دي!" });
+          }
+          let remaining = num;
+          let totalDeleted = 0;
+          while (remaining > 0) {
+            const batch = Math.min(remaining, 100);
+            const deleted = await channel.bulkDelete(batch, true);
+            totalDeleted += deleted.size;
+            remaining -= batch;
+            if (deleted.size < batch) break;
+          }
+          if (totalDeleted === 0) {
+            return interaction.editReply({ content: "⚠️ مفيش رسايل اتمسحت — ممكن كل الرسايل أقدم من 14 يوم أو القناة فاضية!" });
+          }
+          sendModLog("clear", interaction.user, null, `مسح ${totalDeleted} رسالة`, { count: totalDeleted, channel: channel.id }).catch(() => {});
+          return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
+        } catch (err) {
+          logger.error("خطأ في أمر /مسح:", err);
+          const errMsg = err?.code === 50013
+            ? "❌ البوت مش عنده صلاحية **Manage Messages** في القناة دي!"
+            : err?.code === 50034
+            ? "❌ مينفعش تمسح رسايل أقدم من 14 يوم بالـ BulkDelete!"
+            : `❌ فشل المسح: ${err?.message || "خطأ غير معروف"}`;
+          return interaction.editReply({ content: errMsg });
         }
-        sendModLog("clear", interaction.user, null, `مسح ${totalDeleted} رسالة`, { count: totalDeleted, channel: channel.id }).catch(() => {});
-        return interaction.editReply({ content: `🧹 تم تنظيف الروم ومسح **${totalDeleted}** رسالة!` });
       }
 
       if (cmd === "مسح-الكل") {
