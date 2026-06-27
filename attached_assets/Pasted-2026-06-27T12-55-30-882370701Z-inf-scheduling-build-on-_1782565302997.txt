@@ -1,0 +1,41 @@
+2026-06-27T12:55:30.882370701Z [inf]  scheduling build on Metal builder "builder-cojdwb"
+2026-06-27T12:55:32.044366942Z [inf]  fetched snapshot sha256:1f49e8f042746ec69b20fe59071df518b508fa743ee09f5eb460d1a90960d79b (13 MB bytes)
+2026-06-27T12:55:32.044460954Z [inf]  fetching snapshot
+2026-06-27T12:55:32.196161213Z [inf]  unpacking archive
+2026-06-27T12:55:32.372953722Z [inf]  [internal] load build definition from Dockerfile
+2026-06-27T12:55:32.373029726Z [inf]  [internal] load build definition from Dockerfile
+2026-06-27T12:55:32.373377798Z [inf]  [internal] load build definition from Dockerfile
+2026-06-27T12:55:32.533737781Z [inf]  [internal] load build definition from Dockerfile
+2026-06-27T12:55:32.543140619Z [inf]  [internal] load metadata for docker.io/library/node:22-bookworm-slim
+2026-06-27T12:55:32.956157687Z [inf]  [internal] load metadata for docker.io/library/node:22-bookworm-slim
+2026-06-27T12:55:32.956901523Z [inf]  [internal] load .dockerignore
+2026-06-27T12:55:32.957261794Z [inf]  [internal] load .dockerignore
+2026-06-27T12:55:32.957421353Z [inf]  [internal] load .dockerignore
+2026-06-27T12:55:32.985273532Z [inf]  [internal] load .dockerignore
+2026-06-27T12:55:32.995054979Z [inf]  [8/8] COPY . .
+2026-06-27T12:55:32.995057623Z [inf]  [7/8] RUN npm install --omit=dev --no-audit --no-fund     --fetch-retries=5     --fetch-retry-mintimeout=20000     --fetch-retry-maxtimeout=120000
+2026-06-27T12:55:32.995058264Z [inf]  [6/8] COPY package.json ./
+2026-06-27T12:55:32.995058934Z [inf]  [internal] load build context
+2026-06-27T12:55:32.995059565Z [inf]  [5/8] RUN npm config set registry https://registry.npmjs.org/
+2026-06-27T12:55:32.995060186Z [inf]  [4/8] RUN npm install -g npm@latest
+2026-06-27T12:55:32.995060867Z [inf]  [3/8] WORKDIR /app
+2026-06-27T12:55:32.995061458Z [inf]  [2/8] RUN apt-get update && apt-get install -y     ffmpeg     python3     pkg-config     libvips-dev     build-essential     ca-certificates     --no-install-recommends     && rm -rf /var/lib/apt/lists/*
+2026-06-27T12:55:32.995062069Z [inf]  [1/8] FROM docker.io/library/node:22-bookworm-slim@sha256:813a7480f28fdadac1f7f5c824bcdad435b5bc1322a5968bbbdef8d058f9dff4
+2026-06-27T12:55:32.995235800Z [inf]  [1/8] FROM docker.io/library/node:22-bookworm-slim@sha256:813a7480f28fdadac1f7f5c824bcdad435b5bc1322a5968bbbdef8d058f9dff4
+2026-06-27T12:55:32.995237582Z [inf]  [internal] load build context
+2026-06-27T12:55:32.995560387Z [inf]  [internal] load build context
+2026-06-27T12:55:33.008695434Z [inf]  [1/8] FROM docker.io/library/node:22-bookworm-slim@sha256:813a7480f28fdadac1f7f5c824bcdad435b5bc1322a5968bbbdef8d058f9dff4
+2026-06-27T12:55:33.239748095Z [inf]  [internal] load build context
+2026-06-27T12:55:33.248000366Z [inf]  [2/8] RUN apt-get update && apt-get install -y     ffmpeg     python3     pkg-config     libvips-dev     build-essential     ca-certificates     --no-install-recommends     && rm -rf /var/lib/apt/lists/*
+2026-06-27T12:55:33.248002329Z [inf]  [3/8] WORKDIR /app
+2026-06-27T12:55:33.248003030Z [inf]  [4/8] RUN npm install -g npm@latest
+2026-06-27T12:55:33.248003561Z [inf]  [5/8] RUN npm config set registry https://registry.npmjs.org/
+2026-06-27T12:55:33.248004082Z [inf]  [6/8] COPY package.json ./
+2026-06-27T12:55:33.248004572Z [inf]  [7/8] RUN npm install --omit=dev --no-audit --no-fund     --fetch-retries=5     --fetch-retry-mintimeout=20000     --fetch-retry-maxtimeout=120000
+2026-06-27T12:55:33.248005073Z [inf]  [8/8] COPY . .
+2026-06-27T12:55:33.249257332Z [inf]  exporting to docker image format
+2026-06-27T12:55:36.455954369Z [inf]  exporting to docker image format
+2026-06-27T12:55:36.479342260Z [inf]  containerimage.digest: sha256:63478a3e478d7de7c67fb15046a44be7d7958702b538e3f43070e5617eed92fa
+2026-06-27T12:55:36.479348940Z [inf]  containerimage.descriptor: eyJtZWRpYVR5cGUiOiJhcHBsaWNhdGlvbi92bmQub2NpLmltYWdlLm1hbmlmZXN0LnYxK2pzb24iLCJkaWdlc3QiOiJzaGEyNTY6NjM0NzhhM2U0NzhkN2RlN2M2N2ZiMTUwNDZhNDRiZTdkNzk1ODcwMmI1MzhlM2Y0MzA3MGU1NjE3ZWVkOTJmYSIsInNpemUiOjI1ODMsImFubm90YXRpb25zIjp7Im9yZy5vcGVuY29udGFpbmVycy5pbWFnZS5jcmVhdGVkIjoiMjAyNi0wNi0yN1QxMjo1NTozM1oifSwicGxhdGZvcm0iOnsiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJvcyI6ImxpbnV4In19
+2026-06-27T12:55:36.479351604Z [inf]  containerimage.config.digest: sha256:ee6a8cfae3fe5094acbe36e84712aeb05b641276bb5d5ab8351c85a8ccf9e739
+2026-06-27T12:55:39.990679327Z [inf]  image push
