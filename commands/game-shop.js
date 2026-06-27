@@ -4,7 +4,6 @@
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  MessageFlags,
 } from "discord.js";
 
 export const ABILITIES = {
@@ -112,7 +111,7 @@ export async function handleShopButton(interaction, db) {
   if (id.startsWith("gshop_open_")) {
     const embed = buildShopEmbed(db, interaction.user.id);
     const rows  = buildShopRows(db, interaction.user.id);
-    return interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ embeds: [embed], components: rows, ephemeral: true });
   }
 
   // شراء قدرة
@@ -122,22 +121,22 @@ export async function handleShopButton(interaction, db) {
     const requesterId = parts[3];
 
     if (interaction.user.id !== requesterId) {
-      return interaction.reply({ content: "❌ الزرار ده مش إلك!", flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: "❌ الزرار ده مش إلك!", ephemeral: true });
     }
 
     const ability = ABILITIES[abilityId];
-    if (!ability) return interaction.reply({ content: "❌ قدرة غير موجودة!", flags: MessageFlags.Ephemeral });
+    if (!ability) return interaction.reply({ content: "❌ قدرة غير موجودة!", ephemeral: true });
 
     const user     = db.getUser(interaction.user.id);
     const abilities = db.getGameAbilities(interaction.user.id);
     const owned    = abilities[abilityId] || 0;
 
     if (owned >= ability.max) {
-      return interaction.reply({ content: `❌ وصلت للحد الأقصى لـ ${ability.name}!`, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: `❌ وصلت للحد الأقصى لـ ${ability.name}!`, ephemeral: true });
     }
 
     if ((user.coins || 0) < ability.price) {
-      return interaction.reply({ content: `❌ ما عندكش كوينز كافية! لازم **${ability.price} 🪙** وعندك **${user.coins || 0} 🪙**`, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: `❌ ما عندكش كوينز كافية! لازم **${ability.price} 🪙** وعندك **${user.coins || 0} 🪙**`, ephemeral: true });
     }
 
     db.updateUser(interaction.user.id, { coins: (user.coins || 0) - ability.price });
@@ -154,7 +153,7 @@ export async function handleShopButton(interaction, db) {
     const rows = buildShopRows(db, interaction.user.id);
     const shopEmbed = buildShopEmbed(db, interaction.user.id);
     await interaction.update({ embeds: [shopEmbed], components: rows });
-    return interaction.followUp({ embeds: [successEmbed], flags: MessageFlags.Ephemeral });
+    return interaction.followUp({ embeds: [successEmbed], ephemeral: true });
   }
 }
 

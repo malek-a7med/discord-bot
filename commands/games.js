@@ -5,7 +5,6 @@
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle,
-  MessageFlags,
 } from "discord.js";
 
 // ─── حالة الألعاب في الذاكرة ─────────────────────────────────
@@ -166,7 +165,7 @@ const COIN     = "🪙";
 export async function handleRouletteCommand(interaction, db) {
   const channelId = interaction.channel.id;
   if (channelGames.has(channelId)) {
-    return interaction.reply({ content: "❌ في لعبة شغالة في الروم ده — خلصوها الأول!", flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: "❌ في لعبة شغالة في الروم ده — خلصوها الأول!", ephemeral: true });
   }
 
   const gameId = makeId();
@@ -271,10 +270,10 @@ export async function handleRouletteButton(interaction, db) {
 
   // انضم
   if (id.startsWith("rlt_join_")) {
-    if (!state) return interaction.reply({ content: "❌ اللعبة ده انتهت!", flags: MessageFlags.Ephemeral });
-    if (state.phase !== "lobby") return interaction.reply({ content: "❌ اللعبة بدأت!", flags: MessageFlags.Ephemeral });
-    if (state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت بالفعل في اللعبة!", flags: MessageFlags.Ephemeral });
-    if (state.players.length >= 8) return interaction.reply({ content: "❌ اللعبة اكتملت (8 لاعبين)!", flags: MessageFlags.Ephemeral });
+    if (!state) return interaction.reply({ content: "❌ اللعبة ده انتهت!", ephemeral: true });
+    if (state.phase !== "lobby") return interaction.reply({ content: "❌ اللعبة بدأت!", ephemeral: true });
+    if (state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت بالفعل في اللعبة!", ephemeral: true });
+    if (state.players.length >= 8) return interaction.reply({ content: "❌ اللعبة اكتملت (8 لاعبين)!", ephemeral: true });
     state.players.push(interaction.user.id);
     state.alive.add(interaction.user.id);
     const embed = buildRouletteEmbed(state, interaction.guild);
@@ -284,8 +283,8 @@ export async function handleRouletteButton(interaction, db) {
 
   // إلغاء
   if (id.startsWith("rlt_cancel_")) {
-    if (!state) return interaction.reply({ content: "❌ اللعبة منتهية!", flags: MessageFlags.Ephemeral });
-    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يقدر يلغيها!", flags: MessageFlags.Ephemeral });
+    if (!state) return interaction.reply({ content: "❌ اللعبة منتهية!", ephemeral: true });
+    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يقدر يلغيها!", ephemeral: true });
     rouletteGames.delete(gameId);
     channelGames.delete(state.channelId);
     return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("🔫 تم إلغاء الروليت").setDescription("تم إلغاء اللعبة.")], components: [] });
@@ -293,9 +292,9 @@ export async function handleRouletteButton(interaction, db) {
 
   // ابدأ
   if (id.startsWith("rlt_start_")) {
-    if (!state) return interaction.reply({ content: "❌ اللعبة منتهية!", flags: MessageFlags.Ephemeral });
-    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يقدر يبدأها!", flags: MessageFlags.Ephemeral });
-    if (state.players.length < 2) return interaction.reply({ content: "❌ لازم لاعبين اتنين على الأقل!", flags: MessageFlags.Ephemeral });
+    if (!state) return interaction.reply({ content: "❌ اللعبة منتهية!", ephemeral: true });
+    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يقدر يبدأها!", ephemeral: true });
+    if (state.players.length < 2) return interaction.reply({ content: "❌ لازم لاعبين اتنين على الأقل!", ephemeral: true });
     state.phase = "playing";
     state.bulletPos = randInt(1, 6);
     const embed = buildRouletteEmbed(state, interaction.guild);
@@ -307,10 +306,10 @@ export async function handleRouletteButton(interaction, db) {
 
   // سحب الزناد
   if (id.startsWith("rlt_pull_")) {
-    if (!state || state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة مش شغالة!", flags: MessageFlags.Ephemeral });
+    if (!state || state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة مش شغالة!", ephemeral: true });
     const alivePlayers = [...state.alive];
     const currentPlayerId = alivePlayers[state.currentIndex % alivePlayers.length];
-    if (interaction.user.id !== currentPlayerId) return interaction.reply({ content: "❌ مش دورك!", flags: MessageFlags.Ephemeral });
+    if (interaction.user.id !== currentPlayerId) return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
 
     const boom = state.currentChamber === state.bulletPos;
     state.currentChamber++;
@@ -421,13 +420,13 @@ export async function handleRouletteButton(interaction, db) {
 
   // نيوك
   if (id.startsWith("rlt_nuke_")) {
-    if (!state || state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة مش شغالة!", flags: MessageFlags.Ephemeral });
+    if (!state || state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة مش شغالة!", ephemeral: true });
     const alivePlayers = [...state.alive];
     const currentPlayerId = alivePlayers[state.currentIndex % alivePlayers.length];
-    if (interaction.user.id !== currentPlayerId) return interaction.reply({ content: "❌ مش دورك!", flags: MessageFlags.Ephemeral });
+    if (interaction.user.id !== currentPlayerId) return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
 
     const used = db.useGameAbility(currentPlayerId, "nuke");
-    if (!used) return interaction.reply({ content: "❌ ما عندكش نيوك!", flags: MessageFlags.Ephemeral });
+    if (!used) return interaction.reply({ content: "❌ ما عندكش نيوك!", ephemeral: true });
 
     const prize = (state.players.length - 1) * 300;
     db.updateUser(currentPlayerId, { coins: (db.getUser(currentPlayerId).coins || 0) + prize });
@@ -448,7 +447,7 @@ export async function handleRouletteButton(interaction, db) {
 
   // درع / حياة إضافية (استخدام في البداية)
   if (id.startsWith("rlt_shield_")) {
-    return interaction.reply({ content: "💚 الحياة الإضافية هتشتغل تلقائياً لما تتضرب!", flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: "💚 الحياة الإضافية هتشتغل تلقائياً لما تتضرب!", ephemeral: true });
   }
 }
 
@@ -458,7 +457,7 @@ export async function handleRouletteButton(interaction, db) {
 export async function handleMafiaCommand(interaction, db) {
   const channelId = interaction.channel.id;
   if (channelGames.has(channelId)) {
-    return interaction.reply({ content: "❌ في لعبة شغالة في الروم ده!", flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: "❌ في لعبة شغالة في الروم ده!", ephemeral: true });
   }
 
   const gameId = makeId();
@@ -805,10 +804,10 @@ export async function handleMafiaButton(interaction, db) {
 
   // انضم
   if (id.startsWith("maf_join_")) {
-    if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: MessageFlags.Ephemeral });
-    if (state.phase !== "lobby") return interaction.reply({ content: "❌ اللعبة بدأت!", flags: MessageFlags.Ephemeral });
-    if (state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت بالفعل في اللعبة!", flags: MessageFlags.Ephemeral });
-    if (state.players.length >= 10) return interaction.reply({ content: "❌ اللعبة اكتملت!", flags: MessageFlags.Ephemeral });
+    if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", ephemeral: true });
+    if (state.phase !== "lobby") return interaction.reply({ content: "❌ اللعبة بدأت!", ephemeral: true });
+    if (state.players.includes(interaction.user.id)) return interaction.reply({ content: "❌ إنت بالفعل في اللعبة!", ephemeral: true });
+    if (state.players.length >= 10) return interaction.reply({ content: "❌ اللعبة اكتملت!", ephemeral: true });
     state.players.push(interaction.user.id);
     state.alive.add(interaction.user.id);
     await interaction.update({ embeds: [buildMafiaLobbyEmbed(state)], components: buildMafiaLobbyRows(gameId) });
@@ -817,8 +816,8 @@ export async function handleMafiaButton(interaction, db) {
 
   // إلغاء
   if (id.startsWith("maf_cancel_")) {
-    if (!state) return interaction.reply({ content: "❌ اللعبة منتهية!", flags: MessageFlags.Ephemeral });
-    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يلغيها!", flags: MessageFlags.Ephemeral });
+    if (!state) return interaction.reply({ content: "❌ اللعبة منتهية!", ephemeral: true });
+    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يلغيها!", ephemeral: true });
     mafiaGames.delete(gameId);
     channelGames.delete(state.channelId);
     return interaction.update({ embeds: [new EmbedBuilder().setColor(0x555).setTitle("🕵️ تم إلغاء المافيا")], components: [] });
@@ -826,9 +825,9 @@ export async function handleMafiaButton(interaction, db) {
 
   // ابدأ
   if (id.startsWith("maf_start_")) {
-    if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", flags: MessageFlags.Ephemeral });
-    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يبدأها!", flags: MessageFlags.Ephemeral });
-    if (state.players.length < 4) return interaction.reply({ content: "❌ لازم 4 لاعبين على الأقل!", flags: MessageFlags.Ephemeral });
+    if (!state) return interaction.reply({ content: "❌ اللعبة انتهت!", ephemeral: true });
+    if (state.creatorId !== interaction.user.id) return interaction.reply({ content: "❌ اللي عملها بس يبدأها!", ephemeral: true });
+    if (state.players.length < 4) return interaction.reply({ content: "❌ لازم 4 لاعبين على الأقل!", ephemeral: true });
 
     state.roles = assignRoles(state.players);
 
@@ -894,62 +893,62 @@ export async function handleMafiaButton(interaction, db) {
 
   // زر "صوّت الآن" — يفتح أزرار التصويت للمستخدم ده بس
   if (id.startsWith("maf_voteself_")) {
-    if (!state || state.phase !== "day") return interaction.reply({ content: "❌ مش وقت التصويت دلوقتي!", flags: MessageFlags.Ephemeral });
-    if (!state.alive.has(interaction.user.id)) return interaction.reply({ content: "❌ إنت متت! ما تقدرش تصوت.", flags: MessageFlags.Ephemeral });
+    if (!state || state.phase !== "day") return interaction.reply({ content: "❌ مش وقت التصويت دلوقتي!", ephemeral: true });
+    if (!state.alive.has(interaction.user.id)) return interaction.reply({ content: "❌ إنت متت! ما تقدرش تصوت.", ephemeral: true });
     const rows = buildVoteRows(gameId, state, interaction.user.id, interaction.guild);
-    if (rows.length === 0) return interaction.reply({ content: "❌ ما فيش حد تصوت عليه!", flags: MessageFlags.Ephemeral });
-    return interaction.reply({ content: "🗳️ اختار مين تشك فيه:", components: rows, flags: MessageFlags.Ephemeral });
+    if (rows.length === 0) return interaction.reply({ content: "❌ ما فيش حد تصوت عليه!", ephemeral: true });
+    return interaction.reply({ content: "🗳️ اختار مين تشك فيه:", components: rows, ephemeral: true });
   }
 
   // تصويت
   if (id.startsWith("maf_vote_")) {
-    if (!state || state.phase !== "day") return interaction.reply({ content: "❌ مش وقت التصويت!", flags: MessageFlags.Ephemeral });
-    if (!state.alive.has(interaction.user.id)) return interaction.reply({ content: "❌ إنت متت!", flags: MessageFlags.Ephemeral });
+    if (!state || state.phase !== "day") return interaction.reply({ content: "❌ مش وقت التصويت!", ephemeral: true });
+    if (!state.alive.has(interaction.user.id)) return interaction.reply({ content: "❌ إنت متت!", ephemeral: true });
     const parts = id.split("_");
     const targetId = parts[parts.length - 1];
     state.votes.set(interaction.user.id, targetId);
     // حدث الإمبيد الرئيسي
     const msg = await interaction.channel.messages.fetch(state.messageId).catch(() => null);
     if (msg) await msg.edit({ embeds: [buildDayEmbed(state, interaction.guild)], components: msg.components }).catch(() => {});
-    return interaction.reply({ content: `✅ صوتك على <@${targetId}> اتسجل!`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `✅ صوتك على <@${targetId}> اتسجل!`, ephemeral: true });
   }
 
   // تصرف الليل
   if (id.startsWith("maf_night_")) {
-    if (!state || state.phase !== "night") return interaction.reply({ content: "❌ مش الليل دلوقتي!", flags: MessageFlags.Ephemeral });
-    if (!state.alive.has(interaction.user.id)) return interaction.reply({ content: "❌ إنت متت!", flags: MessageFlags.Ephemeral });
+    if (!state || state.phase !== "night") return interaction.reply({ content: "❌ مش الليل دلوقتي!", ephemeral: true });
+    if (!state.alive.has(interaction.user.id)) return interaction.reply({ content: "❌ إنت متت!", ephemeral: true });
     const role = state.roles[interaction.user.id];
-    if (role !== "mafia" && role !== "detective") return interaction.reply({ content: "⚪ إنت مدني — استنى النهار الجاي!", flags: MessageFlags.Ephemeral });
+    if (role !== "mafia" && role !== "detective") return interaction.reply({ content: "⚪ إنت مدني — استنى النهار الجاي!", ephemeral: true });
 
     const rows = buildNightActionRows(gameId, state, interaction.user.id, interaction.guild);
-    if (rows.length === 0) return interaction.reply({ content: "❌ ما فيش هدف متاح!", flags: MessageFlags.Ephemeral });
+    if (rows.length === 0) return interaction.reply({ content: "❌ ما فيش هدف متاح!", ephemeral: true });
 
     const actionTitle = role === "mafia" ? "🔴 اختار ضحيتك الليلة:" : "🔵 اختار مين تحقق معاه:";
-    return interaction.reply({ content: actionTitle, components: rows, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: actionTitle, components: rows, ephemeral: true });
   }
 
   // قتل ليلي (مافيا)
   if (id.startsWith("maf_kill_")) {
-    if (!state || state.phase !== "night") return interaction.reply({ content: "❌ مش الليل!", flags: MessageFlags.Ephemeral });
+    if (!state || state.phase !== "night") return interaction.reply({ content: "❌ مش الليل!", ephemeral: true });
     const parts = id.split("_");
     const targetId = parts[parts.length - 1];
-    if (state.roles[interaction.user.id] !== "mafia") return interaction.reply({ content: "❌ إنت مش مافيا!", flags: MessageFlags.Ephemeral });
+    if (state.roles[interaction.user.id] !== "mafia") return interaction.reply({ content: "❌ إنت مش مافيا!", ephemeral: true });
     state.nightKill = targetId;
-    return interaction.reply({ content: `✅ اخترت <@${targetId}> — استنى الفجر!`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `✅ اخترت <@${targetId}> — استنى الفجر!`, ephemeral: true });
   }
 
   // تحقيق ليلي (محقق)
   if (id.startsWith("maf_detect_")) {
-    if (!state || state.phase !== "night") return interaction.reply({ content: "❌ مش الليل!", flags: MessageFlags.Ephemeral });
+    if (!state || state.phase !== "night") return interaction.reply({ content: "❌ مش الليل!", ephemeral: true });
     const parts = id.split("_");
     const targetId = parts[parts.length - 1];
-    if (state.roles[interaction.user.id] !== "detective") return interaction.reply({ content: "❌ إنت مش محقق!", flags: MessageFlags.Ephemeral });
+    if (state.roles[interaction.user.id] !== "detective") return interaction.reply({ content: "❌ إنت مش محقق!", ephemeral: true });
     state.detectiveTarget = targetId;
     const targetRole = state.roles[targetId];
     const isMafia = targetRole === "mafia";
     return interaction.reply({
       content: `🔍 **نتيجة التحقيق:**\n<@${targetId}> هو **${isMafia ? "🔴 مافيا! 😱" : "✅ بريء"}**`,
-      flags: MessageFlags.Ephemeral
+      ephemeral: true
     });
   }
 }
@@ -1296,7 +1295,7 @@ export async function handleTTTButton(interaction, db) {
         components: [],
       }).catch(() => interaction.reply({ content: "❌ اللعبة انتهت!", flags: 64 }).catch(() => {}));
     }
-    if (state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة ما بدأتش!", flags: MessageFlags.Ephemeral });
+    if (state.phase !== "playing") return interaction.reply({ content: "❌ اللعبة ما بدأتش!", ephemeral: true });
 
     // ── قفل المعالجة المتزامنة ────────────────────────────────
     if (tttProcessing.has(gameId)) {
@@ -1308,26 +1307,26 @@ export async function handleTTTButton(interaction, db) {
     if (interaction.user.id !== state.playerX && !state.isAI) {
       if (interaction.user.id !== currentPlayer) {
         tttProcessing.delete(gameId);
-        return interaction.reply({ content: "❌ مش دورك!", flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
       }
     } else if (state.isAI) {
       if (interaction.user.id !== state.playerX) {
         tttProcessing.delete(gameId);
-        return interaction.reply({ content: "❌ دي لعبتك إنت بس!", flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: "❌ دي لعبتك إنت بس!", ephemeral: true });
       }
       if (state.currentTurn !== "X") {
         tttProcessing.delete(gameId);
-        return interaction.reply({ content: "⏳ الذكاء الاصطناعي بيلعب دلوقتي!", flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: "⏳ الذكاء الاصطناعي بيلعب دلوقتي!", ephemeral: true });
       }
     } else {
       if (interaction.user.id !== currentPlayer) {
         tttProcessing.delete(gameId);
-        return interaction.reply({ content: "❌ مش دورك!", flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: "❌ مش دورك!", ephemeral: true });
       }
     }
     if (state.board[idx] !== "") {
       tttProcessing.delete(gameId);
-      return interaction.reply({ content: "❌ الخانة دي محجوزة!", flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: "❌ الخانة دي محجوزة!", ephemeral: true });
     }
 
     // ── حركة اللاعب ──────────────────────────────────────────

@@ -17,7 +17,6 @@ import {
   ButtonBuilder, ButtonStyle, StringSelectMenuBuilder,
   ModalBuilder, TextInputBuilder, TextInputStyle,
   ChannelType, ThreadAutoArchiveDuration,
-  MessageFlags,
 } from "discord.js";
 
 // ─── Jikan API v4 ────────────────────────────────────────────
@@ -64,11 +63,11 @@ async function jikan(path, params = {}, _retries = 3) {
   return res.json();
 }
 
-// ─── مخزن مؤقت للبيانات — TTL متغير حسب الطلب ─────────────
+// ─── مخزن مؤقت للبيانات (cache 10 دقايق) ──────────────────
 const _cache = new Map();
-async function cachedJikan(key, path, params = {}, ttlMs = 10 * 60_000) {
+async function cachedJikan(key, path, params = {}) {
   const hit = _cache.get(key);
-  if (hit && Date.now() - hit.ts < ttlMs) return hit.data;
+  if (hit && Date.now() - hit.ts < 10 * 60_000) return hit.data;
   const data = await jikan(path, params);
   _cache.set(key, { data, ts: Date.now() });
   return data;
@@ -382,7 +381,7 @@ export async function handleAnimeSearchBtn(interaction) {
 
 // ─── بحث: معالجة نتائج الـ modal ────────────────────────────
 export async function handleAnimeSearchModal(interaction, db) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
   const query = interaction.fields.getTextInputValue("anime_query").trim();
 
   let results;
@@ -390,18 +389,11 @@ export async function handleAnimeSearchModal(interaction, db) {
     const data = await jikan("/anime", { q: query, limit: 8, sfw: false });
     results = data.data || [];
   } catch (e) {
-    // MAL/Jikan واقع — ندور على المواقع البديلة مباشرةً
-    const siteLinks = buildFallbackLinks(query);
-    const embed = new EmbedBuilder()
-      .setColor(0xff6b35)
-      .setTitle(`🔍 بحث عن: "${query}"`)
-      .setDescription(
-        `⚠️ **MyAnimeList** مش متاح دلوقتي — اتفضّل ابحث على المواقع دي مباشرةً:\n\n` +
-        siteLinks.map(l => `• [**${l.name}**](${l.url})`).join("\n")
-      )
-      .setFooter({ text: "اضغط على أي موقع عشان تدور على الأنمي" })
-      .setTimestamp();
-    return interaction.editReply({ embeds: [embed] });
+    const isMalDown = e?.status === 503 || e?.status === 504 || e?.message?.includes("504") || e?.message?.includes("503");
+    const msg = isMalDown
+      ? "❌ موقع **MyAnimeList** واقع دلوقتي — البحث مش شغال مؤقتاً، جرب بعد شوية."
+      : "❌ فشل البحث — جرب تاني بعد شوية.";
+    return interaction.editReply({ content: msg });
   }
 
   if (!results.length) {
@@ -454,16 +446,16 @@ async function showAnimePage(interaction, db, malId, isDeferred = false) {
     const rows  = buildAnimeButtons(malId, interaction.user.id, userStatus);
 
     const method = isDeferred ? interaction.editReply : interaction.reply;
-    await method.call(interaction, { embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+    await method.call(interaction, { embeds: [embed], components: rows, ephemeral: true });
   } catch (e) {
-    const msg = { content: `❌ فشلت في تحميل الأنمي: ${e.message}`, flags: MessageFlags.Ephemeral };
+    const msg = { content: `❌ فشلت في تحميل الأنمي: ${e.message}`, ephemeral: true };
     if (isDeferred) interaction.editReply(msg); else interaction.reply(msg);
   }
 }
 
 // ─── الأنمي الرائج ───────────────────────────────────────────
 export async function handleAnimeTrending(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
   try {
     const data = await cachedJikan("trending", "/top/anime", { filter: "airing", limit: 10 });
     const list = data.data || [];
@@ -505,10 +497,9 @@ export async function handleAnimeTrending(interaction) {
 
 // ─── أنمي الموسم ─────────────────────────────────────────────
 export async function handleAnimeSeason(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
   try {
-    // TTL 6 ساعات — الموسم بيتغير كل 3 شهور، مفيش داعي نعيد جلبه كتير
-    const data = await cachedJikan("season_now", "/seasons/now", { limit: 10, page: 1 }, 6 * 60 * 60_000);
+    const data = await cachedJikan("season_now", "/seasons/now", { limit: 12 });
     const list = (data.data || []).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 10);
 
     const now     = new Date();
@@ -552,7 +543,7 @@ export async function handleAnimeSeason(interaction) {
 
 // ─── قائمة المشاهدة الشخصية ──────────────────────────────────
 export async function handleAnimeMyList(interaction, db) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
 
   const profile  = db.getAnimeProfile(interaction.user.id);
   const watching = profile.watching || [];
@@ -614,7 +605,7 @@ export async function handleAnimeMyList(interaction, db) {
 
 // ─── ملف المستخدم الشخصي ─────────────────────────────────────
 export async function handleAnimeProfile(interaction, db) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
 
   const profile   = db.getAnimeProfile(interaction.user.id);
   const watching  = (profile.watching  || []).length;
@@ -670,7 +661,7 @@ export async function handleAnimeProfile(interaction, db) {
 
 // ─── عرض قائمة الحلقات ───────────────────────────────────────
 export async function handleAnimeEpisodes(interaction, db, malId) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
   try {
     const animeData = await cachedJikan(`anime_${malId}`, `/anime/${malId}/full`);
     const anime     = animeData.data;
@@ -813,13 +804,13 @@ export async function handleAnimeSelectEpisode(interaction, db) {
         content: directUrl
           ? `✅ **تم إرسال رابط الحلقة ${epNum} في الخاص!** 📬`
           : `✅ **تم إرسال الروابط في الخاص!** 📬\nتقدمك اتسجّل تلقائياً.`,
-        flags: MessageFlags.Ephemeral,
+        ephemeral: true,
       });
     } catch {
-      await interaction.followUp({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      await interaction.followUp({ embeds: [embed], ephemeral: true });
     }
   } catch (e) {
-    await interaction.followUp({ content: `❌ خطأ: ${e.message}`, flags: MessageFlags.Ephemeral });
+    await interaction.followUp({ content: `❌ خطأ: ${e.message}`, ephemeral: true });
   }
 }
 
@@ -849,7 +840,7 @@ export async function handleAnimeRateModal(interaction, db) {
   const score    = parseFloat(rawScore);
 
   if (isNaN(score) || score < 1 || score > 10) {
-    return interaction.reply({ content: "❌ التقييم لازم يكون رقم من 1 لـ 10!", flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: "❌ التقييم لازم يكون رقم من 1 لـ 10!", ephemeral: true });
   }
 
   try {
@@ -863,10 +854,10 @@ export async function handleAnimeRateModal(interaction, db) {
         .setTitle("⭐ تم التقييم!")
         .setDescription(`قيّمت **${anime.title_english || anime.title}** بـ **${score}/10** ⭐\nتقييمك اتحفظ في ملفك الشخصي.`)
         .setTimestamp()],
-      flags: MessageFlags.Ephemeral,
+      ephemeral: true,
     });
   } catch (e) {
-    return interaction.reply({ content: `❌ خطأ: ${e.message}`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `❌ خطأ: ${e.message}`, ephemeral: true });
   }
 }
 
@@ -881,7 +872,7 @@ export async function handleAnimeListAction(interaction, db, status, malId) {
       db.removeFromAnimeList(interaction.user.id, malId);
       return interaction.reply({
         content: `✅ **${title}** اتشال من قايمتك.`,
-        flags: MessageFlags.Ephemeral,
+        ephemeral: true,
       });
     }
 
@@ -895,16 +886,16 @@ export async function handleAnimeListAction(interaction, db, status, malId) {
         .setDescription(`**${title}** اتضاف لقائمة **${labels[status]}**`)
         .setThumbnail(anime.images?.jpg?.image_url)
         .setTimestamp()],
-      flags: MessageFlags.Ephemeral,
+      ephemeral: true,
     });
   } catch (e) {
-    return interaction.reply({ content: `❌ خطأ: ${e.message}`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `❌ خطأ: ${e.message}`, ephemeral: true });
   }
 }
 
 // ─── تريلر ───────────────────────────────────────────────────
 export async function handleAnimeTrailer(interaction, malId) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
   try {
     const data  = await cachedJikan(`anime_${malId}`, `/anime/${malId}/full`);
     const anime = data.data;
@@ -925,7 +916,7 @@ export async function handleAnimeTrailer(interaction, malId) {
 
 // ─── توصيات بناءً على قائمة المستخدم ────────────────────────
 export async function handleAnimeRecommend(interaction, db) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({ ephemeral: true });
 
   const profile   = db.getAnimeProfile(interaction.user.id);
   const allWatched = [...(profile.completed || []), ...(profile.watching || [])];
@@ -1054,12 +1045,12 @@ export async function handleAnimePublish(interaction, db) {
       content:
         `✅ **تم نشر لوحة الأنمي في <#${interaction.channel.id}>!**\n` +
         `🔒 **ثريد الأخبار:** <#${newsThread.id}> — مقفول، البوت بيبعت فيه الأخبار تلقائياً.`,
-      flags: MessageFlags.Ephemeral,
+      ephemeral: true,
     });
   } catch (e) {
     return interaction.reply({
       content: `❌ خطأ: ${e.message}\nتأكد إن البوت عنده صلاحيات **Manage Threads** و **Send Messages**.`,
-      flags: MessageFlags.Ephemeral,
+      ephemeral: true,
     });
   }
 }
@@ -1164,5 +1155,5 @@ export const animeCommand = new SlashCommandBuilder()
 // ─── handler أمر /أنمي ───────────────────────────────────────
 export async function handleAnimeCommand(interaction) {
   const panel = buildAnimePanel();
-  return interaction.reply({ ...panel, flags: MessageFlags.Ephemeral });
+  return interaction.reply({ ...panel, ephemeral: true });
 }

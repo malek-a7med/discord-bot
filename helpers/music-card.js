@@ -1,260 +1,249 @@
 // ════════════════════════════════════════════════════════════════
-//  Music Card — بوت زنجي | ثيم الفراعنة
-//  Canvas-based music now-playing card
+//  Music Card Generator — بوت زنجي
+//  مبني على Wick Player، معدّل ومنسوب لـ 𝒎𝒂𝒍𝒆𝒌
 // ════════════════════════════════════════════════════════════════
-import { createCanvas, loadImage, GlobalFonts } from "@napi-rs/canvas";
-import { AttachmentBuilder, EmbedBuilder } from "discord.js";
-import path from "path";
-import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import pkg from '@napi-rs/canvas';
+const { createCanvas, loadImage, registerFont } = pkg;
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import sharp from 'sharp';
+import {
+  AttachmentBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from 'discord.js';
 
-// ── ألوان الثيم ────────────────────────────────────────────────
-const COLORS = {
-  bg_dark:    "#0a0010",
-  bg_card:    "#12001f",
-  purple_neon:"#9B30FF",
-  purple_mid: "#6a0dad",
-  purple_glow:"#bf7fff",
-  gold:       "#FFD700",
-  gold_dim:   "#b8960c",
-  white:      "#ffffff",
-  gray:       "#aaaaaa",
-  bar_bg:     "#2a0040",
-  bar_fill:   "#9B30FF",
-};
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const FONTS_DIR = join(__dirname, '..', 'data', 'fonts');
 
-// ── رسم progress bar ───────────────────────────────────────────
-function drawProgressBar(ctx, x, y, width, height, progress) {
-  // خلفية البار
-  ctx.fillStyle = COLORS.bar_bg;
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, height, height / 2);
-  ctx.fill();
-
-  // fill
-  const fillWidth = Math.max(height, width * Math.min(progress, 1));
-  const grad = ctx.createLinearGradient(x, 0, x + fillWidth, 0);
-  grad.addColorStop(0, COLORS.purple_mid);
-  grad.addColorStop(1, COLORS.purple_neon);
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.roundRect(x, y, fillWidth, height, height / 2);
-  ctx.fill();
-
-  // نقطة المؤشر
-  ctx.fillStyle = COLORS.white;
-  ctx.beginPath();
-  ctx.arc(x + fillWidth, y + height / 2, height * 0.9, 0, Math.PI * 2);
-  ctx.fill();
+let fontsRegistered = false;
+function ensureFonts() {
+  if (fontsRegistered) return;
+  try {
+    registerFont(join(FONTS_DIR, 'Roboto-Bold.ttf'),    { family: 'Roboto', weight: 'bold' });
+    registerFont(join(FONTS_DIR, 'Roboto-Regular.ttf'), { family: 'Roboto', weight: 'regular' });
+    registerFont(join(FONTS_DIR, 'Roboto-Italic.ttf'),  { family: 'Roboto', weight: 'italic' });
+    fontsRegistered = true;
+  } catch (e) {
+    console.error('❌ [MusicCard] خطأ في الفونتس:', e.message);
+  }
 }
 
-// ── تحويل ثانية لـ mm:ss ──────────────────────────────────────
 function formatTime(sec) {
-  if (!sec || isNaN(sec)) return "0:00";
   const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60).toString().padStart(2, "0");
+  const s = Math.floor(sec % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 }
 
-// ── رسم نص مع truncate ────────────────────────────────────────
-function drawText(ctx, text, x, y, maxWidth, font, color, align = "left") {
-  ctx.font = font;
-  ctx.fillStyle = color;
-  ctx.textAlign = align;
-  const measured = ctx.measureText(text);
-  if (measured.width > maxWidth) {
-    while (text.length > 1 && ctx.measureText(text + "…").width > maxWidth) {
-      text = text.slice(0, -1);
-    }
-    text += "…";
-  }
-  ctx.fillText(text, x, y);
+function drawRoundedRect(ctx, x, y, w, h, r) {
+  if (w < 2 * r) r = w / 2;
+  if (h < 2 * r) r = h / 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
-// ── الدالة الرئيسية ───────────────────────────────────────────
+function wrapTruncate(ctx, text, x, y, maxW, maxChars, lineH) {
+  if (text.length > maxChars) text = text.slice(0, maxChars - 3) + '...';
+  const words = text.split(' ');
+  let line = '';
+  for (let i = 0; i < words.length; i++) {
+    const test = line + words[i] + ' ';
+    if (ctx.measureText(test).width > maxW && i > 0) {
+      ctx.fillText(line.trim(), x, y);
+      line = words[i] + ' ';
+      y += lineH;
+    } else {
+      line = test;
+    }
+  }
+  ctx.fillText(line.trim(), x, y);
+}
+
+async function getThumb(url) {
+  try {
+    if (!url) throw new Error('no url');
+    const { default: fetch } = await import('node-fetch');
+    const res = await fetch(url, { timeout: 5000 });
+    if (!res.ok) throw new Error('bad response');
+    const buf = await res.buffer();
+    return await sharp(buf).jpeg().toBuffer();
+  } catch {
+    return null;
+  }
+}
+
+async function generateMusicCard(song, currentTime = 0, queue = null) {
+  ensureFonts();
+  try {
+    const W = 1200, H = 500;
+    const canvas = createCanvas(W, H);
+    const ctx = canvas.getContext('2d');
+    ctx.antialias = 'subpixel';
+
+    // خلفية
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#141E30');
+    bg.addColorStop(1, '#243B55');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // صورة مصغرة
+    const thumbSize = 300;
+    const thumbX = 50, thumbY = (H - thumbSize) / 2;
+    const thumbBuf = await getThumb(song.thumbnail);
+
+    if (thumbBuf) {
+      const img = await loadImage(thumbBuf);
+      ctx.save();
+      drawRoundedRect(ctx, thumbX, thumbY, thumbSize, thumbSize, 20);
+      ctx.clip();
+      ctx.drawImage(img, thumbX, thumbY, thumbSize, thumbSize);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = '#2c3e50';
+      drawRoundedRect(ctx, thumbX, thumbY, thumbSize, thumbSize, 20);
+      ctx.fill();
+    }
+
+    // إطار الصورة
+    ctx.strokeStyle = '#66FCF1';
+    ctx.lineWidth = 5;
+    drawRoundedRect(ctx, thumbX, thumbY, thumbSize, thumbSize, 20);
+    ctx.stroke();
+
+    const textX = thumbX + thumbSize + 40;
+    const textW = W - textX - 40;
+
+    // اسم الأغنية — DisTube بيستخدم song.name
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 50px Roboto';
+    ctx.textBaseline = 'top';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 10;
+    wrapTruncate(ctx, song.name || song.title || 'أغنية', textX, 50, textW, 50, 60);
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+
+    // طالب الأغنية
+    ctx.fillStyle = '#66FCF1';
+    ctx.font = '28px Roboto';
+    const requester = song.user ? `طلبها: ${song.user.username}` : '';
+    if (requester) wrapTruncate(ctx, requester, textX, 290, textW, 40, 35);
+
+    // شريط التقدم
+    const totalTime = song.duration || 1;
+    const barX = textX, barY = 330, barW = textW, barH = 30;
+
+    ctx.fillStyle = '#3A3B3C';
+    drawRoundedRect(ctx, barX, barY, barW, barH, 15);
+    ctx.fill();
+
+    const progress = Math.min(currentTime / totalTime, 1) * barW;
+    if (progress > 0) {
+      const pg = ctx.createLinearGradient(barX, 0, barX + progress, 0);
+      pg.addColorStop(0, '#66FCF1');
+      pg.addColorStop(1, '#45A29E');
+      ctx.fillStyle = pg;
+      drawRoundedRect(ctx, barX, barY, Math.max(progress, 2), barH, 15);
+      ctx.fill();
+    }
+
+    // وقت
+    ctx.fillStyle = '#C5C6C7';
+    ctx.font = '20px Roboto';
+    ctx.fillText(`${formatTime(currentTime)} / ${formatTime(totalTime)}`, barX, barY + barH + 10);
+
+    // صوت وتكرار
+    if (queue) {
+      const repeatLabel = queue.repeatMode === 0 ? 'إيقاف' : queue.repeatMode === 1 ? 'تكرار أغنية' : 'تكرار قائمة';
+      ctx.fillText(`🔊 ${queue.volume}%`, barX, barY + barH + 38);
+      ctx.fillText(`🔁 ${repeatLabel}`, barX + 200, barY + barH + 38);
+    }
+
+    // إطار خارجي
+    ctx.strokeStyle = '#66FCF1';
+    ctx.lineWidth = 5;
+    drawRoundedRect(ctx, 20, 20, W - 40, H - 40, 25);
+    ctx.stroke();
+
+    return canvas.toBuffer('image/png');
+  } catch (e) {
+    console.error('❌ [MusicCard] خطأ في إنشاء الكارت:', e.message);
+    return null;
+  }
+}
+
+function buildMusicRows(song) {
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('music_pause').setLabel('⏸ وقف').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('music_resume').setLabel('▶️ كمل').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('music_skip').setLabel('⏭️ التالية').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('music_stop').setLabel('⏹️ اطلع').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('music_lyrics').setLabel('📝 كلمات').setStyle(ButtonStyle.Secondary),
+  );
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉-').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('music_repeat').setLabel('🔁 تكرار').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setLabel('🔗 افتح في Spotify').setStyle(ButtonStyle.Link).setURL(song.url || 'https://open.spotify.com'),
+  );
+  return [row1, row2];
+}
+
 export async function sendMusicCard(queue, song, textChannel) {
   try {
-    const W = 900, H = 280;
-    const canvas = createCanvas(W, H);
-    const ctx = canvas.getContext("2d");
+    let currentTime = 0;
 
-    // ── خلفية الكارت ──────────────────────────────────────────
-    // gradient نيون بنفسجي
-    const bgGrad = ctx.createLinearGradient(0, 0, W, H);
-    bgGrad.addColorStop(0,   "#0a0010");
-    bgGrad.addColorStop(0.5, "#130020");
-    bgGrad.addColorStop(1,   "#0a0010");
-    ctx.fillStyle = bgGrad;
-    ctx.beginPath();
-    ctx.roundRect(0, 0, W, H, 20);
-    ctx.fill();
+    const cardBuf = await generateMusicCard(song, currentTime, queue);
+    if (!cardBuf) return;
+    if (!textChannel?.send) return;
 
-    // توهج بنفسجي في الزوايا
-    const glowLeft = ctx.createRadialGradient(0, H / 2, 0, 0, H / 2, 250);
-    glowLeft.addColorStop(0,   "rgba(155,48,255,0.35)");
-    glowLeft.addColorStop(1,   "rgba(155,48,255,0)");
-    ctx.fillStyle = glowLeft;
-    ctx.fillRect(0, 0, W, H);
+    const rows = buildMusicRows(song);
+    const msg = await textChannel.send({
+      files: [new AttachmentBuilder(cardBuf, { name: 'musiccard.png' })],
+      components: rows,
+    });
 
-    const glowRight = ctx.createRadialGradient(W, H / 2, 0, W, H / 2, 200);
-    glowRight.addColorStop(0,   "rgba(255,215,0,0.15)");
-    glowRight.addColorStop(1,   "rgba(255,215,0,0)");
-    ctx.fillStyle = glowRight;
-    ctx.fillRect(0, 0, W, H);
+    queue.currentMessage = msg;
+    queue.initiatorId = song.user?.id;
 
-    // إطار بنفسجي
-    ctx.strokeStyle = COLORS.purple_neon;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(1, 1, W - 2, H - 2, 20);
-    ctx.stroke();
-
-    // ── صورة الأغنية (الغلاف) ─────────────────────────────────
-    const thumbSize = 200;
-    const thumbX    = 30;
-    const thumbY    = (H - thumbSize) / 2;
-    const thumbUrl  = song.thumbnail || null;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(thumbX, thumbY, thumbSize, thumbSize, 14);
-    ctx.clip();
-
-    if (thumbUrl) {
+    // تحديث كل 5 ثواني عشان منضغطش على Discord API
+    const interval = setInterval(async () => {
       try {
-        const img = await loadImage(thumbUrl);
-        ctx.drawImage(img, thumbX, thumbY, thumbSize, thumbSize);
+        if (!queue || queue.paused || queue.destroyed || !queue.currentMessage) {
+          clearInterval(interval);
+          return;
+        }
+        currentTime = Math.floor(queue.currentTime || 0);
+        const total = song.duration || 1;
+        if (currentTime > total) currentTime = total;
+
+        const updated = await generateMusicCard(song, currentTime, queue);
+        if (!updated) { clearInterval(interval); return; }
+
+        await queue.currentMessage.edit({
+          files: [new AttachmentBuilder(updated, { name: 'musiccard.png' })],
+          components: rows,
+        });
+
+        if (currentTime >= total) clearInterval(interval);
       } catch {
-        // fallback لو فشل تحميل الصورة
-        ctx.fillStyle = COLORS.bg_card;
-        ctx.fillRect(thumbX, thumbY, thumbSize, thumbSize);
-        ctx.font = "bold 60px sans-serif";
-        ctx.fillStyle = COLORS.purple_neon;
-        ctx.textAlign = "center";
-        ctx.fillText("🎵", thumbX + thumbSize / 2, thumbY + thumbSize / 2 + 20);
+        clearInterval(interval);
       }
-    } else {
-      ctx.fillStyle = COLORS.bg_card;
-      ctx.fillRect(thumbX, thumbY, thumbSize, thumbSize);
-      ctx.font = "bold 60px sans-serif";
-      ctx.fillStyle = COLORS.purple_neon;
-      ctx.textAlign = "center";
-      ctx.fillText("🎵", thumbX + thumbSize / 2, thumbY + thumbSize / 2 + 20);
-    }
-    ctx.restore();
+    }, 5000);
 
-    // إطار ذهبي حول الصورة
-    ctx.strokeStyle = COLORS.gold;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(thumbX, thumbY, thumbSize, thumbSize, 14);
-    ctx.stroke();
-
-    // ── النصوص ────────────────────────────────────────────────
-    const textX = thumbX + thumbSize + 30;
-    const textW = W - textX - 30;
-
-    // شارة "يشتغل دلوقتي"
-    ctx.fillStyle = COLORS.purple_neon + "33";
-    ctx.beginPath();
-    ctx.roundRect(textX, 28, 160, 28, 8);
-    ctx.fill();
-    ctx.font = "bold 14px sans-serif";
-    ctx.fillStyle = COLORS.purple_glow;
-    ctx.textAlign = "left";
-    ctx.fillText("▶  يشتغل دلوقتي", textX + 10, 47);
-
-    // اسم الأغنية
-    drawText(
-      ctx,
-      song.name || "أغنية مجهولة",
-      textX, 98, textW,
-      "bold 26px sans-serif",
-      COLORS.white, "left"
-    );
-
-    // اسم القناة / الفنان
-    drawText(
-      ctx,
-      song.uploader?.name || "فنان مجهول",
-      textX, 128, textW,
-      "16px sans-serif",
-      COLORS.gray, "left"
-    );
-
-    // خط فاصل ذهبي
-    ctx.strokeStyle = COLORS.gold_dim;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(textX, 145);
-    ctx.lineTo(W - 30, 145);
-    ctx.stroke();
-
-    // ── Progress Bar ───────────────────────────────────────────
-    const barY    = 165;
-    const barH    = 8;
-    const barW    = textW;
-
-    const elapsed  = queue.currentTime || 0;
-    const total    = song.duration    || 1;
-    const progress = elapsed / total;
-
-    drawProgressBar(ctx, textX, barY, barW, barH, progress);
-
-    // الأوقات
-    ctx.font = "14px sans-serif";
-    ctx.fillStyle = COLORS.gray;
-    ctx.textAlign = "left";
-    ctx.fillText(formatTime(elapsed), textX, barY + barH + 22);
-    ctx.textAlign = "right";
-    ctx.fillText(formatTime(total), textX + barW, barY + barH + 22);
-
-    // ── من طلبها + المصدر ──────────────────────────────────────
-    const reqBy = song.user?.username || song.user?.tag || "مجهول";
-    ctx.font = "14px sans-serif";
-    ctx.fillStyle = COLORS.gold;
-    ctx.textAlign = "left";
-    ctx.fillText(`👑 طلبها: ${reqBy}`, textX, barY + barH + 55);
-
-    const sourceIcon =
-      /spotify/i.test(song.url)     ? "🟢 Spotify"   :
-      /youtube|youtu/i.test(song.url) ? "🔴 YouTube"   :
-      /soundcloud/i.test(song.url)  ? "🟠 SoundCloud":
-                                       "🎵 موسيقى";
-    ctx.textAlign = "right";
-    ctx.fillStyle = COLORS.gray;
-    ctx.fillText(sourceIcon, textX + barW, barY + barH + 55);
-
-    // ── إرسال الكارت ──────────────────────────────────────────
-    const buffer     = canvas.toBuffer("image/png");
-    const attachment = new AttachmentBuilder(buffer, { name: "music-card.png" });
-
-    const embed = new EmbedBuilder()
-      .setColor(0x9B30FF)
-      .setImage("attachment://music-card.png")
-      .setFooter({ text: `✨ سيرفر الفراعنة 👑 | ${queue.songs.length > 1 ? `${queue.songs.length - 1} أغنية في الانتظار` : "آخر أغنية"}` });
-
-    const msg = await textChannel.send({ embeds: [embed], files: [attachment] });
-    return msg;
-
-  } catch (err) {
-    console.error("❌ [MusicCard] خطأ في توليد الكارت:", err.message);
-    // fallback بسيط بدون canvas
-    try {
-      const elapsed = queue.currentTime || 0;
-      const total   = song.duration    || 0;
-      const embed = new EmbedBuilder()
-        .setColor(0x9B30FF)
-        .setTitle(`🎵 ${song.name || "أغنية"}`)
-        .setThumbnail(song.thumbnail || null)
-        .addFields(
-          { name: "🎤 الفنان",  value: song.uploader?.name || "مجهول", inline: true },
-          { name: "⏱️ الوقت",  value: `${formatTime(elapsed)} / ${formatTime(total)}`, inline: true },
-          { name: "👑 طلبها",  value: song.user?.username || "مجهول", inline: true }
-        )
-        .setFooter({ text: "✨ سيرفر الفراعنة 👑" });
-      return await textChannel.send({ embeds: [embed] });
-    } catch { /* صمت تام */ }
+  } catch (e) {
+    console.error('❌ [MusicCard] خطأ في إرسال الكارت:', e.message);
   }
 }
