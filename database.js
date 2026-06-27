@@ -137,6 +137,21 @@ class Database {
     }
   }
 
+  removeWarningByIndex(userId, index) {
+    this.ensureUser(userId);
+    const warnings = this.data.users[userId].warnings;
+    if (!warnings || index < 0 || index >= warnings.length) return false;
+    warnings.splice(index, 1);
+    this.save();
+    return true;
+  }
+
+  clearAllWarnings(userId) {
+    this.ensureUser(userId);
+    this.data.users[userId].warnings = [];
+    this.save();
+  }
+
   addTimeout(userId, duration, reason) {
     this.ensureUser(userId);
     if (!this.data.users[userId].timeouts) {

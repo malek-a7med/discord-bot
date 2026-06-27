@@ -18,7 +18,7 @@ import config from "./config.js";
 import Database from "./database.js";
 import Logger from "./logger.js";
 import ModerationListener from "./helpers/moderation-listener.js";
-import { registerMusicCommands, musicHandler } from "./commands/music.js";
+import { musicCommands } from "./commands/music.js";
 import { registerCleanChapterCommand, handleCleanChapter } from "./commands/image-cleaner.js";
 import { registerTranslateChapterCommand, handleTranslateChapter } from "./commands/translator.js";
 import {
@@ -30,6 +30,7 @@ import {
 import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
 import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan, getSettings as amGetSettings, setFeature as amSetFeature, getAllFeatures as amGetAllFeatures } from "./helpers/auto-mod.js";
+import { modWarnCommands, handleModWarnCommand, handleWarnsPagination } from "./commands/moderation.js";
 
 // ─── قناة لوج الأوتو مود per-guild ─────────────────────────────
 const _amLogChannels = new Map(); // guildId → channelId
@@ -279,10 +280,7 @@ const LEGACY_COMMANDS = [
     .addUserOption((o) => o.setName("عضو").setDescription("العضو").setRequired(true))
     .addStringOption((o) => o.setName("السبب").setDescription("السبب")),
   new SlashCommandBuilder().setName("مساعدة").setDescription("قائمة جميع الأوامر / Help"),
-  new SlashCommandBuilder()
-    .setName("تحذيرات")
-    .setDescription("عرض تحذيرات عضو / View warnings")
-    .addUserOption((o) => o.setName("عضو").setDescription("العضو")),
+  ...modWarnCommands,
   new SlashCommandBuilder()
     .setName("ليدربورد")
     .setDescription("أفضل 10 أعضاء في السيرفر / Top 10 leaderboard")
@@ -466,16 +464,15 @@ const LEGACY_COMMANDS = [
 
 // Advanced Feature Commands
 async function getAdvancedCommands() {
-  const musicCommands = await registerMusicCommands(null);
-  const cleanCommand = await registerCleanChapterCommand(null);
+  const cleanCommand     = await registerCleanChapterCommand(null);
   const translateCommand = await registerTranslateChapterCommand(null);
-  const whitenCommands = await registerWhitenCommands(null);
+  const whitenCommands   = await registerWhitenCommands(null);
 
   return [
     cleanCommand.data,
     translateCommand.data,
     ...musicCommands.map(cmd => cmd.data),
-    ...whitenCommands.map(cmd => cmd.data)
+    ...whitenCommands.map(cmd => cmd.data),
   ];
 }
 
@@ -1889,8 +1886,22 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "تحذير") {
         const target = interaction.options.getUser("عضو");
         const reason = interaction.options.getString("السبب");
+        if (target.bot) return interaction.reply({ content: "❌ مش هتحذّر بوت!", flags: 64 });
         db.addWarning(target.id, reason, "MANUAL_MODERATOR");
-        return interaction.reply({ content: `⚠️ تم توجيه تحذير لـ ${target} بسبب: ${reason}` });
+        const wcount = db.getWarnings(target.id).length;
+        const wEmbed = new EmbedBuilder()
+          .setColor(wcount <= 2 ? 0xf39c12 : wcount <= 4 ? 0xe67e22 : 0xe74c3c)
+          .setTitle("⚠️ تحذير رسمي")
+          .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+          .addFields(
+            { name: "👤 العضو",    value: `${target}`,          inline: true  },
+            { name: "🛡️ المشرف",  value: `${user}`,            inline: true  },
+            { name: "💬 السبب",    value: reason.slice(0,512),  inline: false },
+            { name: "⚠️ الإجمالي", value: `\`${wcount}\` تحذير`, inline: true },
+          )
+          .setTimestamp();
+        try { await target.send({ embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("⚠️ لقيت تحذير على حسابك").addFields({ name: "💬 السبب", value: reason }, { name: "📊 إجماليك", value: `\`${wcount}\`` }).setTimestamp()] }); } catch {}
+        return interaction.reply({ embeds: [wEmbed] });
       }
 
       if (cmd === "اسكات") {
@@ -1922,11 +1933,8 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: "🤖 **جميع الأوامر بتشتغل بـ السلاش (`/`):**\nعامة: `ping`, `hello`, `serverinfo`\nنظام مالي: `بروفايل`, `محفظة`, `يومي`, `ليدربورد`\nميوزك: `play`, `skip`, `stop`, `queue`\n🎁 متقدم: `clean_chapter`, `translate_chapter`\n🧹 تنظيف سريع: `تنظيف_صورة`, `تنظيف_رابط`, `استخراج_نص`" });
       }
 
-      if (cmd === "تحذيرات") {
-        const target = interaction.options.getUser("عضو") ?? user;
-        const warns = db.getWarnings(target.id);
-        if (warns.length === 0) return interaction.reply({ content: "😇 العضو ده سجلّه أبيض وزي الفل!" });
-        return interaction.reply({ content: `⚠️ عدد تحذيراته: **${warns.length}** تحذير.` });
+      if (["تحذيرات","تحذير-يدوي","مسح-تحذير","مسح-كل-التحذيرات"].includes(cmd)) {
+        return await handleModWarnCommand(interaction, db, config);
       }
 
       if (cmd === "ليدربورد") {
@@ -2298,7 +2306,7 @@ client.on("interactionCreate", async (interaction) => {
 
         // 🎵 قائمة الميوزك
         if (interaction.customId === "dmp_queue") {
-          const { musicHandler: mh } = await import("./commands/music.js");
+          const { musicHandler: mh } = await import("./helpers/music-handler.js");
           const q = mh?.getQueue?.(g?.id);
           if (!q || q.length === 0) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", flags: 64 });
           const txt = q.slice(0, 5).map((s, i) => `**${i+1}.** ${s.title}`).join("\n");
@@ -2307,7 +2315,7 @@ client.on("interactionCreate", async (interaction) => {
 
         // ⏹️ إيقاف الميوزك
         if (interaction.customId === "dmp_stop") {
-          const { musicHandler: mh } = await import("./commands/music.js");
+          const { musicHandler: mh } = await import("./helpers/music-handler.js");
           mh?.stop?.(g?.id);
           return interaction.reply({ content: "⏹️ تم إيقاف الميوزك!", flags: 64 });
         }
@@ -2465,6 +2473,11 @@ client.on("interactionCreate", async (interaction) => {
           logger.error("خطأ في wipe_confirm:", err);
         }
         return;
+      }
+
+      // ─── أزرار pagination سجل التحذيرات ─────────────────────────
+      if (interaction.customId.startsWith("warns_page|")) {
+        return await handleWarnsPagination(interaction, db);
       }
 
       if (interaction.customId === "admin_clear_games") {
