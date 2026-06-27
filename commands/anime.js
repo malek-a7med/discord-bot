@@ -51,21 +51,16 @@ async function cachedJikan(key, path, params = {}) {
   return data;
 }
 
-// ─── YouTube Episode Search ───────────────────────────────────
-async function searchYouTubeEpisode(title, epNum) {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  const query = `${title} episode ${epNum}`;
-  if (apiKey) {
-    try {
-      const q = encodeURIComponent(query);
-      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q}&type=video&maxResults=1&key=${apiKey}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
-      const data = await res.json();
-      const videoId = data.items?.[0]?.id?.videoId;
-      if (videoId) return { url: `https://www.youtube.com/watch?v=${videoId}`, found: true };
-    } catch {}
-  }
-  return { url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, found: false };
+// ─── مواقع المشاهدة العربية ────────────────────────────────────
+function buildWatchLinks(title, epNum) {
+  const titleEnc = encodeURIComponent(title);
+  return [
+    { name: "🔴 Anime Phoenix",  url: `https://anime-phoenix.com/?s=${titleEnc}` },
+    { name: "🟣 Anime3rb",       url: `https://anime3rb.com/search/?s=${titleEnc}` },
+    { name: "🟢 AnimeGon",       url: `https://animegon.com/?s=${titleEnc}` },
+    { name: "🔵 WitAnime",       url: `https://witanime.life/?s=${titleEnc}` },
+    { name: "🟡 Anime4Up",       url: `https://anime4up.bond/?s=${titleEnc}` },
+  ];
 }
 
 // ─── Session store (نتائج البحث + صفحة الأنمي + حلقات) ─────
@@ -592,14 +587,14 @@ export async function handleAnimeEpisodes(interaction, db, malId) {
   }
 }
 
-// ─── اختيار حلقة وإرسال فيديو يوتيوب مباشرةً ───────────────
+// ─── اختيار حلقة وإرسال روابط المشاهدة العربية مباشرةً ─────
 export async function handleAnimeSelectEpisode(interaction, db) {
   await interaction.deferUpdate();
 
-  const value   = interaction.values[0]; // ep_${malId}_${epNum}
-  const parts   = value.split("_");
-  const malId   = parseInt(parts[1]);
-  const epNum   = parseInt(parts[2]);
+  const value  = interaction.values[0]; // ep_${malId}_${epNum}
+  const parts  = value.split("_");
+  const malId  = parseInt(parts[1]);
+  const epNum  = parseInt(parts[2]);
 
   try {
     const animeData = await cachedJikan(`anime_${malId}`, `/anime/${malId}/full`);
@@ -609,33 +604,25 @@ export async function handleAnimeSelectEpisode(interaction, db) {
     // تحديث progress في قايمة المستخدم
     db.updateAnimeProgress(interaction.user.id, malId, epNum, anime.episodes || 0);
 
-    // البحث عن الحلقة على يوتيوب
-    const yt = await searchYouTubeEpisode(title, epNum);
+    const links = buildWatchLinks(title, epNum);
 
     const embed = new EmbedBuilder()
       .setColor(scoreColor(anime.score))
       .setTitle(`▶️ ${title} — حلقة ${epNum}`)
       .setDescription(
-        `${yt.found
-          ? `🎬 **وجدنا الحلقة على يوتيوب!** الرابط في الأسفل 👇`
-          : `🔍 **نتيجة بحث يوتيوب** — اختار الحلقة الصح من الصفحة`
-        }\n\n` +
-        `📈 تقدمك: حلقة **${epNum}**/${anime.episodes || "?"}`
+        `📺 **روابط مشاهدة الحلقة ${epNum}${anime.episodes ? ` من ${anime.episodes}` : ""}:**\n\n` +
+        links.map(l => `• [${l.name}](${l.url})`).join("\n") +
+        `\n\n📈 تقدمك: حلقة **${epNum}**/${anime.episodes || "?"}`
       )
       .setThumbnail(anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url)
       .addFields(
-        { name: "📊 التقييم",       value: anime.score ? `⭐ ${anime.score}/10` : "—", inline: true },
-        { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`,           inline: true },
+        { name: "📊 التقييم",        value: anime.score ? `⭐ ${anime.score}/10` : "—", inline: true },
+        { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`,            inline: true },
       )
       .setFooter({ text: `MAL ID: ${malId} • زنجي Bot 🎌` })
       .setTimestamp();
 
-    // إرسال الـ embed + رابط يوتيوب — Discord يعمل embed تلقائي للفيديو
-    await interaction.followUp({
-      content: yt.url,
-      embeds: [embed],
-      ephemeral: true,
-    });
+    await interaction.followUp({ embeds: [embed], ephemeral: true });
   } catch (e) {
     await interaction.followUp({ content: `❌ خطأ: ${e.message}`, ephemeral: true });
   }
