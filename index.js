@@ -1930,7 +1930,60 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "مساعدة") {
-        return interaction.reply({ content: "🤖 **جميع الأوامر بتشتغل بـ السلاش (`/`):**\nعامة: `ping`, `hello`, `serverinfo`\nنظام مالي: `بروفايل`, `محفظة`, `يومي`, `ليدربورد`\nميوزك: `play`, `skip`, `stop`, `queue`\n🎁 متقدم: `clean_chapter`, `translate_chapter`\n🧹 تنظيف سريع: `تنظيف_صورة`, `تنظيف_رابط`, `استخراج_نص`" });
+        const helpEmbed = new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setTitle("📖 قائمة أوامر زنجي")
+          .setThumbnail(client.user?.displayAvatarURL({ dynamic: true }))
+          .addFields(
+            {
+              name: "🌐 عامة",
+              value: "`/ping` `/hello` `/roll` `/serverinfo` `/userinfo` `/القوانين` `/اقتراح`",
+              inline: false,
+            },
+            {
+              name: "👤 بروفايل ومحفظة",
+              value: "`/بروفايل` `/محفظة` `/يومي` `/ليدربورد`",
+              inline: false,
+            },
+            {
+              name: "🎮 ألعاب",
+              value: "`/الألعاب` `/العاب` `/مصارعة` `/احدث-المميزات`",
+              inline: false,
+            },
+            {
+              name: "🎵 موسيقى",
+              value: "`/تشغيل` `/إيقاف` `/تخطي` `/قائمة-تشغيل` `/توقف-مؤقت` `/استئناف`",
+              inline: false,
+            },
+            {
+              name: "🛡️ إدارة — تحذيرات",
+              value: "`/تحذير` `/تحذير-يدوي` `/تحذيرات` `/مسح-تحذير` `/مسح-كل-التحذيرات`",
+              inline: false,
+            },
+            {
+              name: "🔨 إدارة — عقوبات",
+              value: "`/اسكات` `/طرد` `/تبنيد` `/مسح` `/مسح-الكل`",
+              inline: false,
+            },
+            {
+              name: "⚙️ إعدادات السيرفر",
+              value: "`/ترحيب-قناة` `/قناة-النسخ` `/اوتومود` `/اوتومود-لوج` `/لوحة-إدارة` `/لوحة-اقتراحات`",
+              inline: false,
+            },
+            {
+              name: "🤖 AI وأدوات",
+              value: "`/صورة` `/مانهوا-إنشاء` `/مانهوا-إضافة-مصطلح` `/مانهوا-عرض-المصطلحات`",
+              inline: false,
+            },
+            {
+              name: "👑 أونر فقط",
+              value: "`/حالة-البوت` `/مفاتيح-جيميني` `/رسالة-جماعية` `/لوحة-dm` `/قناة-اللوجز` `/رفع-بلوك` `/قائمة-مبلوكين`",
+              inline: false,
+            },
+          )
+          .setFooter({ text: "💡 استخدم /احدث-المميزات عشان تعرف آخر إضافات!" })
+          .setTimestamp();
+        return interaction.reply({ embeds: [helpEmbed], flags: 64 });
       }
 
       if (["تحذيرات","تحذير-يدوي","مسح-تحذير","مسح-كل-التحذيرات"].includes(cmd)) {
