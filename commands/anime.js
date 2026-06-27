@@ -136,6 +136,36 @@ async function getWitanimeDirectLink(title, epNum) {
   }
 }
 
+// ─── جيب رابط الحلقة المباشر من Anime Phoenix ────────────────
+async function getAnimePhoenixDirectLink(title, epNum) {
+  try {
+    const slug = title.toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/\s+/g, "-");
+
+    // الـ pattern بتاعهم: {slug}-season-1-episode-{N}  أو  {slug}-episode-{N}
+    const candidates = [
+      `https://anime-phoenix.com/episodes/${slug}-season-1-episode-${epNum}`,
+      `https://anime-phoenix.com/episodes/${slug}-episode-${epNum}`,
+      `https://anime-phoenix.com/episodes/${slug}-season-2-episode-${epNum}`,
+    ];
+
+    for (const url of candidates) {
+      try {
+        const r = await fetch(url, {
+          method: "HEAD", headers: SCRAPE_HEADERS,
+          signal: AbortSignal.timeout(4_000),
+        });
+        if (r.ok) return url;
+      } catch {}
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── روابط بحث احتياطية لو ما لقيناش رابط مباشر ──────────────
 function buildFallbackLinks(title) {
   const titleEnc = encodeURIComponent(title);
@@ -694,8 +724,14 @@ export async function handleAnimeSelectEpisode(interaction, db) {
     // تحديث progress
     db.updateAnimeProgress(interaction.user.id, malId, epNum, anime.episodes || 0);
 
-    // جرب تجيب رابط مباشر من WitAnime
-    const directUrl = await getWitanimeDirectLink(title, epNum);
+    // جرب WitAnime وAnime Phoenix بالتوازي — أسرع
+    const [witanimeUrl, phoenixUrl] = await Promise.all([
+      getWitanimeDirectLink(title, epNum),
+      getAnimePhoenixDirectLink(title, epNum),
+    ]);
+
+    const directUrl  = witanimeUrl || phoenixUrl;
+    const sourceName = witanimeUrl  ? "WitAnime" : phoenixUrl ? "Anime Phoenix" : null;
 
     let embed;
     if (directUrl) {
@@ -704,7 +740,7 @@ export async function handleAnimeSelectEpisode(interaction, db) {
         .setColor(0x2ecc71)
         .setTitle(`▶️ ${title} — حلقة ${epNum}`)
         .setDescription(
-          `✅ **وجدنا رابط الحلقة مباشرةً على WitAnime!**\n\n` +
+          `✅ **وجدنا رابط الحلقة مباشرةً على ${sourceName}!**\n\n` +
           `🔗 [**اضغط هنا لمشاهدة الحلقة ${epNum}**](${directUrl})\n\n` +
           `📈 تقدمك: حلقة **${epNum}**/${anime.episodes || "?"}`
         )
@@ -713,7 +749,7 @@ export async function handleAnimeSelectEpisode(interaction, db) {
           { name: "📊 التقييم",        value: anime.score ? `⭐ ${anime.score}/10` : "—", inline: true },
           { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`,            inline: true },
         )
-        .setFooter({ text: `WitAnime • زنجي Bot 🎌` })
+        .setFooter({ text: `${sourceName} • زنجي Bot 🎌` })
         .setTimestamp();
     } else {
       // ⚠️ ما لقيناش رابط مباشر — روابط بحث احتياطية
