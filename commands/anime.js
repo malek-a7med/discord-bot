@@ -16,7 +16,6 @@ import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, StringSelectMenuBuilder,
   ModalBuilder, TextInputBuilder, TextInputStyle,
-  ChannelType,
 } from "discord.js";
 
 // ─── Jikan API v4 ────────────────────────────────────────────
@@ -735,83 +734,13 @@ export async function handleAnimeTrailer(interaction, malId) {
   }
 }
 
-// ─── تعريف الأمر ─────────────────────────────────────────────
-export const animeRoomCommand = new SlashCommandBuilder()
-  .setName("أنمي-روم")
-  .setDescription("🎌 إعداد روم الأنمي — يبعت فيه لوحة التحكم الكاملة [مشرف]")
-  .addChannelOption(o =>
-    o.setName("قناة")
-      .setDescription("القناة اللي هتتبعت فيها اللوحة (الافتراضي: الروم الحالي)")
-      .addChannelTypes(ChannelType.GuildText)
-  );
-
-export const animeSearchCommand = new SlashCommandBuilder()
+// ─── تعريف الأمر الوحيد ──────────────────────────────────────
+export const animeCommand = new SlashCommandBuilder()
   .setName("أنمي")
-  .setDescription("🔍 ابحث عن أي أنمي وشوف تفاصيله")
-  .addStringOption(o =>
-    o.setName("بحث")
-      .setDescription("اسم الأنمي بالعربي أو الإنجليزي")
-      .setRequired(true)
-  );
+  .setDescription("🎌 افتح مركز الأنمي — بحث، قوايم، تقييمات، وأكتر كله في أزرار");
 
-// ─── handler أمر /أنمي-روم ──────────────────────────────────
-export async function handleAnimeRoomCommand(interaction) {
-  if (!interaction.memberPermissions?.has("ManageChannels") && !interaction.client?.config?.isOwner?.(interaction.user.id)) {
-    // نسمح للكل يستخدمه عشان يبعت اللوحة
-  }
-
-  const targetCh = interaction.options.getChannel("قناة") || interaction.channel;
-
-  try {
-    await targetCh.send(buildAnimePanel());
-    return interaction.reply({
-      content: `✅ تم إرسال لوحة الأنمي في <#${targetCh.id}>!`,
-      ephemeral: true,
-    });
-  } catch (e) {
-    return interaction.reply({
-      content: `❌ فشل: ${e.message}`,
-      ephemeral: true,
-    });
-  }
-}
-
-// ─── handler أمر /أنمي [بحث:...] ───────────────────────────
-export async function handleAnimeSearchCommand(interaction, db) {
-  await interaction.deferReply({ ephemeral: true });
-  const query = interaction.options.getString("بحث").trim();
-
-  let results;
-  try {
-    const data = await jikan("/anime", { q: query, limit: 8, sfw: false });
-    results = data.data || [];
-  } catch (e) {
-    return interaction.editReply({ content: "❌ فشل البحث — جرب تاني." });
-  }
-
-  if (!results.length) {
-    return interaction.editReply({ content: `❌ ما لقيتش نتايج لـ **${query}**.` });
-  }
-
-  setSession(interaction.user.id, { type: "search_results", results, query });
-
-  const options = results.slice(0, 10).map((a, i) => ({
-    label: (a.title_english || a.title).slice(0, 100),
-    description: `${a.type || "?"} • ${a.episodes ? a.episodes + " حلقة" : "؟ حلقات"} • ⭐ ${a.score || "N/A"}`,
-    value: `${a.mal_id}`,
-  }));
-
-  const embed = new EmbedBuilder()
-    .setColor(0x3498db)
-    .setTitle(`🔍 نتايج: "${query}"`)
-    .setDescription(`وجدت **${results.length}** نتيجة:`);
-
-  const row = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId("anime_select_result")
-      .setPlaceholder("اختار الأنمي...")
-      .addOptions(options)
-  );
-
-  return interaction.editReply({ embeds: [embed], components: [row] });
+// ─── handler أمر /أنمي ───────────────────────────────────────
+export async function handleAnimeCommand(interaction) {
+  const panel = buildAnimePanel();
+  return interaction.reply({ ...panel, ephemeral: true });
 }

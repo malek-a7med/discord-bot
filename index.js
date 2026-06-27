@@ -40,15 +40,15 @@ import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesH
 import { bankSavingsCommand, handleBankButton, handleBankModal } from "./commands/bank-savings.js";
 import { bankLuckEgCommand, handleBankLuckEgButton, handleBankLuckEgModal } from "./commands/bank-luck-eg.js";
 import {
-  animeRoomCommand, animeSearchCommand, animeSessions,
+  animeCommand,
   buildAnimePanel,
+  handleAnimeCommand,
   handleAnimeSearchBtn, handleAnimeSearchModal,
   handleAnimeSelectResult, handleAnimeTrending, handleAnimeSeason,
   handleAnimeMyList, handleAnimeProfile,
   handleAnimeEpisodes, handleAnimeSelectEpisode,
   handleAnimeRate, handleAnimeRateModal,
   handleAnimeListAction, handleAnimeTrailer,
-  handleAnimeRoomCommand, handleAnimeSearchCommand,
 } from "./commands/anime.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -611,8 +611,7 @@ const LEGACY_COMMANDS = [
   pollCommand,
   bankLifeCommand,
   bankLuckEgCommand.data,
-  animeRoomCommand,
-  animeSearchCommand,
+  animeCommand,
   new SlashCommandBuilder()
     .setName("حالة-الحماية")
     .setDescription("🛡️ عرض حالة كل أنظمة الحماية في البوت [أونر فقط]"),
@@ -680,7 +679,7 @@ function validateLatestFeatures(allCommands) {
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
       "قائمة-الباند","رفع-باند",
-      "أنمي-روم","أنمي",
+      "أنمي",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -2661,8 +2660,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ── نظام الأنمي ────────────────────────────────────────────
-      if (cmd === "أنمي-روم") return await handleAnimeRoomCommand(interaction);
-      if (cmd === "أنمي")     return await handleAnimeSearchCommand(interaction, db);
+      if (cmd === "أنمي") return await handleAnimeCommand(interaction);
 
       if (cmd === "رفع-باند") {
         if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
