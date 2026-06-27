@@ -29,7 +29,7 @@ import {
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
 import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
-import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
+import { scanMessage as autoModScan, getSettings as amGetSettings, setFeature as amSetFeature, getAllFeatures as amGetAllFeatures } from "./helpers/auto-mod.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -359,6 +359,46 @@ const LEGACY_COMMANDS = [
     .setName("قائمة-مبلوكين")
     .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
   battleCommand,
+  new SlashCommandBuilder()
+    .setName("اوتومود")
+    .setDescription("تحكم في إعدادات الأوتو مود [أونر فقط]")
+    .addSubcommand(sub =>
+      sub.setName("حالة").setDescription("اعرض حالة كل ميزات الأوتو مود")
+    )
+    .addSubcommand(sub =>
+      sub.setName("تفعيل")
+        .setDescription("فعّل ميزة معينة في الأوتو مود")
+        .addStringOption(opt =>
+          opt.setName("ميزة")
+            .setDescription("الميزة اللي تفعّلها")
+            .setRequired(true)
+            .addChoices(
+              { name: "🛡️ الأوتو مود كله",                     value: "enabled" },
+              { name: "🔨 كاشف الهاكر والسبام",                  value: "antiHacker" },
+              { name: "⚡ كاشف السبام السريع",                   value: "antiSpam" },
+              { name: "🤖 تحليل AI للنصوص",                      value: "aiText" },
+              { name: "🖼️ تحليل AI للصور",                       value: "aiImage" },
+              { name: "⛔ الفلتر الفوري (إرهاب/CSAM)",           value: "instantPatterns" },
+            )
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName("ايقاف")
+        .setDescription("أوقف ميزة معينة في الأوتو مود")
+        .addStringOption(opt =>
+          opt.setName("ميزة")
+            .setDescription("الميزة اللي توقفها")
+            .setRequired(true)
+            .addChoices(
+              { name: "🛡️ الأوتو مود كله",                     value: "enabled" },
+              { name: "🔨 كاشف الهاكر والسبام",                  value: "antiHacker" },
+              { name: "⚡ كاشف السبام السريع",                   value: "antiSpam" },
+              { name: "🤖 تحليل AI للنصوص",                      value: "aiText" },
+              { name: "🖼️ تحليل AI للصور",                       value: "aiImage" },
+              { name: "⛔ الفلتر الفوري (إرهاب/CSAM)",           value: "instantPatterns" },
+            )
+        )
+    ),
 ];
 
 // Advanced Feature Commands
@@ -1319,6 +1359,44 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     try {
+      // ─── اوتومود — تحكم في الإعدادات ────────────────────────────
+      if (cmd === "اوتومود") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", flags: 64 });
+        }
+        const sub      = interaction.options.getSubcommand();
+        const guildId  = guild?.id || "global";
+        const settings = amGetSettings(guildId);
+        const features  = amGetAllFeatures();
+
+        if (sub === "حالة") {
+          const lines = Object.entries(features).map(([key, label]) => {
+            const on = settings[key];
+            return `${on ? "🟢" : "🔴"} **${label}** — ${on ? "مفعّل" : "متوقف"}`;
+          });
+          const embed = new EmbedBuilder()
+            .setColor(settings.enabled ? 0x2ecc71 : 0xe74c3c)
+            .setTitle("🛡️ حالة الأوتو مود")
+            .setDescription(lines.join("\n"))
+            .setFooter({ text: "استخدم /اوتومود تفعيل أو /اوتومود ايقاف للتحكم" })
+            .setTimestamp();
+          return interaction.reply({ embeds: [embed], flags: 64 });
+        }
+
+        const feature = interaction.options.getString("ميزة");
+        const enable  = sub === "تفعيل";
+        const ok = amSetFeature(guildId, feature, enable);
+        if (!ok) return interaction.reply({ content: "❌ ميزة مش موجودة!", flags: 64 });
+
+        const label = features[feature] || feature;
+        const embed = new EmbedBuilder()
+          .setColor(enable ? 0x2ecc71 : 0xe74c3c)
+          .setTitle(`${enable ? "🟢 تم التفعيل" : "🔴 تم الإيقاف"}`)
+          .setDescription(`**${label}** — ${enable ? "✅ شغّال دلوقتي" : "⛔ متوقف دلوقتي"}`)
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed], flags: 64 });
+      }
+
       // ─── قائمة المبلوكين ─────────────────────────────────────────
       if (cmd === "قائمة-مبلوكين") {
         if (!config.isOwner(user.id)) {
