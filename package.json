@@ -1,33 +1,30 @@
 {
   "name": "@workspace/discord-bot",
   "version": "1.0.0",
-  "description": "Discord Bot with 59 slash commands",
+  "description": "Discord Bot with 22 slash commands",
   "main": "index.js",
   "type": "module",
-  "engines": {
-    "node": ">=22.0.0"
-  },
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
-    "@distube/soundcloud": "^2.0.4",
+    "@distube/soundcloud": "^2.0.0",
     "@distube/spotify": "^2.0.2",
-    "@distube/yt-dlp": "^2.0.1",
+    "@distube/yt-dlp": "^2.0.0",
     "@google/generative-ai": "^0.24.1",
-    "@napi-rs/canvas": "^0.1.100",
-    "axios": "^1.18.1",
+    "@napi-rs/canvas": "^0.1.68",
+    "axios": "^1.18.0",
     "discord.js": "^14.26.4",
-    "distube": "^5.2.3",
+    "distube": "^5.0.0",
     "dotenv": "^17.4.2",
     "express": "^4.22.2",
-    "genius-lyrics": "^4.4.7",
     "google-auth-library": "^9.15.1",
     "googleapis": "^173.0.0",
+    "kazagumo": "^3.4.3",
     "node-fetch": "^2.7.0",
-    "opusscript": "^0.0.8",
     "sharp": "^0.34.5",
+    "shoukaku": "^4.1.0",
     "tesseract.js": "^7.0.0"
   }
 }
