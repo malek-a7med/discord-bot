@@ -58,10 +58,14 @@ function truncate(ctx, text, maxW) {
 
 // ── تحميل خلفية السيرفر (مرة واحدة) ─────────────────────────
 let _bgImg = null;
+let _bgMtime = 0;
 async function getBg() {
-  if (_bgImg) return _bgImg;
   try {
+    const { statSync } = await import('fs');
+    const mtime = statSync(BG_PATH).mtimeMs;
+    if (_bgImg && mtime === _bgMtime) return _bgImg;
     _bgImg = await loadImage(readFileSync(BG_PATH));
+    _bgMtime = mtime;
     return _bgImg;
   } catch { return null; }
 }

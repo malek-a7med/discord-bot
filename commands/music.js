@@ -48,54 +48,62 @@ export function initMusicSystem(client) {
   // منع تنفيذ auto-leave مرتين في نفس الوقت
   const autoLeavingGuilds = new Set();
 
-  client.on('voiceStateUpdate', async (oldState, newState) => {
+  // ─── دالة مشتركة للخروج من الصوت ───────────────────────────
+  async function forceLeave(guild, textChannel = null) {
+    const guildId = guild.id;
+    if (autoLeavingGuilds.has(guildId)) return;
+    autoLeavingGuilds.add(guildId);
     try {
-      const guildId = newState.guild?.id || oldState.guild?.id;
-      if (!guildId) return;
-
-      // تجاهل events البوت نفسه
-      if (newState.member?.user?.bot || oldState.member?.user?.bot) return;
-
+      // أرسل رسالة وداع
+      if (textChannel?.send) {
+        textChannel.send({
+          embeds: [new EmbedBuilder().setColor(0x9b59b6).setDescription('👋 القناة الصوتية فاضية — خرجت تلقائياً')],
+        }).catch(() => {});
+      }
+      // احذف كارت الموسيقى
       const q = distube.getQueue(guildId);
-      if (!q) return;
-      const botVoiceChannel = q.voice?.channel;
-      if (!botVoiceChannel) return;
-
-      // تأكد إن الحدث متعلق بالقناة اللي البوت فيها
-      const affectedChannelId = oldState.channelId || newState.channelId;
-      if (affectedChannelId !== botVoiceChannel.id) return;
-
-      // فعلاً خرج من القناة دي؟
-      if (oldState.channelId !== botVoiceChannel.id) return;
-
-      const humans = botVoiceChannel.members.filter(m => !m.user.bot).size;
-      if (humans > 0) return;
-
-      // تجنب التنفيذ المزدوج
-      if (autoLeavingGuilds.has(guildId)) return;
-      autoLeavingGuilds.add(guildId);
-
-      // آخر واحد خرج — البوت يخرج تلقائياً
-      q.textChannel?.send({
-        embeds: [new EmbedBuilder().setColor(0x9b59b6).setDescription('👋 القناة الصوتية فاضية — خرجت تلقائياً')],
-      }).catch(() => {});
-      if (q.currentMessage) {
+      if (q?.currentMessage) {
         await q.currentMessage.delete().catch(() => {});
         q.currentMessage = null;
       }
+      // أوقف DisTube
       await distube.stop(guildId).catch(() => {});
-      // فصل الاتصال الصوتي بشكل صريح لو لسه موصول
+      // افصل الاتصال الصوتي بشكل صريح
       try {
         const { getVoiceConnection } = await import('@discordjs/voice');
         const conn = getVoiceConnection(guildId);
         if (conn) conn.destroy();
       } catch {}
-
+      // تأكيد إضافي: فصل مباشر من خلال guild
+      await guild.members.me?.voice?.disconnect().catch(() => {});
+    } finally {
       autoLeavingGuilds.delete(guildId);
-    } catch (e) {
-      const gId = newState.guild?.id || oldState.guild?.id;
-      if (gId) autoLeavingGuilds.delete(gId);
     }
+  }
+
+  client.on('voiceStateUpdate', async (oldState, newState) => {
+    try {
+      const guild = newState.guild || oldState.guild;
+      if (!guild) return;
+
+      // تجاهل events البوت نفسه
+      if (newState.member?.user?.bot || oldState.member?.user?.bot) return;
+
+      // هل البوت جوه قناة صوتية أصلاً؟
+      const botVoiceChannel = guild.members.me?.voice?.channel;
+      if (!botVoiceChannel) return;
+
+      // هل الحدث متعلق بنفس القناة اللي البوت فيها؟
+      if (oldState.channelId !== botVoiceChannel.id) return;
+
+      // عدّ البشر اللي فضلوا في القناة
+      const humans = botVoiceChannel.members.filter(m => !m.user.bot).size;
+      if (humans > 0) return;
+
+      // القناة فاضية — اخرج
+      const q = distube.getQueue(guild.id);
+      await forceLeave(guild, q?.textChannel ?? null);
+    } catch {}
   });
 
   distube.on('playSong', async (queue, song) => {
@@ -129,8 +137,34 @@ export function initMusicSystem(client) {
     } catch {}
   });
 
-  distube.on('finish', (queue) => {
-    try { queue.textChannel?.send('🏁 خلصت القائمة!').catch(() => {}); } catch {}
+  distube.on('finish', async (queue) => {
+    try {
+      // حذف كارت الموسيقى
+      if (queue.currentMessage) {
+        await queue.currentMessage.delete().catch(() => {});
+        queue.currentMessage = null;
+      }
+      queue.textChannel?.send({
+        embeds: [new EmbedBuilder().setColor(0x9b59b6).setDescription('🏁 خلصت القائمة — خرجت من القناة الصوتية!')],
+      }).catch(() => {});
+
+      // نأخذ الـ guild من أكثر من مصدر عشان نضمن الوصول حتى لو DisTube بدأ يمسح queue.voice
+      const guild =
+        queue.textChannel?.guild ||
+        queue.voice?.channel?.guild ||
+        client.guilds.cache.get(queue.id);
+
+      if (guild) {
+        try {
+          const { getVoiceConnection } = await import('@discordjs/voice');
+          const conn = getVoiceConnection(guild.id);
+          if (conn) conn.destroy();
+        } catch {}
+        await guild.members.me?.voice?.disconnect().catch(() => {});
+      }
+    } catch (e) {
+      console.error('❌ [Music] finish event خطأ:', e.message);
+    }
   });
 
   distube.on('error', (error, queue) => {
