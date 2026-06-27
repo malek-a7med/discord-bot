@@ -622,7 +622,16 @@ export async function handleAnimeSelectEpisode(interaction, db) {
       .setFooter({ text: `MAL ID: ${malId} • زنجي Bot 🎌` })
       .setTimestamp();
 
-    await interaction.followUp({ embeds: [embed], ephemeral: true });
+    try {
+      await interaction.user.send({ embeds: [embed] });
+      await interaction.followUp({
+        content: `✅ **تم إرسال روابط الحلقة ${epNum} في الخاص!** 📬\nتقدمك اتسجّل تلقائياً.`,
+        ephemeral: true,
+      });
+    } catch {
+      // لو الـ DM مغلق، نرد في نفس المكان
+      await interaction.followUp({ embeds: [embed], ephemeral: true });
+    }
   } catch (e) {
     await interaction.followUp({ content: `❌ خطأ: ${e.message}`, ephemeral: true });
   }
