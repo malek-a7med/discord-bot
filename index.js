@@ -30,6 +30,18 @@ import {
 import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan, getSettings as amGetSettings, setFeature as amSetFeature, getAllFeatures as amGetAllFeatures } from "./helpers/auto-mod.js";
 import { modWarnCommands, handleModWarnCommand, handleWarnsPagination } from "./commands/moderation.js";
+import {
+  animeCommand,
+  handleAnimeCommand,
+  handleAnimeSearchBtn, handleAnimeSearchModal, handleAnimeSelectResult,
+  handleAnimeTrending, handleAnimeSeason,
+  handleAnimeMyList, handleAnimeProfile,
+  handleAnimeEpisodes, handleAnimeSelectEpisode,
+  handleAnimeRate, handleAnimeRateModal,
+  handleAnimeListAction, handleAnimeTrailer,
+  handleAnimeRecommend, handleAnimePublish,
+  scheduleAnimeNews,
+} from "./commands/anime.js";
 
 // ─── قناة لوج الأوتو مود per-guild ─────────────────────────────
 const _amLogChannels = new Map(); // guildId → channelId
@@ -457,6 +469,7 @@ const LEGACY_COMMANDS = [
             )
         )
     ),
+  animeCommand,
 ];
 
 // Advanced Feature Commands
@@ -1088,6 +1101,7 @@ client.once("clientReady", async (c) => {
   await ensureSuggestionsPanel(c);
   setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
+  scheduleAnimeNews(c, db);
 
   // ── إعطاء البوت صلاحيات كاملة (Administrator) في كل السيرفرات ──
   for (const [, guild] of c.guilds.cache) {
@@ -1742,6 +1756,10 @@ client.on("interactionCreate", async (interaction) => {
       }
 
 
+      if (cmd === "أنمي") {
+        return await handleAnimeCommand(interaction);
+      }
+
       if (cmd === "العاب") {
         if (activeGames.has(channel.id)) return interaction.reply({ content: "❌ فيه لعبة شغالة هنا بالفعل!", flags: 64 });
         activeGames.set(channel.id, true);
@@ -2293,6 +2311,21 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     try {
 
+      // ─── أزرار مركز الأنمي ───────────────────────────────────────
+      if (interaction.customId === "anime_search_btn")  return await handleAnimeSearchBtn(interaction);
+      if (interaction.customId === "anime_trending_btn") return await handleAnimeTrending(interaction);
+      if (interaction.customId === "anime_season_btn")   return await handleAnimeSeason(interaction);
+      if (interaction.customId === "anime_mylist_btn")   return await handleAnimeMyList(interaction, db);
+      if (interaction.customId === "anime_profile_btn")  return await handleAnimeProfile(interaction, db);
+      if (interaction.customId === "anime_recommend_btn") return await handleAnimeRecommend(interaction, db);
+      if (interaction.customId === "anime_publish_btn")  return await handleAnimePublish(interaction, db);
+      if (interaction.customId.startsWith("anime_eps_"))   return await handleAnimeEpisodes(interaction, db, interaction.customId.replace("anime_eps_", ""));
+      if (interaction.customId.startsWith("anime_rate_"))  return await handleAnimeRate(interaction, db, interaction.customId.replace("anime_rate_", ""));
+      if (interaction.customId.startsWith("anime_trailer_")) return await handleAnimeTrailer(interaction, interaction.customId.replace("anime_trailer_", ""));
+      if (interaction.customId.startsWith("anime_list_"))  {
+        const [,, status, malId] = interaction.customId.split("_");
+        return await handleAnimeListAction(interaction, db, status, malId);
+      }
 
       // ─── أزرار لوحة تحكم الأونر ──────────────────────────────────
       if (interaction.customId.startsWith("dmp_")) {
@@ -2573,8 +2606,18 @@ client.on("interactionCreate", async (interaction) => {
     }
   }
 
+  if (interaction.isStringSelectMenu()) {
+    // ─── قوائم مركز الأنمي ───────────────────────────────────────
+    if (interaction.customId === "anime_select_result")  return await handleAnimeSelectResult(interaction, db);
+    if (interaction.customId === "anime_select_episode") return await handleAnimeSelectEpisode(interaction, db);
+  }
+
   if (interaction.isModalSubmit()) {
     try {
+
+      // ─── مودالات مركز الأنمي ─────────────────────────────────────
+      if (interaction.customId === "anime_search_modal") return await handleAnimeSearchModal(interaction, db);
+      if (interaction.customId === "anime_rate_modal")   return await handleAnimeRateModal(interaction, db);
 
       if (interaction.customId === SUGGESTION_MODAL_ID) {
         const text = interaction.fields.getTextInputValue(SUGGESTION_INPUT_ID);
