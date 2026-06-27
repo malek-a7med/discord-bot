@@ -49,6 +49,7 @@ import {
   handleAnimeEpisodes, handleAnimeSelectEpisode,
   handleAnimeRate, handleAnimeRateModal,
   handleAnimeListAction, handleAnimeTrailer,
+  handleAnimeRecommend, handleAnimePublish,
 } from "./commands/anime.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -4132,11 +4133,13 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── أزرار نظام الأنمي ────────────────────────────────────────
-      if (interaction.customId === "anime_search_btn")   return await handleAnimeSearchBtn(interaction);
-      if (interaction.customId === "anime_trending_btn") return await handleAnimeTrending(interaction);
-      if (interaction.customId === "anime_season_btn")   return await handleAnimeSeason(interaction);
-      if (interaction.customId === "anime_mylist_btn")   return await handleAnimeMyList(interaction, db);
-      if (interaction.customId === "anime_profile_btn")  return await handleAnimeProfile(interaction, db);
+      if (interaction.customId === "anime_search_btn")    return await handleAnimeSearchBtn(interaction);
+      if (interaction.customId === "anime_trending_btn")  return await handleAnimeTrending(interaction);
+      if (interaction.customId === "anime_season_btn")    return await handleAnimeSeason(interaction);
+      if (interaction.customId === "anime_mylist_btn")    return await handleAnimeMyList(interaction, db);
+      if (interaction.customId === "anime_profile_btn")   return await handleAnimeProfile(interaction, db);
+      if (interaction.customId === "anime_recommend_btn") return await handleAnimeRecommend(interaction, db);
+      if (interaction.customId === "anime_publish_btn")   return await handleAnimePublish(interaction);
 
       if (interaction.customId.startsWith("anime_eps_")) {
         const malId = parseInt(interaction.customId.replace("anime_eps_", ""));

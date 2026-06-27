@@ -172,27 +172,32 @@ export function buildAnimePanel() {
     .setTitle("🎌 مركز الأنمي — Zangi Bot")
     .setDescription(
       "**أهلاً بك في مركز الأنمي! 🌸**\n\n" +
-      "هنا تقدر تبحث عن أي أنمي، تتابع قوايم مشاهدتك، تشوف الأحدث، وكتير أكتر!\n\n" +
-      "🔍 **بحث** — ابحث عن أي أنمي\n" +
+      "🔍 **بحث** — ابحث عن أي أنمي بالاسم\n" +
       "🔥 **رائج** — أشهر الأنميات دلوقتي\n" +
       "🌸 **موسم الآن** — أنمي الموسم الحالي\n" +
-      "📋 **قائمتي** — قوايم مشاهدتك الشخصية\n" +
-      "👤 **ملفي** — إحصائياتك وتقييماتك\n\n" +
-      "*كل حاجة ephemeral — بس أنت اللي تشوفها* 🔒"
+      "🔁 **توصيات** — أنمي مقترح بناءً على قائمتك\n" +
+      "📋 **قائمتي** — قوايم مشاهدتك (watching / completed / plan)\n" +
+      "👤 **ملفي** — إحصائياتك وتقييماتك\n" +
+      "📤 **نشر اللوحة** — ابعت اللوحة دي عامة في الروم عشان الكل يستخدمها\n\n" +
+      "*ردودك الشخصية مخفية — بس أنت اللي تشوفها* 🔒"
     )
-    .setImage("https://i.imgur.com/ZgPzE1h.png")
     .setFooter({ text: "بيانات من MyAnimeList • Jikan API v4" })
     .setTimestamp();
 
-  const row = new ActionRowBuilder().addComponents(
+  const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("anime_search_btn").setLabel("🔍 بحث").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("anime_trending_btn").setLabel("🔥 رائج").setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId("anime_season_btn").setLabel("🌸 موسم الآن").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("anime_recommend_btn").setLabel("🔁 توصيات").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("anime_publish_btn").setLabel("📤 نشر اللوحة").setStyle(ButtonStyle.Secondary),
+  );
+
+  const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("anime_mylist_btn").setLabel("📋 قائمتي").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("anime_profile_btn").setLabel("👤 ملفي").setStyle(ButtonStyle.Secondary),
   );
 
-  return { embeds: [embed], components: [row] };
+  return { embeds: [embed], components: [row1, row2] };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -731,6 +736,105 @@ export async function handleAnimeTrailer(interaction, malId) {
     });
   } catch (e) {
     return interaction.editReply({ content: `❌ خطأ: ${e.message}` });
+  }
+}
+
+// ─── توصيات بناءً على قائمة المستخدم ────────────────────────
+export async function handleAnimeRecommend(interaction, db) {
+  await interaction.deferReply({ ephemeral: true });
+
+  const profile   = db.getAnimeProfile(interaction.user.id);
+  const allWatched = [...(profile.completed || []), ...(profile.watching || [])];
+
+  // لو القائمة فاضية، نوصي من أفضل الأنميات عموماً
+  if (!allWatched.length) {
+    try {
+      const data = await cachedJikan("top_all", "/top/anime", { filter: "bypopularity", limit: 10 });
+      const list = data.data || [];
+      const options = list.slice(0, 10).map(a => ({
+        label: (a.title_english || a.title).slice(0, 100),
+        description: `⭐ ${a.score || "N/A"} • ${a.genres?.slice(0,2).map(g=>g.name).join(", ") || ""}`,
+        value: `${a.mal_id}`,
+      }));
+      const embed = new EmbedBuilder()
+        .setColor(0x9b59b6)
+        .setTitle("🔁 توصيات — الأكثر شعبية")
+        .setDescription("لسه ما عندكش قائمة مشاهدة، فده أفضل الأنميات عموماً:\n*(أضف أنمي لقائمتك عشان التوصيات تبقى شخصية أكتر)*");
+      return interaction.editReply({ embeds: [embed], components: [
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder().setCustomId("anime_select_result").setPlaceholder("اختار أنمي...").addOptions(options)
+        )
+      ]});
+    } catch (e) {
+      return interaction.editReply({ content: "❌ فشل تحميل التوصيات." });
+    }
+  }
+
+  // اختار أنمي عشوائي من القائمة عشان نجيب توصيات منه
+  const ratings = profile.ratings || {};
+  // الأعلى تقييم أو أي حاجة من القائمة
+  const sorted = allWatched
+    .map(a => ({ ...a, score: ratings[a.malId] || 0 }))
+    .sort((a, b) => b.score - a.score);
+
+  const watchedIds = new Set(allWatched.map(a => a.malId));
+  let recs = [];
+
+  // جرب أول 3 أنميات عشان تلاقي توصيات كافية
+  for (const entry of sorted.slice(0, 3)) {
+    try {
+      const data = await jikan(`/anime/${entry.malId}/recommendations`);
+      const items = (data.data || [])
+        .filter(r => !watchedIds.has(r.entry?.mal_id))
+        .slice(0, 5);
+      recs.push(...items.map(r => r.entry));
+      if (recs.length >= 8) break;
+    } catch { continue; }
+  }
+
+  // شيل المكرر
+  const seen = new Set();
+  recs = recs.filter(a => { if (!a?.mal_id || seen.has(a.mal_id)) return false; seen.add(a.mal_id); return true; }).slice(0, 10);
+
+  if (!recs.length) {
+    return interaction.editReply({ content: "❌ ما لقيناش توصيات — جرب تضيف أنميات أكتر في قائمتك." });
+  }
+
+  const embed = new EmbedBuilder()
+    .setColor(0x9b59b6)
+    .setTitle("🔁 توصيات مخصصة ليك")
+    .setDescription(
+      `بناءً على قائمتك (${allWatched.length} أنمي)، ده اللي ممكن يعجبك:\n\n` +
+      recs.map((a, i) => `**${i+1}.** **[${(a.title_english || a.title || "—").slice(0,45)}](https://myanimelist.net/anime/${a.mal_id})**`).join("\n")
+    )
+    .setFooter({ text: "اختار من القايمة عشان تشوف تفاصيله" });
+
+  const options = recs.map(a => ({
+    label: (a.title_english || a.title || "أنمي").slice(0, 100),
+    description: `MAL ID: ${a.mal_id}`,
+    value: `${a.mal_id}`,
+  }));
+
+  return interaction.editReply({ embeds: [embed], components: [
+    new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder().setCustomId("anime_select_result").setPlaceholder("اختار أنمي من التوصيات...").addOptions(options)
+    )
+  ]});
+}
+
+// ─── نشر اللوحة في الروم عاملة ──────────────────────────────
+export async function handleAnimePublish(interaction) {
+  try {
+    await interaction.channel.send(buildAnimePanel());
+    return interaction.reply({
+      content: `✅ تم نشر لوحة الأنمي في <#${interaction.channel.id}>!\nدلوقتي أي حد في الروم يقدر يستخدمها.`,
+      ephemeral: true,
+    });
+  } catch (e) {
+    return interaction.reply({
+      content: `❌ مش قادر أنشر في الروم ده — تأكد إن البوت عنده صلاحية إرسال رسايل.\n*${e.message}*`,
+      ephemeral: true,
+    });
   }
 }
 
