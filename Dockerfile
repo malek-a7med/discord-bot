@@ -8,10 +8,14 @@ RUN corepack enable && corepack prepare yarn@stable --activate
 
 WORKDIR /app
 
+ENV NODE_ENV=development
+
 COPY package*.json ./
 
-RUN yarn install --production=false
+RUN yarn install
 
 COPY . .
+
+ENV NODE_ENV=production
 
 CMD ["npm", "start"]
