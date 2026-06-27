@@ -28,7 +28,6 @@ import {
   handleOcrUpload
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount } from "./helpers/owner-ai.js";
-import { battleCommand, handleBattleCommand, handleBattleButton, handleBattleModal } from "./commands/battle.js";
 import { scanMessage as autoModScan, getSettings as amGetSettings, setFeature as amSetFeature, getAllFeatures as amGetAllFeatures } from "./helpers/auto-mod.js";
 import { modWarnCommands, handleModWarnCommand, handleWarnsPagination } from "./commands/moderation.js";
 
@@ -412,7 +411,6 @@ const LEGACY_COMMANDS = [
   new SlashCommandBuilder()
     .setName("قائمة-مبلوكين")
     .setDescription("اعرض كل اليوزرز اللي عندهم بلوك نشط دلوقتي [أونر فقط]"),
-  battleCommand,
   new SlashCommandBuilder()
     .setName("اوتومود-لوج")
     .setDescription("تعيين قناة لوج الأوتو مود [أونر فقط]")
@@ -1743,9 +1741,6 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
       }
 
-      if (cmd === "مصارعة") {
-        return await handleBattleCommand(interaction, db, geminiModel());
-      }
 
       if (cmd === "العاب") {
         if (activeGames.has(channel.id)) return interaction.reply({ content: "❌ فيه لعبة شغالة هنا بالفعل!", flags: 64 });
@@ -1946,7 +1941,7 @@ client.on("interactionCreate", async (interaction) => {
             },
             {
               name: "🎮 ألعاب",
-              value: "`/الألعاب` `/العاب` `/مصارعة` `/احدث-المميزات`",
+              value: "`/الألعاب` `/العاب` `/احدث-المميزات`",
               inline: false,
             },
             {
@@ -2298,10 +2293,6 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     try {
 
-      // ─── أزرار مصارعة الكلام ──────────────────────────────────────
-      if (interaction.customId.startsWith("btl_")) {
-        return await handleBattleButton(interaction, db, geminiModel());
-      }
 
       // ─── أزرار لوحة تحكم الأونر ──────────────────────────────────
       if (interaction.customId.startsWith("dmp_")) {
@@ -2584,10 +2575,6 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
-      // ─── مودال مصارعة الكلام ────────────────────────────────────
-      if (interaction.customId.startsWith("btl_modal_")) {
-        return await handleBattleModal(interaction, db, geminiModel());
-      }
 
       if (interaction.customId === SUGGESTION_MODAL_ID) {
         const text = interaction.fields.getTextInputValue(SUGGESTION_INPUT_ID);
