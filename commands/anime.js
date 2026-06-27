@@ -389,11 +389,18 @@ export async function handleAnimeSearchModal(interaction, db) {
     const data = await jikan("/anime", { q: query, limit: 8, sfw: false });
     results = data.data || [];
   } catch (e) {
-    const isMalDown = e?.status === 503 || e?.status === 504 || e?.message?.includes("504") || e?.message?.includes("503");
-    const msg = isMalDown
-      ? "❌ موقع **MyAnimeList** واقع دلوقتي — البحث مش شغال مؤقتاً، جرب بعد شوية."
-      : "❌ فشل البحث — جرب تاني بعد شوية.";
-    return interaction.editReply({ content: msg });
+    // MAL/Jikan واقع — ندور على المواقع البديلة مباشرةً
+    const siteLinks = buildFallbackLinks(query);
+    const embed = new EmbedBuilder()
+      .setColor(0xff6b35)
+      .setTitle(`🔍 بحث عن: "${query}"`)
+      .setDescription(
+        `⚠️ **MyAnimeList** مش متاح دلوقتي — اتفضّل ابحث على المواقع دي مباشرةً:\n\n` +
+        siteLinks.map(l => `• [**${l.name}**](${l.url})`).join("\n")
+      )
+      .setFooter({ text: "اضغط على أي موقع عشان تدور على الأنمي" })
+      .setTimestamp();
+    return interaction.editReply({ embeds: [embed] });
   }
 
   if (!results.length) {
