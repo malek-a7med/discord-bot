@@ -16,6 +16,7 @@ import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, StringSelectMenuBuilder,
   ModalBuilder, TextInputBuilder, TextInputStyle,
+  ChannelType, ThreadAutoArchiveDuration,
 } from "discord.js";
 
 // ─── Jikan API v4 ────────────────────────────────────────────
@@ -48,6 +49,23 @@ async function cachedJikan(key, path, params = {}) {
   const data = await jikan(path, params);
   _cache.set(key, { data, ts: Date.now() });
   return data;
+}
+
+// ─── YouTube Episode Search ───────────────────────────────────
+async function searchYouTubeEpisode(title, epNum) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  const query = `${title} episode ${epNum}`;
+  if (apiKey) {
+    try {
+      const q = encodeURIComponent(query);
+      const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${q}&type=video&maxResults=1&key=${apiKey}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      const data = await res.json();
+      const videoId = data.items?.[0]?.id?.videoId;
+      if (videoId) return { url: `https://www.youtube.com/watch?v=${videoId}`, found: true };
+    } catch {}
+  }
+  return { url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, found: false };
 }
 
 // ─── Session store (نتائج البحث + صفحة الأنمي + حلقات) ─────
@@ -574,7 +592,7 @@ export async function handleAnimeEpisodes(interaction, db, malId) {
   }
 }
 
-// ─── اختيار حلقة وإرسال رابط في الخاص ──────────────────────
+// ─── اختيار حلقة وإرسال فيديو يوتيوب مباشرةً ───────────────
 export async function handleAnimeSelectEpisode(interaction, db) {
   await interaction.deferUpdate();
 
@@ -587,53 +605,37 @@ export async function handleAnimeSelectEpisode(interaction, db) {
     const animeData = await cachedJikan(`anime_${malId}`, `/anime/${malId}/full`);
     const anime     = animeData.data;
     const title     = anime.title_english || anime.title;
-    const titleJP   = anime.title;
 
     // تحديث progress في قايمة المستخدم
     db.updateAnimeProgress(interaction.user.id, malId, epNum, anime.episodes || 0);
 
-    // بناء روابط المشاهدة
-    const encoded    = encodeURIComponent(titleJP || title);
-    const encodedEN  = encodeURIComponent(title);
+    // البحث عن الحلقة على يوتيوب
+    const yt = await searchYouTubeEpisode(title, epNum);
 
-    const watchLinks = [
-      { name: "🟢 AniWatch.to",    url: `https://aniwatch.to/search?keyword=${encodedEN}` },
-      { name: "🔵 Gogoanime",      url: `https://gogoanime.tel/search.html?keyword=${encodedEN}` },
-      { name: "🟡 Crunchyroll",    url: `https://www.crunchyroll.com/search?q=${encodedEN}` },
-      { name: "🔴 AnimeKai",       url: `https://animekai.to/browser?keyword=${encodedEN}` },
-      { name: "⚫ MyAnimeList",     url: `https://myanimelist.net/anime/${malId}` },
-    ];
-
-    const dmEmbed = new EmbedBuilder()
+    const embed = new EmbedBuilder()
       .setColor(scoreColor(anime.score))
-      .setTitle(`▶️ ${title}`)
+      .setTitle(`▶️ ${title} — حلقة ${epNum}`)
       .setDescription(
-        `**حلقة ${epNum}** ${anime.episodes ? `من ${anime.episodes}` : ""}\n\n` +
-        `📺 روابط المشاهدة:\n` +
-        watchLinks.map(l => `• [${l.name}](${l.url})`).join("\n") +
-        `\n\n💡 *ابحث عن الاسم في أي موقع من فوق وهتلاقي الحلقة مباشرة*`
+        `${yt.found
+          ? `🎬 **وجدنا الحلقة على يوتيوب!** الرابط في الأسفل 👇`
+          : `🔍 **نتيجة بحث يوتيوب** — اختار الحلقة الصح من الصفحة`
+        }\n\n` +
+        `📈 تقدمك: حلقة **${epNum}**/${anime.episodes || "?"}`
       )
       .setThumbnail(anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url)
       .addFields(
-        { name: "📊 تقييم الأنمي", value: anime.score ? `⭐ ${anime.score}/10` : "لا يوجد", inline: true },
-        { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`, inline: true },
-        { name: "📈 تقدمك", value: `حلقة **${epNum}**/${anime.episodes || "?"}`, inline: true },
+        { name: "📊 التقييم",       value: anime.score ? `⭐ ${anime.score}/10` : "—", inline: true },
+        { name: "📺 إجمالي الحلقات", value: `${anime.episodes || "؟"} حلقة`,           inline: true },
       )
       .setFooter({ text: `MAL ID: ${malId} • زنجي Bot 🎌` })
       .setTimestamp();
 
-    try {
-      await interaction.user.send({ embeds: [dmEmbed] });
-      await interaction.followUp({
-        content: `✅ **تم إرسال رابط الحلقة ${epNum} في الخاص!** 📬\nتقدمك اتسجّل تلقائياً.`,
-        ephemeral: true,
-      });
-    } catch {
-      // لو الـ DM مغلق، نرد في نفس المكان
-      await interaction.editReply({
-        content: `❌ مش قادر أبعتلك في الخاص — تأكد إن الـ DM مفتوح.\n\n📺 **روابط المشاهدة لحلقة ${epNum}:**\n${watchLinks.map(l => `• [${l.name}](${l.url})`).join("\n")}`,
-      });
-    }
+    // إرسال الـ embed + رابط يوتيوب — Discord يعمل embed تلقائي للفيديو
+    await interaction.followUp({
+      content: yt.url,
+      embeds: [embed],
+      ephemeral: true,
+    });
   } catch (e) {
     await interaction.followUp({ content: `❌ خطأ: ${e.message}`, ephemeral: true });
   }
@@ -822,17 +824,57 @@ export async function handleAnimeRecommend(interaction, db) {
   ]});
 }
 
-// ─── نشر اللوحة في الروم عاملة ──────────────────────────────
+// ─── نشر اللوحة في الروم + إنشاء ثريد أخبار مقفول ──────────
 export async function handleAnimePublish(interaction) {
   try {
+    // 1) نشر اللوحة عاملة في الروم
     await interaction.channel.send(buildAnimePanel());
+
+    // 2) إيجاد أو إنشاء ثريد الأخبار المقفول
+    let newsThread = null;
+    try {
+      await interaction.channel.threads.fetchActive();
+      newsThread = interaction.channel.threads.cache.find(t => t.name === "📰 أخبار الأنمي");
+    } catch {}
+
+    if (!newsThread) {
+      newsThread = await interaction.channel.threads.create({
+        name: "📰 أخبار الأنمي",
+        autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
+        type: ChannelType.PublicThread,
+        reason: "ثريد أخبار الأنمي التلقائي",
+      });
+
+      // إرسال رسالة الترحيب في الثريد ثم قفله
+      await newsThread.send({
+        embeds: [new EmbedBuilder()
+          .setColor(0x2b2d31)
+          .setTitle("📰 أخبار الأنمي")
+          .setDescription(
+            "**أهلاً بيك في ثريد أخبار الأنمي! 🎌**\n\n" +
+            "هنا البوت بيبعت تلقائياً:\n" +
+            "• 🔔 إشعارات الحلقات الجديدة\n" +
+            "• 🔥 أنمي موسم الآن\n" +
+            "• 📊 إحصائيات أسبوعية\n\n" +
+            "*الثريد ده مخصص للبوت بس — مش ممكن ترد فيه.*"
+          )
+          .setFooter({ text: "زنجي Bot 🤖" })
+          .setTimestamp()
+        ],
+      });
+
+      await newsThread.setLocked(true, "ثريد للبوت بس — مقفول للأعضاء");
+    }
+
     return interaction.reply({
-      content: `✅ تم نشر لوحة الأنمي في <#${interaction.channel.id}>!\nدلوقتي أي حد في الروم يقدر يستخدمها.`,
+      content:
+        `✅ **تم نشر لوحة الأنمي في <#${interaction.channel.id}>!**\n` +
+        `🔒 **ثريد الأخبار:** <#${newsThread.id}> — مقفول، البوت بس يبعت فيه.`,
       ephemeral: true,
     });
   } catch (e) {
     return interaction.reply({
-      content: `❌ مش قادر أنشر في الروم ده — تأكد إن البوت عنده صلاحية إرسال رسايل.\n*${e.message}*`,
+      content: `❌ خطأ: ${e.message}\nتأكد إن البوت عنده صلاحيات **Manage Threads** و **Send Messages**.`,
       ephemeral: true,
     });
   }
