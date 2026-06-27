@@ -24,7 +24,7 @@ const JIKAN = "https://api.jikan.moe/v4";
 const JIKAN_DELAY_MS = 400; // احترام rate limit (3 req/sec)
 
 let _lastJikanCall = 0;
-async function jikan(path, params = {}) {
+async function jikan(path, params = {}, _retries = 3) {
   const now = Date.now();
   const wait = JIKAN_DELAY_MS - (now - _lastJikanCall);
   if (wait > 0) await new Promise(r => setTimeout(r, wait));
@@ -33,11 +33,33 @@ async function jikan(path, params = {}) {
   const url = new URL(`${JIKAN}${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
-  const res = await fetch(url.toString(), {
-    headers: { "Accept": "application/json", "User-Agent": "ZangiDiscordBot/3.0" },
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`Jikan ${res.status}: ${path}`);
+  let res;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { "Accept": "application/json", "User-Agent": "ZangiDiscordBot/3.0" },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch (fetchErr) {
+    // timeout أو network error — نجرب تاني
+    if (_retries > 1) {
+      await new Promise(r => setTimeout(r, 1500));
+      return jikan(path, params, _retries - 1);
+    }
+    throw fetchErr;
+  }
+
+  // 429 = rate limit، 503/504 = MAL واقع — نجرب تاني
+  if ((res.status === 429 || res.status === 503 || res.status === 504) && _retries > 1) {
+    const delay = res.status === 429 ? 2000 : 1500;
+    await new Promise(r => setTimeout(r, delay));
+    return jikan(path, params, _retries - 1);
+  }
+
+  if (!res.ok) {
+    const err = new Error(`Jikan ${res.status}: ${path}`);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -367,7 +389,11 @@ export async function handleAnimeSearchModal(interaction, db) {
     const data = await jikan("/anime", { q: query, limit: 8, sfw: false });
     results = data.data || [];
   } catch (e) {
-    return interaction.editReply({ content: "❌ فشل البحث — جرب تاني بعد شوية." });
+    const isMalDown = e?.status === 503 || e?.status === 504 || e?.message?.includes("504") || e?.message?.includes("503");
+    const msg = isMalDown
+      ? "❌ موقع **MyAnimeList** واقع دلوقتي — البحث مش شغال مؤقتاً، جرب بعد شوية."
+      : "❌ فشل البحث — جرب تاني بعد شوية.";
+    return interaction.editReply({ content: msg });
   }
 
   if (!results.length) {
