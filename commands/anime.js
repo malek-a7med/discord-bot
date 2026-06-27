@@ -821,9 +821,9 @@ export async function handleAnimeRecommend(interaction, db) {
 }
 
 // ─── نشر اللوحة في الروم + إنشاء ثريد أخبار مقفول ──────────
-export async function handleAnimePublish(interaction) {
+export async function handleAnimePublish(interaction, db) {
   try {
-    // 1) نشر اللوحة عاملة في الروم
+    // 1) نشر اللوحة عامة في الروم
     await interaction.channel.send(buildAnimePanel());
 
     // 2) إيجاد أو إنشاء ثريد الأخبار المقفول
@@ -841,7 +841,6 @@ export async function handleAnimePublish(interaction) {
         reason: "ثريد أخبار الأنمي التلقائي",
       });
 
-      // إرسال رسالة الترحيب في الثريد ثم قفله
       await newsThread.send({
         embeds: [new EmbedBuilder()
           .setColor(0x2b2d31)
@@ -849,9 +848,9 @@ export async function handleAnimePublish(interaction) {
           .setDescription(
             "**أهلاً بيك في ثريد أخبار الأنمي! 🎌**\n\n" +
             "هنا البوت بيبعت تلقائياً:\n" +
-            "• 🔔 إشعارات الحلقات الجديدة\n" +
-            "• 🔥 أنمي موسم الآن\n" +
-            "• 📊 إحصائيات أسبوعية\n\n" +
+            "• 🔔 إشعارات الحلقات الجديدة فور ما تنزل\n" +
+            "• 🔥 أنمي الموسم الحالي\n" +
+            "• 📡 تحديثات مستمرة\n\n" +
             "*الثريد ده مخصص للبوت بس — مش ممكن ترد فيه.*"
           )
           .setFooter({ text: "زنجي Bot 🤖" })
@@ -862,10 +861,13 @@ export async function handleAnimePublish(interaction) {
       await newsThread.setLocked(true, "ثريد للبوت بس — مقفول للأعضاء");
     }
 
+    // 3) حفظ thread ID في الداتابيس عشان نظام الأخبار يعرف يبعت فين
+    if (db) db.setConfig("animeNewsThreadId", newsThread.id);
+
     return interaction.reply({
       content:
         `✅ **تم نشر لوحة الأنمي في <#${interaction.channel.id}>!**\n` +
-        `🔒 **ثريد الأخبار:** <#${newsThread.id}> — مقفول، البوت بس يبعت فيه.`,
+        `🔒 **ثريد الأخبار:** <#${newsThread.id}> — مقفول، البوت بيبعت فيه الأخبار تلقائياً.`,
       ephemeral: true,
     });
   } catch (e) {
@@ -874,6 +876,98 @@ export async function handleAnimePublish(interaction) {
       ephemeral: true,
     });
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  📰 نظام أخبار الأنمي — يبعت في الثريد فور ما حلقة جديدة تطلع
+// ═══════════════════════════════════════════════════════════════
+
+export function scheduleAnimeNews(client, db) {
+  const CHECK_INTERVAL_MS = 60 * 60 * 1000; // كل ساعة
+
+  async function checkAndPostNews() {
+    const threadId = db.getConfig("animeNewsThreadId");
+    if (!threadId) return; // لو الثريد ملوش ID معناها لسه ما اتنشأش
+
+    // جيب الثريد
+    let thread;
+    try {
+      thread = await client.channels.fetch(threadId);
+    } catch {
+      return; // الثريد اتحذف أو البوت مش قادر يوصله
+    }
+    if (!thread) return;
+
+    // جيب قائمة الأنمي اللي بتعرض دلوقتي
+    let airingList;
+    try {
+      const res = await fetch("https://api.jikan.moe/v4/schedules/now?limit=25", {
+        headers: { "Accept": "application/json", "User-Agent": "ZangiDiscordBot/3.0" },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      airingList = json.data || [];
+    } catch {
+      return;
+    }
+
+    if (!airingList.length) return;
+
+    // المعرفات اللي اتبعتت قبل كده (عشان منكررش)
+    const postedIds = new Set(db.getConfig("animeNewsPosted", []));
+    const toPost    = airingList.filter(a => a.mal_id && !postedIds.has(a.mal_id));
+
+    if (!toPost.length) return;
+
+    // ابعت كل أنمي جديد على حدى
+    for (const anime of toPost.slice(0, 5)) {
+      const title   = anime.title_english || anime.title;
+      const titleEnc = encodeURIComponent(title);
+      const score   = anime.score ? `⭐ ${anime.score}/10` : "⭐ جديد";
+      const genres  = anime.genres?.slice(0, 3).map(g => g.name).join(" • ") || "—";
+      const episodes = anime.episodes ? `${anime.episodes} حلقة` : "يعرض الآن 📡";
+
+      const watchLinks = buildWatchLinks(title, "");
+
+      const embed = new EmbedBuilder()
+        .setColor(0xe74c3c)
+        .setTitle(`📡 حلقة جديدة — ${title}`)
+        .setURL(anime.url || `https://myanimelist.net/anime/${anime.mal_id}`)
+        .setDescription(
+          `${score} • ${episodes} • ${genres}\n\n` +
+          `**شاهد الحلقة الجديدة:**\n` +
+          watchLinks.map(l => `• [${l.name}](${l.url})`).join("\n")
+        )
+        .setTimestamp();
+
+      if (anime.images?.jpg?.image_url) {
+        embed.setThumbnail(anime.images.jpg.image_url);
+      }
+
+      try {
+        await thread.send({ embeds: [embed] });
+        postedIds.add(anime.mal_id);
+        // تأخير بسيط بين كل رسالة عشان ما نضربش rate limit
+        await new Promise(r => setTimeout(r, 1500));
+      } catch {
+        // لو الثريد مش شغال نوقف
+        break;
+      }
+    }
+
+    // حفظ المعرفات المنشورة (نحتفظ بآخر 500 بس عشان الملف ما يكبرش)
+    const updatedList = [...postedIds].slice(-500);
+    db.setConfig("animeNewsPosted", updatedList);
+  }
+
+  // تشغيل فوري بعد دقيقتين من بدء البوت، ثم كل ساعة
+  setTimeout(() => {
+    checkAndPostNews().catch(() => {});
+    setInterval(() => checkAndPostNews().catch(() => {}), CHECK_INTERVAL_MS);
+  }, 2 * 60 * 1000);
+
+  console.log("✅ [AnimeNews] نظام أخبار الأنمي جاهز — بيتحقق كل ساعة");
 }
 
 // ─── تعريف الأمر الوحيد ──────────────────────────────────────

@@ -460,6 +460,17 @@ class Database {
     return !!(this.data.banList && this.data.banList[userId]);
   }
 
+  getConfig(key, defaultValue = null) {
+    if (!this.data.config) this.data.config = {};
+    return this.data.config[key] !== undefined ? this.data.config[key] : defaultValue;
+  }
+
+  setConfig(key, value) {
+    if (!this.data.config) this.data.config = {};
+    this.data.config[key] = value;
+    this.save();
+  }
+
   clearOldData(maxAge = 86400000) {
     // Clear spam tracking after 24 hours
     const now = Date.now();

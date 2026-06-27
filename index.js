@@ -50,6 +50,7 @@ import {
   handleAnimeRate, handleAnimeRateModal,
   handleAnimeListAction, handleAnimeTrailer,
   handleAnimeRecommend, handleAnimePublish,
+  scheduleAnimeNews,
 } from "./commands/anime.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -1404,6 +1405,7 @@ client.once("clientReady", async (c) => {
   setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
   scheduleDailyChallenge(c, db);
+  scheduleAnimeNews(c, db);
 
   // ── إعطاء البوت صلاحيات كاملة (Administrator) في كل السيرفرات ──
   for (const [, guild] of c.guilds.cache) {
@@ -4139,7 +4141,7 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId === "anime_mylist_btn")    return await handleAnimeMyList(interaction, db);
       if (interaction.customId === "anime_profile_btn")   return await handleAnimeProfile(interaction, db);
       if (interaction.customId === "anime_recommend_btn") return await handleAnimeRecommend(interaction, db);
-      if (interaction.customId === "anime_publish_btn")   return await handleAnimePublish(interaction);
+      if (interaction.customId === "anime_publish_btn")   return await handleAnimePublish(interaction, db);
 
       if (interaction.customId.startsWith("anime_eps_")) {
         const malId = parseInt(interaction.customId.replace("anime_eps_", ""));
