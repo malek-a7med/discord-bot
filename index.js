@@ -2176,8 +2176,9 @@ client.on("messageCreate", async (msg) => {
     } catch { }
   }
 
-  // 3. "يا زنجي" بالظبط من الأونر فقط — الرسالة لازم تكون دي بس بدون أي كلام تاني
-  const calledByName = /^يا\s+زنجي$/i.test(msg.content.trim()) && isOwner;
+  // 3. "يا زنجي" من الأونر فقط — لازم الكلمتين دول يكونوا موجودين متراصين
+  //    يرد لو قال "يا زنجي" لوحدها أو "يا زنجي إيه رأيك..." — بس مش لو قال "زنجي" بدون "يا"
+  const calledByName = /يا\s+زنجي/i.test(msg.content) && isOwner;
 
   if (!calledByName && !isBotDirectMention && !isReplyToBot) return;
 
