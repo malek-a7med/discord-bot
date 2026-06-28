@@ -2162,11 +2162,24 @@ client.on("messageCreate", async (msg) => {
     }
   }
 
-  const isOwner      = config.isOwner(msg.author.id);
-  // البوت مبيردش على أي منشن أو ذكر اسم — بس لو الأونر كتب "يا زنجي" بالظبط
-  const calledByName = /يا زنجي/i.test(msg.content) && isOwner;
+  const isOwner = config.isOwner(msg.author.id);
 
-  if (!calledByName) return;
+  // 1. منشن مباشر للبوت (مش @everyone أو @here) — بس لو ذكر البوت بالـ @
+  const isBotDirectMention = msg.mentions.users.has(client.user.id);
+
+  // 2. ريبلاي على رسالة البوت
+  let isReplyToBot = false;
+  if (msg.reference?.messageId) {
+    try {
+      const refMsg = await msg.channel.messages.fetch(msg.reference.messageId);
+      isReplyToBot = refMsg.author.id === client.user.id;
+    } catch { }
+  }
+
+  // 3. "يا زنجي" بالظبط من الأونر فقط — الرسالة لازم تكون دي بس بدون أي كلام تاني
+  const calledByName = /^يا\s+زنجي$/i.test(msg.content.trim()) && isOwner;
+
+  if (!calledByName && !isBotDirectMention && !isReplyToBot) return;
 
   msg.channel.sendTyping().catch(() => {});
 

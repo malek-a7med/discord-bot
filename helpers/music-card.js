@@ -85,10 +85,13 @@ async function getThumb(url) {
 
 const BG_IMAGE_PATH = join(__dirname, '..', 'data', 'music-bg.png');
 let _cachedBg = null;
+let _cachedBgMtime = 0;
 async function loadBgImage() {
-  if (_cachedBg) return _cachedBg;
   try {
+    const { mtimeMs } = await import('fs').then(f => f.promises.stat(BG_IMAGE_PATH));
+    if (_cachedBg && _cachedBgMtime === mtimeMs) return _cachedBg;
     _cachedBg = await loadImage(BG_IMAGE_PATH);
+    _cachedBgMtime = mtimeMs;
     return _cachedBg;
   } catch {
     return null;

@@ -452,8 +452,8 @@ export async function handleAnimeSearchModal(interaction, db) {
 
   const embed = new EmbedBuilder()
     .setColor(0x3498db)
-    .setTitle(`🔍 نتايج البحث: "${query}"`)
-    .setDescription(`وجدت **${results.length}** نتيجة — اختار من القايمة:`);
+    .setTitle(`🔍 نتايج البحث: "${rawQuery}"`)
+    .setDescription(`وجدت **${results.length}** نتيجة — اختار من القايمة:${translatedQuery ? `\n*(البحث عن: ${translatedQuery})*` : ""}`);
 
   const row = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
@@ -938,13 +938,19 @@ export async function handleAnimeListAction(interaction, db, status, malId) {
     const labels = { watching: "أشاهده 📺", completed: "اكتملت ✅", plan: "هشاهده 📌", dropped: "تركته 🚫" };
     db.setAnimeStatus(interaction.user.id, malId, title, status, anime.episodes || 0, anime.images?.jpg?.image_url);
 
+    const viewListRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("anime_mylist_btn").setLabel("📋 عرض قائمتي").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("anime_search_btn").setLabel("🔍 بحث").setStyle(ButtonStyle.Secondary),
+    );
+
     return interaction.reply({
       embeds: [new EmbedBuilder()
-        .setColor(scoreColor(anime.score))
-        .setTitle(`✅ تم التحديث`)
-        .setDescription(`**${title}** اتضاف لقائمة **${labels[status]}**`)
+        .setColor(0x2ecc71)
+        .setTitle(`✅ تم الحفظ في قائمتك!`)
+        .setDescription(`**${title}** اتضاف بنجاح لقائمة **${labels[status]}** 🎉\nاضغط "عرض قائمتي" عشان تشوف قايمتك المحدثة.`)
         .setThumbnail(anime.images?.jpg?.image_url)
         .setTimestamp()],
+      components: [viewListRow],
       ephemeral: true,
     });
   } catch (e) {
