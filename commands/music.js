@@ -220,39 +220,57 @@ export function initMusicSystem(client) {
   // ─── خروج تلقائي لما القناة تفضى ────────────────────────────
   const emptyLeaveTimers = new Map(); // guildId → timeoutHandle
 
+  // دالة مساعدة للخروج الفعلي من القناة
+  async function forceLeaveVoice(guild, textChannel) {
+    try {
+      const q = distube.getQueue(guild.id);
+      if (q?.currentMessage) {
+        await q.currentMessage.delete().catch(() => {});
+        q.currentMessage = null;
+      }
+      if (q) await distube.stop(guild.id).catch(() => {});
+      // تأكد من الخروج حتى لو مفيش queue
+      const botVC = guild.members.me?.voice?.channel;
+      if (botVC) await guild.members.me.voice.disconnect().catch(() => {});
+      textChannel?.send({
+        embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription('👋 القناة فاضية — خرجت تلقائياً!')],
+      }).catch(() => {});
+    } catch {}
+  }
+
   client.on('voiceStateUpdate', async (oldState, newState) => {
     try {
-      const guildId = newState.guild.id || oldState.guild.id;
-      const q = distube.getQueue(guildId);
-      if (!q) return;
-      const botVC = q.voice?.channel;
-      if (!botVC) return;
+      const guild = newState.guild || oldState.guild;
+      const guildId = guild.id;
+
+      // جيب القناة الصوتية للبوت مباشرة (مش محتاج queue)
+      const botVC = guild.members.me?.voice?.channel;
+      if (!botVC) {
+        // البوت مش في قناة — امسح أي تايمر معلّق
+        if (emptyLeaveTimers.has(guildId)) {
+          clearTimeout(emptyLeaveTimers.get(guildId));
+          emptyLeaveTimers.delete(guildId);
+        }
+        return;
+      }
+
       const humans = botVC.members.filter(m => !m.user.bot).size;
+      const q = distube.getQueue(guildId);
 
       if (humans === 0) {
         // فاضية — ابدأ عداد 30 ثانية للخروج
         if (!emptyLeaveTimers.has(guildId)) {
-          q.textChannel?.send({
+          const textCh = q?.textChannel || null;
+          textCh?.send({
             embeds: [new EmbedBuilder().setColor(0xf39c12).setDescription('⚠️ القناة الصوتية فاضية — هخرج تلقائياً في **30 ثانية** لو محدش رجع')],
           }).catch(() => {});
 
           const timer = setTimeout(async () => {
-            try {
-              emptyLeaveTimers.delete(guildId);
-              // تأكد إن القناة لسه فاضية
-              const stillEmpty = botVC.members.filter(m => !m.user.bot).size === 0;
-              if (!stillEmpty) return;
-              const qNow = distube.getQueue(guildId);
-              if (!qNow) return;
-              if (qNow.currentMessage) {
-                await qNow.currentMessage.delete().catch(() => {});
-                qNow.currentMessage = null;
-              }
-              qNow.textChannel?.send({
-                embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription('👋 القناة فاضية — خرجت تلقائياً!')],
-              }).catch(() => {});
-              await distube.stop(guildId).catch(() => {});
-            } catch {}
+            emptyLeaveTimers.delete(guildId);
+            // تأكد إن لسه فاضية
+            const stillEmpty = guild.members.me?.voice?.channel?.members.filter(m => !m.user.bot).size === 0;
+            if (!stillEmpty) return;
+            await forceLeaveVoice(guild, q?.textChannel || null);
           }, 30_000);
 
           emptyLeaveTimers.set(guildId, timer);
@@ -262,8 +280,8 @@ export function initMusicSystem(client) {
         if (emptyLeaveTimers.has(guildId)) {
           clearTimeout(emptyLeaveTimers.get(guildId));
           emptyLeaveTimers.delete(guildId);
-          if (q.paused) q.resume().catch?.(() => {});
-          q.textChannel?.send({
+          if (q?.paused) q.resume().catch?.(() => {});
+          q?.textChannel?.send({
             embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription('▶️ حد رجع! بكمل الموسيقى 🎵')],
           }).catch(() => {});
         }
@@ -466,7 +484,7 @@ export async function handlePlay(interaction) {
     const sourceType = detectSourceType(query);
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
 
-    // ── Spotify ───────────────────────────────────────────────────
+    // ── Spotify — كل الأنواع عن طريق fetchSpotifyContent مباشرة ──
     if (sourceType.startsWith('spotify_')) {
       const typeLabels = {
         spotify_track:      '🎵 جاري جلب الأغنية من Spotify...',
@@ -476,28 +494,40 @@ export async function handlePlay(interaction) {
       };
       await interaction.editReply({ content: typeLabels[sourceType] || '🎵 جاري جلب المحتوى من Spotify...' });
 
-      // ── أغنية منفردة: لو في كريدنشيالز حوّلها لاسم وابحث يوتيوب ──
-      // ── باقي الأنواع (playlist/album/artist/short): SpotifyPlugin يتكلف بيها ──
-      const hasSpotifyCreds = !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
-
-      if (sourceType === 'spotify_track' && hasSpotifyCreds) {
-        let sp;
-        try {
-          sp = await fetchSpotifyContent(query);
-        } catch (apiErr) {
-          console.error('❌ [Music] fetchSpotifyContent فشل، بحاول مع SpotifyPlugin:', apiErr.message);
-          await distube.play(voiceChannel, query, playOptions);
-          return;
-        }
-        await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
-        await distube.play(voiceChannel, sp.tracks[0], playOptions);
-      } else {
-        // ── SpotifyPlugin بيجيب توكن تلقائي (أو بيعمل scraping لو مفيش كريدنشيالز) ──
-        await distube.play(voiceChannel, query, playOptions);
-        await interaction.editReply({ content: '✅ جاري التشغيل من Spotify!' }).catch(() => {});
+      let sp;
+      try {
+        sp = await fetchSpotifyContent(query);
+      } catch (apiErr) {
+        console.error('❌ [Music] fetchSpotifyContent فشل:', apiErr.message);
+        return interaction.editReply({ content: `❌ ${apiErr.message}` });
       }
 
-      return; // ← خروج بعد Spotify
+      await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+
+      if (sp.tracks.length === 1) {
+        await distube.play(voiceChannel, sp.tracks[0], playOptions);
+      } else {
+        await distube.play(voiceChannel, sp.tracks[0], playOptions);
+        ;(async () => {
+          const q = distube.getQueue(interaction.guildId);
+          if (q) q._batchLoading = true;
+          for (let i = 1; i < sp.tracks.length; i++) {
+            try { await distube.play(voiceChannel, sp.tracks[i], { ...playOptions }); } catch {}
+            await new Promise(r => setTimeout(r, 350));
+          }
+          const qEnd = distube.getQueue(interaction.guildId);
+          if (qEnd) {
+            qEnd._batchLoading = false;
+            qEnd.textChannel?.send({
+              embeds: [new EmbedBuilder()
+                .setColor(0x1DB954)
+                .setDescription(`✅ أُضيفت **${sp.tracks.length} أغنية** من Spotify للقائمة 🎵`)],
+            }).catch(() => {});
+          }
+        })();
+      }
+
+      return;
     }
 
     if (sourceType === 'youtube' || sourceType === 'soundcloud') {
@@ -564,6 +594,7 @@ export async function handleStop(interaction) {
 
     const q = distube.getQueue(interaction.guildId);
 
+    // امسح رسالة الداش بورد
     const dashMsg = isButton ? interaction.message : q?.currentMessage;
     if (dashMsg) await dashMsg.delete().catch(() => {});
     if (q?.currentMessage && q.currentMessage.id !== dashMsg?.id) {
@@ -571,14 +602,13 @@ export async function handleStop(interaction) {
     }
     if (q) q.currentMessage = null;
 
-    if (q) {
-      await distube.stop(interaction.guildId).catch(() => {});
-    }
+    // وقّف الموسيقى
+    if (q) await distube.stop(interaction.guildId).catch(() => {});
 
-    // خروج صريح من القناة الصوتية لو البوت لسه فيها
-    const vc = interaction.guild?.members?.me?.voice?.channel;
-    if (vc) {
-      interaction.guild.members.me.voice.disconnect().catch(() => {});
+    // خروج مضمون من القناة الصوتية حتى لو مفيش queue
+    const botMember = interaction.guild?.members?.me;
+    if (botMember?.voice?.channel) {
+      await botMember.voice.disconnect().catch(() => {});
     }
 
     if (!isButton) {
