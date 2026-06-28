@@ -518,12 +518,24 @@ export async function handlePlay(interaction) {
     console.error('❌ [Music] handlePlay:', errMsg);
 
     let msg;
-    if (/private|unavailable|blocked|age.?restricted/i.test(errMsg))
+    // إيرور سبوتيفاي بسبب مفيش كريدنشيالز
+    if (/private or unavailable|SPOTIFY_API_ERROR|embed page/i.test(errMsg)) {
+      msg = [
+        '⚠️ **مش قادر أحمّل البلاي ليست من Spotify!**',
+        '',
+        'سبوتيفاي بيحتاج مفاتيح مجانية عشان يشتغل. اعمل الخطوات دي:',
+        '**١.** روح على: `developer.spotify.com/dashboard`',
+        '**٢.** سجّل دخول وانشئ App جديدة (اسمها أي حاجة)',
+        '**٣.** افتح الـ App وانسخ الـ Client ID والـ Client Secret',
+        '**٤.** حطّهم في ريل واي: `SPOTIFY_CLIENT_ID` و `SPOTIFY_CLIENT_SECRET`',
+      ].join('\n');
+    } else if (/private|blocked|age.?restricted/i.test(errMsg)) {
       msg = `🔒 الأغنية/البلاي ليست دي مش متاحة (private أو blocked)`;
-    else if (/no result|not found|مش لاقي/i.test(errMsg))
-      msg = `❌ مش لاقي الأغنية دي!\n💡 جرب ترفق رابط مباشر من \`open.spotify.com\``;
-    else
+    } else if (/no result|not found|مش لاقي/i.test(errMsg)) {
+      msg = `❌ مش لاقي الأغنية دي! جرب اكتب اسم الأغنية مباشرة`;
+    } else {
       msg = `❌ حصل خطأ: \`${errMsg.slice(0, 300)}\``;
+    }
 
     try { await interaction.editReply({ content: msg }); }
     catch { await interaction.reply({ content: msg, ephemeral: true }).catch(() => {}); }
