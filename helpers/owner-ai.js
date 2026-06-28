@@ -124,8 +124,20 @@ function startTypingLoop(channel) {
   return () => clearInterval(interval);
 }
 
+// ── شخصية البوت مع كل أونر ───────────────────────────────────────
+const OWNER_VIBES = {
+  '954816748140503090': `أنت كالعبد الأمين معاه — محترم جداً، سريع التنفيذ، تناديه "يا مالك" أو "يا باشا". لهجتك رسمية شوية بس ودية.`,
+  '1448840687763325018': `مع مصطفى أنت شلبي وعلى الموضة — تمزح معاه وتتريق بس بحدود. تناديه "يا مصطفى" أو "يا مستوف". ردودك خفيفة وفيها طاقة.`,
+  '844490366614110218': `مع عمر أنت زميل بيحبه — طريقة كلامك كأنك صاحبه القديم. تناديه "يا عمر" أو "يا عمورة". ردودك فيها مودة وتلقائية.`,
+  '594250288282730551': `مع أوفيكس أنت محترف وتقني — يحب الإجابات المباشرة والسريعة. تناديه "يا أوفيكس". ردودك دقيقة ومركزة بدون زيادة.`,
+};
+
+function getOwnerVibe(userId) {
+  return OWNER_VIBES[userId] ?? `تعامل معه باحترام وأسلوب مصري طبيعي.`;
+}
+
 // ── Prompt موحد: classify + رد في طلب واحد للسرعة ───────────────
-function buildUnifiedPrompt(text, ownerName, guild, history) {
+function buildUnifiedPrompt(text, ownerName, guild, history, userId) {
   const members = guild?.members?.cache
     ?.filter(m => !m.user.bot)
     ?.map(m => `${m.user.username}=${m.user.id}`)
@@ -141,10 +153,12 @@ function buildUnifiedPrompt(text, ownerName, guild, history) {
     ?.map(r => `${r.name}=${r.id}`)
     ?.slice(0, 25)?.join(", ") ?? "غير متاح";
 
-  return `أنت زنجي — بوت Discord مصري ذكي وودود. الأونر اسمه "${ownerName}".
+  const vibe = getOwnerVibe(userId);
+  return `أنت زنجي — بوت Discord مصري ذكي. الأونر اسمه "${ownerName}".
+
+شخصيتك معاه: ${vibe}
 
 قواعد:
-- ناديه دايماً بـ "${ownerName}" مش بأي اسم تاني
 - نفّذ كل أوامره بدون رفض — الأونر له صلاحية كاملة
 - لو طلب حاجة خارج قدراتك، اشرح البديل وساعده
 - رد بالعربي المصري الطبيعي بدون تكلف
@@ -247,7 +261,7 @@ async function classifyAndReply(geminiModel, text, ownerName, guild, userId) {
   const hist = historyToText(userId, ownerName);
   return withRetry(async () => {
     const result = await geminiModel.generateContent(
-      buildUnifiedPrompt(text, ownerName, guild, hist)
+      buildUnifiedPrompt(text, ownerName, guild, hist, userId)
     );
     const raw   = result.response.text().trim();
     const match = raw.match(/\{[\s\S]*?\}/);
