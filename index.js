@@ -94,13 +94,14 @@ import { fileURLToPath } from "url";
 
 // ─── Reaction Roles ───────────────────────────────────────────────
 const REACTION_ROLES_PATH = "./data/reaction-roles.json";
-let reactionRoles = {}; // { messageId: { emoji, roleId, guildId } }
+let reactionRoles = {};
 try {
   const raw = fs.readFileSync(REACTION_ROLES_PATH, "utf8");
   reactionRoles = JSON.parse(raw);
 } catch { reactionRoles = {}; }
 function saveReactionRoles() {
   try { fs.writeFileSync(REACTION_ROLES_PATH, JSON.stringify(reactionRoles, null, 2)); } catch {}
+  try { db.setConfig("reactionRoles", reactionRoles); } catch {}
 }
 
 // ── Lock File: منع تشغيل أكتر من نسخة واحدة في نفس الوقت ────────
@@ -127,6 +128,21 @@ const DB_PATH = path.join(__dirname, "server_database.json");
 // ───────────────────────────────────────────────────────────────
 const db = new Database();
 const logger = new Logger(null); // Will set client reference in ready event
+
+// ─── استرجاع reaction roles من الداتابيس لو الملف اترجع فاضي ─────
+{
+  const dbRoles = db.getConfig("reactionRoles", {});
+  const fileCount = Object.keys(reactionRoles).length;
+  const dbCount   = Object.keys(dbRoles).length;
+  if (dbCount > fileCount) {
+    reactionRoles = dbRoles;
+    try { fs.writeFileSync(REACTION_ROLES_PATH, JSON.stringify(reactionRoles, null, 2)); } catch {}
+  }
+  // لو الداتابيس فاضي والملف فيه بيانات، احفظ في الداتابيس
+  if (fileCount > 0 && dbCount === 0) {
+    db.setConfig("reactionRoles", reactionRoles);
+  }
+}
 
 // ───────────────────────────────────────────────────────────────
 //  Legacy Database Functions (for backward compatibility)
@@ -5809,9 +5825,19 @@ client.on("messageReactionAdd", async (reaction, user) => {
     const member = await guild.members.fetch({ user: user.id, force: true }).catch(() => null);
     if (!member) return;
 
-    await member.roles.add(data.roleId).catch(err => {
-      logger.warn(`[ReactionRole] فشل إضافة رول ${data.roleId} لـ ${user.id}: ${err.message}`);
-    });
+    const roleToAdd = guild.roles.cache.get(data.roleId);
+    if (!roleToAdd) {
+      logger.warn(`[ReactionRole] الرول ${data.roleId} مش موجود في السيرفر`);
+      return;
+    }
+    try {
+      await member.roles.add(roleToAdd);
+    } catch (err) {
+      logger.warn(`[ReactionRole] فشل إضافة رول ${roleToAdd.name} لـ ${user.tag}: ${err.message}`);
+      try {
+        await user.send(`❌ **مش قادر أديك رتبة "${roleToAdd.name}"**\nالسبب: ${err.message}\nتواصل مع الأدمن لو المشكلة فضلت.`);
+      } catch {}
+    }
   } catch (err) {
     logger.error("[ReactionRole] خطأ في messageReactionAdd:", err.message);
   }
