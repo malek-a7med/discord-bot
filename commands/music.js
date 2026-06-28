@@ -36,6 +36,52 @@ function detectSourceType(query) {
   return 'text';
 }
 
+// ─── استخراج بلاي ليست سبوتيفاي عن طريق yt-dlp مباشرة ─────────
+async function fetchSpotifyViaYtDlp(url) {
+  const { execFile } = await import('child_process');
+  const { promisify } = await import('util');
+  const execFileAsync = promisify(execFile);
+
+  // حل الـ short link الأول
+  let resolvedUrl = url;
+  if (/spotify\.link\//i.test(url)) {
+    const { default: nodeFetch } = await import('node-fetch');
+    const res = await nodeFetch(url, { redirect: 'follow', timeout: 8000 });
+    resolvedUrl = res.url;
+  }
+
+  try {
+    const { stdout } = await execFileAsync('yt-dlp', [
+      '--dump-json',
+      '--flat-playlist',
+      '--no-warnings',
+      '--no-check-certificate',
+      resolvedUrl,
+    ], { timeout: 60000, maxBuffer: 10 * 1024 * 1024 });
+
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    const tracks = [];
+    let playlistName = 'بلاي ليست سبوتيفاي';
+
+    for (const line of lines) {
+      try {
+        const item = JSON.parse(line);
+        if (item.playlist_title) playlistName = item.playlist_title;
+        const title = item.title || item.track || '';
+        const artist = item.artist || item.uploader || '';
+        if (title) {
+          tracks.push(artist ? `${artist} ${title}`.trim() : title);
+        }
+      } catch {}
+    }
+
+    if (!tracks.length) throw new Error('مش لاقي أغاني في البلاي ليست دي');
+    return { type: 'playlist', name: playlistName, tracks: tracks.slice(0, 100) };
+  } catch (err) {
+    throw new Error(`yt-dlp فشل: ${err.message}`);
+  }
+}
+
 // ─── Spotify token helper ──────────────────────────────────────
 async function getSpotifyToken() {
   const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
@@ -430,41 +476,80 @@ export async function handlePlay(interaction) {
       };
       await interaction.editReply({ content: typeLabels[sourceType] || '🎵 جاري جلب المحتوى من Spotify...' });
 
-      let sp;
-      try {
-        sp = await fetchSpotifyContent(query);
-      } catch (apiErr) {
-        console.error('❌ [Music] fetchSpotifyContent فشل:', apiErr.message);
-        return interaction.editReply({ content: `❌ ${apiErr.message}` });
-      }
+      const hasSpotifyCreds = !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
 
-      if (sp.tracks.length === 1) {
-        // أغنية واحدة
-        await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
-        await distube.play(voiceChannel, sp.tracks[0], playOptions);
+      // لو فيه كريدنشيالز جرب الطريقة الرسمية
+      if (hasSpotifyCreds) {
+        let sp;
+        try {
+          sp = await fetchSpotifyContent(query);
+        } catch (apiErr) {
+          console.error('❌ [Music] fetchSpotifyContent فشل، بحاول عن طريق yt-dlp:', apiErr.message);
+          // فولباك لـ yt-dlp
+          await interaction.editReply({ content: '🔁 جاري المحاولة بطريقة تانية...' });
+          await distube.play(voiceChannel, query, playOptions);
+          return;
+        }
+
+        if (sp.tracks.length === 1) {
+          await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+          await distube.play(voiceChannel, sp.tracks[0], playOptions);
+        } else {
+          await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+          await distube.play(voiceChannel, sp.tracks[0], playOptions);
+          ;(async () => {
+            const q = distube.getQueue(interaction.guildId);
+            if (q) q._batchLoading = true;
+            for (let i = 1; i < sp.tracks.length; i++) {
+              try { await distube.play(voiceChannel, sp.tracks[i], { ...playOptions }); } catch {}
+              await new Promise(r => setTimeout(r, 350));
+            }
+            const qEnd = distube.getQueue(interaction.guildId);
+            if (qEnd) {
+              qEnd._batchLoading = false;
+              qEnd.textChannel?.send({
+                embeds: [new EmbedBuilder()
+                  .setColor(0x1DB954)
+                  .setDescription(`✅ أُضيفت **${sp.tracks.length} أغنية** من Spotify للقائمة 🎵`)],
+              }).catch(() => {});
+            }
+          })();
+        }
       } else {
-        // مجموعة — شغّل الأولى وأضيف الباقي في background
-        await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
-        await distube.play(voiceChannel, sp.tracks[0], playOptions);
+        // مفيش كريدنشيالز — نستخدم yt-dlp عشان نجيب أسماء الأغاني
+        console.log('ℹ️ [Music] مفيش Spotify credentials — بستخدم yt-dlp لاستخراج البلاي ليست');
+        let sp;
+        try {
+          sp = await fetchSpotifyViaYtDlp(query);
+        } catch (ytErr) {
+          console.error('❌ [Music] fetchSpotifyViaYtDlp فشل:', ytErr.message);
+          return interaction.editReply({ content: `❌ مش قادر أحمل البلاي ليست دي: ${ytErr.message}` });
+        }
 
-        // أضيف الباقي بدون إزعاج
-        ;(async () => {
-          const q = distube.getQueue(interaction.guildId);
-          if (q) q._batchLoading = true;
-          for (let i = 1; i < sp.tracks.length; i++) {
-            try { await distube.play(voiceChannel, sp.tracks[i], { ...playOptions }); } catch {}
-            await new Promise(r => setTimeout(r, 350));
-          }
-          const qEnd = distube.getQueue(interaction.guildId);
-          if (qEnd) {
-            qEnd._batchLoading = false;
-            qEnd.textChannel?.send({
-              embeds: [new EmbedBuilder()
-                .setColor(0x1DB954)
-                .setDescription(`✅ أُضيفت **${sp.tracks.length} أغنية** من Spotify للقائمة 🎵`)],
-            }).catch(() => {});
-          }
-        })();
+        if (sp.tracks.length === 1) {
+          await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+          await distube.play(voiceChannel, sp.tracks[0], playOptions);
+        } else {
+          await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+          await distube.play(voiceChannel, sp.tracks[0], playOptions);
+          ;(async () => {
+            const q = distube.getQueue(interaction.guildId);
+            if (q) q._batchLoading = true;
+            for (let i = 1; i < sp.tracks.length; i++) {
+              try { await distube.play(voiceChannel, sp.tracks[i], { ...playOptions }); } catch {}
+              await new Promise(r => setTimeout(r, 350));
+            }
+            const qEnd = distube.getQueue(interaction.guildId);
+            if (qEnd) {
+              qEnd._batchLoading = false;
+              qEnd.textChannel?.send({
+                embeds: [new EmbedBuilder()
+                  .setColor(0x1DB954)
+                  .setDescription(`✅ أُضيفت **${sp.tracks.length} أغنية** من Spotify للقائمة 🎵`)],
+              }).catch(() => {});
+            }
+          })();
+        }
       }
 
       return; // ← خروج بعد Spotify
