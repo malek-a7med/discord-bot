@@ -350,6 +350,7 @@ export function buildAnimePanel() {
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("anime_mylist_btn").setLabel("📋 قائمتي").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("anime_profile_btn").setLabel("👤 ملفي").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("anime_subscribe_btn").setLabel("🔔 اشتراك").setStyle(ButtonStyle.Success),
   );
 
   return { embeds: [embed], components: [row1, row2] };
@@ -1056,6 +1057,49 @@ export async function handleAnimePublish(interaction, db) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  🔔 اشتراك في أخبار الأنمي — DM للمشتركين
+// ═══════════════════════════════════════════════════════════════
+export async function handleAnimeSubscribe(interaction, db) {
+  await interaction.deferReply({ ephemeral: true });
+  const userId = interaction.user.id;
+  const subscribers = new Set(db.getConfig("animeNewsSubscribers", []));
+  const isSubscribed = subscribers.has(userId);
+
+  if (isSubscribed) {
+    subscribers.delete(userId);
+    db.setConfig("animeNewsSubscribers", [...subscribers]);
+    return interaction.editReply({
+      content: "🔕 **تم إلغاء اشتراكك في أخبار الأنمي.**\nمش هتوصلك أخبار تانية على DM.",
+    });
+  } else {
+    // تجربة إن البوت يقدر يبعت DM للمستخدم
+    try {
+      await interaction.user.send({
+        embeds: [new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle("🔔 اشتركت في أخبار الأنمي!")
+          .setDescription(
+            "**تمام! هيوصلك على DM كل ما في حلقة جديدة تطلع 🎌**\n\n" +
+            "عشان تلغي الاشتراك، افتح مركز الأنمي واضغط **🔕 إلغاء الاشتراك**."
+          )
+          .setFooter({ text: "بوت زنجي 🤖" })
+          .setTimestamp()
+        ],
+      });
+    } catch {
+      return interaction.editReply({
+        content: "❌ مش قادر أبعتلك DM!\nافتح **Privacy Settings** في Discord وخلي **Allow direct messages from server members** مفعّلة.",
+      });
+    }
+    subscribers.add(userId);
+    db.setConfig("animeNewsSubscribers", [...subscribers]);
+    return interaction.editReply({
+      content: "✅ **تم الاشتراك! هيوصلك على DM كل ما في حلقة جديدة 🔔**",
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  📰 نظام أخبار الأنمي — يبعت في الثريد فور ما حلقة جديدة تطلع
 // ═══════════════════════════════════════════════════════════════
 
@@ -1103,6 +1147,9 @@ export function scheduleAnimeNews(client, db) {
 
     if (!toPost.length) return;
 
+    // جيب المشتركين عشان نبعتلهم DM
+    const subscribers = db.getConfig("animeNewsSubscribers", []);
+
     // ابعت كل أنمي جديد على حدى
     for (const anime of toPost.slice(0, 5)) {
       const title   = anime.title_english || anime.title;
@@ -1131,6 +1178,16 @@ export function scheduleAnimeNews(client, db) {
       try {
         await thread.send({ embeds: [embed] });
         postedIds.add(anime.mal_id);
+
+        // ابعت DM لكل المشتركين
+        for (const userId of subscribers) {
+          try {
+            const user = await client.users.fetch(userId);
+            await user.send({ embeds: [embed] });
+          } catch {}
+          await new Promise(r => setTimeout(r, 500));
+        }
+
         // تأخير بسيط بين كل رسالة عشان ما نضربش rate limit
         await new Promise(r => setTimeout(r, 1500));
       } catch {

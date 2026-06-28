@@ -50,6 +50,7 @@ import {
   handleAnimeRate, handleAnimeRateModal,
   handleAnimeListAction, handleAnimeTrailer,
   handleAnimeRecommend, handleAnimePublish,
+  handleAnimeSubscribe,
   scheduleAnimeNews,
 } from "./commands/anime.js";
 
@@ -4168,7 +4169,8 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId === "anime_mylist_btn")    return await handleAnimeMyList(interaction, db);
       if (interaction.customId === "anime_profile_btn")   return await handleAnimeProfile(interaction, db);
       if (interaction.customId === "anime_recommend_btn") return await handleAnimeRecommend(interaction, db);
-      if (interaction.customId === "anime_publish_btn")   return await handleAnimePublish(interaction, db);
+      if (interaction.customId === "anime_publish_btn")     return await handleAnimePublish(interaction, db);
+      if (interaction.customId === "anime_subscribe_btn")  return await handleAnimeSubscribe(interaction, db);
 
       if (interaction.customId.startsWith("anime_eps_")) {
         const malId = parseInt(interaction.customId.replace("anime_eps_", ""));
