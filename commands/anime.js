@@ -18,10 +18,26 @@ import {
   ModalBuilder, TextInputBuilder, TextInputStyle,
   ChannelType, ThreadAutoArchiveDuration,
 } from "discord.js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import config from "../config.js";
+
+// ─── Gemini للترجمة فقط ────────────────────────────────────
+const _genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
+async function translateAnimeQuery(arabicQuery) {
+  try {
+    const model = _genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const res = await model.generateContent(
+      `ترجم اسم الأنمي ده للإنجليزي فقط، ارجع الاسم الإنجليزي بس بدون أي كلام تاني: "${arabicQuery}"`
+    );
+    return res.response.text().trim().replace(/^["']|["']$/g, "");
+  } catch {
+    return null;
+  }
+}
 
 // ─── Jikan API v4 ────────────────────────────────────────────
 const JIKAN = "https://api.jikan.moe/v4";
-const JIKAN_DELAY_MS = 400; // احترام rate limit (3 req/sec)
+const JIKAN_DELAY_MS = 350;
 
 let _lastJikanCall = 0;
 async function jikan(path, params = {}, _retries = 3) {
@@ -63,11 +79,11 @@ async function jikan(path, params = {}, _retries = 3) {
   return res.json();
 }
 
-// ─── مخزن مؤقت للبيانات (cache 10 دقايق) ──────────────────
+// ─── مخزن مؤقت للبيانات (cache 30 دقيقة) ──────────────────
 const _cache = new Map();
 async function cachedJikan(key, path, params = {}) {
   const hit = _cache.get(key);
-  if (hit && Date.now() - hit.ts < 10 * 60_000) return hit.data;
+  if (hit && Date.now() - hit.ts < 30 * 60_000) return hit.data;
   const data = await jikan(path, params);
   _cache.set(key, { data, ts: Date.now() });
   return data;
@@ -383,12 +399,27 @@ export async function handleAnimeSearchBtn(interaction) {
 // ─── بحث: معالجة نتائج الـ modal ────────────────────────────
 export async function handleAnimeSearchModal(interaction, db) {
   await interaction.deferReply({ ephemeral: true });
-  const query = interaction.fields.getTextInputValue("anime_query").trim();
+  const rawQuery = interaction.fields.getTextInputValue("anime_query").trim();
+
+  // لو الاستعلام عربي — نترجمه بـ Gemini عشان البحث ينجح
+  const hasArabic = /[\u0600-\u06FF]/.test(rawQuery);
+  let query = rawQuery;
+  let translatedQuery = null;
+  if (hasArabic) {
+    translatedQuery = await translateAnimeQuery(rawQuery);
+    if (translatedQuery) query = translatedQuery;
+  }
 
   let results;
   try {
     const data = await jikan("/anime", { q: query, limit: 8, sfw: false });
     results = data.data || [];
+    // لو الترجمة ما أدّتش نتايج، جرب الأصلي
+    if (!results.length && translatedQuery) {
+      const fallback = await jikan("/anime", { q: rawQuery, limit: 8, sfw: false });
+      results = fallback.data || [];
+      query = rawQuery;
+    }
   } catch (e) {
     const isMalDown = e?.status === 503 || e?.status === 504 || e?.message?.includes("504") || e?.message?.includes("503");
     const msg = isMalDown
@@ -398,7 +429,7 @@ export async function handleAnimeSearchModal(interaction, db) {
   }
 
   if (!results.length) {
-    return interaction.editReply({ content: `❌ ما لقيتش نتايج لـ **${query}** — جرب اسم تاني.` });
+    return interaction.editReply({ content: `❌ ما لقيتش نتايج لـ **${rawQuery}** — جرب اسم تاني.` });
   }
 
   // حفظ النتائج في الـ session
@@ -666,6 +697,25 @@ export async function handleAnimeEpisodes(interaction, db, malId) {
   try {
     const animeData = await cachedJikan(`anime_${malId}`, `/anime/${malId}/full`);
     const anime     = animeData.data;
+
+    // الأفلام ملهاش حلقات — نعرض روابط مشاهدة مباشرة
+    if (anime.type === "Movie" || (anime.episodes === 1 && anime.type !== "TV")) {
+      const title    = anime.title_english || anime.title;
+      const fallback = buildFallbackLinks(title);
+      const embed = new EmbedBuilder()
+        .setColor(scoreColor(anime.score))
+        .setTitle(`🎬 شاهد الفيلم: ${title.slice(0, 60)}`)
+        .setDescription(
+          `هذا الأنمي فيلم — مفيش حلقات منفصلة.\n\n**روابط المشاهدة:**\n` +
+          fallback.map(l => `• [${l.name}](${l.url})`).join("\n")
+        )
+        .setThumbnail(anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url)
+        .addFields({ name: "⏱️ المدة", value: anime.duration || "—", inline: true })
+        .setFooter({ text: `MAL ID: ${malId} • زنجي Bot 🎌` })
+        .setTimestamp();
+      return interaction.editReply({ embeds: [embed] });
+    }
+
     const epsData   = await cachedJikan(`eps_${malId}_1`, `/anime/${malId}/episodes`, { page: 1 });
     const episodes  = epsData.data || [];
     const totalEps  = anime.episodes || epsData.pagination?.items?.total || episodes.length;
@@ -1222,6 +1272,9 @@ export const animeCommand = new SlashCommandBuilder()
 
 // ─── handler أمر /أنمي ───────────────────────────────────────
 export async function handleAnimeCommand(interaction) {
+  if (!config.isOwner(interaction.user.id)) {
+    return interaction.reply({ content: "❌ هذا الأمر للإدارة فقط.", ephemeral: true });
+  }
   const panel = buildAnimePanel();
   return interaction.reply({ ...panel, ephemeral: true });
 }

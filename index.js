@@ -1266,7 +1266,7 @@ async function ensureSuggestionsPanel(clientInstance, force = false) {
 }
 
 // ✅ [تعديل 4] deferReply أول سطر لمنع Rate Limit تحت الضغط
-async function handleSuggestionModalSubmit(interaction, suggestionText) {
+async function handleSuggestionModalSubmit(interaction, suggestionText, imageUrl = null) {
   // deferReply فوراً قبل أي عملية ثقيلة
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ ephemeral: true });
@@ -1278,6 +1278,10 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
       content: "❌ لا يمكن إرسال اقتراح فارغ. يرجى كتابة اقتراحك بالتفصيل.",
     });
   }
+
+  // تحقق من رابط الصورة لو موجود
+  const validImage = imageUrl && /^https?:\/\/.+\.(png|jpe?g|gif|webp)/i.test(imageUrl.trim())
+    ? imageUrl.trim() : null;
 
   const suggestionsChannel = await interaction.client.channels
     .fetch(SUGGESTIONS_CHANNEL_ID)
@@ -1293,14 +1297,11 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
     });
   }
 
+  const publicEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" });
+  if (validImage) publicEmbed.setImage(validImage);
+
   const publicMessage = await suggestionsChannel.send({
-    embeds: [
-      buildSuggestionEmbed({
-        user: interaction.user,
-        text: trimmedText,
-        statusKey: "pending",
-      }),
-    ],
+    embeds: [publicEmbed],
   });
 
   const adminEmbed = buildSuggestionEmbed({
@@ -4669,6 +4670,15 @@ client.on("interactionCreate", async (interaction) => {
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
               .setMaxLength(2000)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("suggest_image")
+              .setLabel("رابط صورة (اختياري — PNG/JPG/GIF)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setPlaceholder("https://...")
           )
         );
         return await interaction.showModal(modal);
@@ -4686,6 +4696,15 @@ client.on("interactionCreate", async (interaction) => {
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
               .setMaxLength(2000)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("bug_image")
+              .setLabel("رابط صورة توضيحية (اختياري)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setPlaceholder("https://...")
           )
         );
         return await interaction.showModal(modal);
@@ -4703,6 +4722,15 @@ client.on("interactionCreate", async (interaction) => {
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
               .setMaxLength(2000)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("other_image")
+              .setLabel("رابط صورة (اختياري)")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(false)
+              .setMaxLength(500)
+              .setPlaceholder("https://...")
           )
         );
         return await interaction.showModal(modal);
@@ -5193,16 +5221,19 @@ client.on("interactionCreate", async (interaction) => {
 
       // ✅ [تعديل 5] معالجة مودالات الأزرار الثلاثة
       if (interaction.customId === "modal_suggest_idea") {
-        const text = interaction.fields.getTextInputValue("suggest_text");
-        return await handleSuggestionModalSubmit(interaction, text);
+        const text  = interaction.fields.getTextInputValue("suggest_text");
+        const image = interaction.fields.getTextInputValue("suggest_image").trim() || null;
+        return await handleSuggestionModalSubmit(interaction, text, image);
       }
       if (interaction.customId === "modal_suggest_bug") {
-        const text = interaction.fields.getTextInputValue("bug_text");
-        return await handleSuggestionModalSubmit(interaction, text);
+        const text  = interaction.fields.getTextInputValue("bug_text");
+        const image = interaction.fields.getTextInputValue("bug_image").trim() || null;
+        return await handleSuggestionModalSubmit(interaction, text, image);
       }
       if (interaction.customId === "modal_suggest_other") {
-        const text = interaction.fields.getTextInputValue("other_text");
-        return await handleSuggestionModalSubmit(interaction, text);
+        const text  = interaction.fields.getTextInputValue("other_text");
+        const image = interaction.fields.getTextInputValue("other_image").trim() || null;
+        return await handleSuggestionModalSubmit(interaction, text, image);
       }
 
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
