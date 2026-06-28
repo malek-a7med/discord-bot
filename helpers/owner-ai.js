@@ -167,7 +167,7 @@ function buildUnifiedPrompt(text, ownerName, guild, history, userId) {
 أعضاء: ${members}
 قنوات: ${channels}
 رتب: ${roles}
-${memoryToPromptText()}${history ? `\nسياق المحادثة:\n${history}\n` : ""}
+${memoryToPromptText(userId)}${history ? `\nسياق المحادثة:\n${history}\n` : ""}
 رسالة الأونر: "${text}"
 
 رد بـ JSON فقط — اختار الأكشن الأنسب لطلب الأونر:
@@ -384,7 +384,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     // ─── ذاكرة دائمة ─────────────────────────────────────────────
     if (action === "remember") {
       if (!parsed.key || !parsed.value) return send("❌ محتاج key و value عشان أحفظ!");
-      const result = memoryRemember(parsed.key, parsed.value);
+      const result = memoryRemember(parsed.key, parsed.value, userId);
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", result);
       return send({
         embeds: [new EmbedBuilder()
@@ -397,19 +397,19 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     }
 
     if (action === "forget_memory") {
-      const result = memoryForget(parsed.key || "");
+      const result = memoryForget(parsed.key || "", userId);
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", result);
       return send(ok("🗑️ تم المسح من الذاكرة", result));
     }
 
     if (action === "clear_memory") {
-      memoryClear();
+      memoryClear(userId);
       pushHistory(userId, "user", rawText); pushHistory(userId, "model", "تم مسح كل الذاكرة");
       return send(ok("🧹 تم مسح كل الذاكرة", "الذاكرة اتمسحت بالكامل دلوقتي"));
     }
 
     if (action === "show_memory") {
-      const all = memoryGetAll();
+      const all = memoryGetAll(userId);
       const entries = Object.entries(all);
       if (!entries.length) return send("📭 الذاكرة فاضية دلوقتي — قولي احفظ حاجة!");
       const lines = entries.map(([k, v]) => `• **${k}**: ${v.value}`).join("\n");
@@ -423,7 +423,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     }
 
     if (action === "search_memory") {
-      const results = memorySearch(parsed.query || "");
+      const results = memorySearch(parsed.query || "", userId);
       if (!results.length) return send(`🔍 مش لاقي حاجة عن "${parsed.query}"`);
       const lines = results.map(([k, v]) => `• **${k}**: ${v.value}`).join("\n");
       return send({
