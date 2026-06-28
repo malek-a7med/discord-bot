@@ -49,41 +49,55 @@ export function initMusicSystem(client) {
     ],
   });
 
-  const pausedAt = new Map();
-  const STREAM_MAX_AGE = 2 * 60 * 60 * 1000;
+  // ─── خروج تلقائي لما القناة تفضى ────────────────────────────
+  const emptyLeaveTimers = new Map(); // guildId → timeoutHandle
 
   client.on('voiceStateUpdate', async (oldState, newState) => {
     try {
-      const q = distube.getQueue(newState.guild.id || oldState.guild.id);
+      const guildId = newState.guild.id || oldState.guild.id;
+      const q = distube.getQueue(guildId);
       if (!q) return;
-      const botVoiceChannel = q.voice?.channel;
-      if (!botVoiceChannel) return;
-      const humans = botVoiceChannel.members.filter(m => !m.user.bot).size;
+      const botVC = q.voice?.channel;
+      if (!botVC) return;
+      const humans = botVC.members.filter(m => !m.user.bot).size;
 
       if (humans === 0) {
-        if (!q.paused) {
-          q.pause();
-          pausedAt.set(q.id, Date.now());
+        // فاضية — ابدأ عداد 30 ثانية للخروج
+        if (!emptyLeaveTimers.has(guildId)) {
           q.textChannel?.send({
-            embeds: [new EmbedBuilder().setColor(0xf39c12).setDescription('⏸️ القناة الصوتية فاضية — الموسيقى اتوقفت تلقائياً')],
+            embeds: [new EmbedBuilder().setColor(0xf39c12).setDescription('⚠️ القناة الصوتية فاضية — هخرج تلقائياً في **30 ثانية** لو محدش رجع')],
           }).catch(() => {});
+
+          const timer = setTimeout(async () => {
+            try {
+              emptyLeaveTimers.delete(guildId);
+              // تأكد إن القناة لسه فاضية
+              const stillEmpty = botVC.members.filter(m => !m.user.bot).size === 0;
+              if (!stillEmpty) return;
+              const qNow = distube.getQueue(guildId);
+              if (!qNow) return;
+              if (qNow.currentMessage) {
+                await qNow.currentMessage.delete().catch(() => {});
+                qNow.currentMessage = null;
+              }
+              qNow.textChannel?.send({
+                embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription('👋 القناة فاضية — خرجت تلقائياً!')],
+              }).catch(() => {});
+              await distube.stop(guildId).catch(() => {});
+            } catch {}
+          }, 30_000);
+
+          emptyLeaveTimers.set(guildId, timer);
         }
       } else {
-        if (q.paused && pausedAt.has(q.id)) {
-          const pausedTime = Date.now() - pausedAt.get(q.id);
-          pausedAt.delete(q.id);
-          if (pausedTime > STREAM_MAX_AGE) {
-            q.textChannel?.send({
-              embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription('⏭️ الأغنية موقوفة من أكتر من ساعتين — الرابط انتهت صلاحيته، بتخطى للتالية!')],
-            }).catch(() => {});
-            if (q.songs.length > 1) await distube.skip(q.id).catch(() => {});
-            else await distube.stop(q.id).catch(() => {});
-          } else {
-            q.resume();
-            q.textChannel?.send({
-              embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription('▶️ حد رجع! بكمل الموسيقى 🎵')],
-            }).catch(() => {});
-          }
+        // حد رجع — إلغي العداد وكمّل
+        if (emptyLeaveTimers.has(guildId)) {
+          clearTimeout(emptyLeaveTimers.get(guildId));
+          emptyLeaveTimers.delete(guildId);
+          if (q.paused) q.resume().catch?.(() => {});
+          q.textChannel?.send({
+            embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription('▶️ حد رجع! بكمل الموسيقى 🎵')],
+          }).catch(() => {});
         }
       }
     } catch {}
@@ -108,6 +122,7 @@ export function initMusicSystem(client) {
 
   distube.on('addSong', (queue, song) => {
     try {
+      if (queue._batchLoading) return; // كتم الرسايل أثناء تحميل البلاي ليست
       if (!queue.textChannel?.send) return;
       const min = Math.floor(song.duration / 60);
       const sec = (song.duration % 60).toString().padStart(2, '0');
@@ -325,9 +340,84 @@ export async function handlePlay(interaction) {
       }
 
     } else if (sourceType === 'spotify_playlist') {
-      // ── بلاي ليست / ألبوم Spotify ──
+      // ── بلاي ليست / ألبوم Spotify — جيب الأغاني يدوياً من API ──
       await interaction.editReply({ content: '🎵 جاري تحميل البلاي ليست من Spotify...' });
-      await distube.play(voiceChannel, query, playOptions);
+
+      let tracks = [];
+      try {
+        // احصل على access_token
+        const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `grant_type=client_credentials&client_id=${process.env.SPOTIFY_CLIENT_ID}&client_secret=${process.env.SPOTIFY_CLIENT_SECRET}`,
+        });
+        const { access_token } = await tokenRes.json();
+        if (!access_token) throw new Error('فشل الحصول على Spotify token');
+
+        const isAlbum = /open\.spotify\.com\/album/i.test(query);
+        const idMatch = query.match(/(?:playlist|album)\/([a-zA-Z0-9]+)/);
+        if (!idMatch) throw new Error('رابط Spotify غير صحيح');
+        const spotifyId = idMatch[1];
+
+        // جيب أول 50 أغنية (max per request)
+        const endpoint = isAlbum
+          ? `https://api.spotify.com/v1/albums/${spotifyId}/tracks?limit=50`
+          : `https://api.spotify.com/v1/playlists/${spotifyId}/tracks?limit=50&fields=items(track(name,artists,is_local))`;
+
+        const plRes = await fetch(endpoint, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        });
+        const plData = await plRes.json();
+
+        if (plData.error) throw new Error(plData.error.message || 'فشل تحميل البلاي ليست');
+
+        tracks = (plData.items || [])
+          .map(item => {
+            const t = isAlbum ? item : item?.track;
+            if (!t || t.is_local || !t.name) return null;
+            const artist = t.artists?.[0]?.name || '';
+            return `${artist} ${t.name}`.trim();
+          })
+          .filter(Boolean)
+          .slice(0, 50);
+
+        if (!tracks.length) throw new Error('البلاي ليست فاضية أو private — جرب بلاي ليست عامة');
+
+      } catch (apiErr) {
+        // fallback: جرب SpotifyPlugin مباشرة
+        console.warn('⚠️ [Music] Spotify API playlist fetch فشل:', apiErr.message, '— هجرب SpotifyPlugin');
+        await distube.play(voiceChannel, query, playOptions);
+        tracks = []; // SpotifyPlugin شغّل، مش محتاج نكمل
+      }
+
+      if (tracks.length) {
+        await interaction.editReply({ content: `🎵 لاقيت **${tracks.length} أغنية** — جاري التشغيل...` });
+
+        // شغّل الأغنية الأولى
+        await distube.play(voiceChannel, tracks[0], playOptions);
+
+        // أضيف الباقي للقائمة بـ flag يمنع فيضان رسايل addSong
+        if (tracks.length > 1) {
+          (async () => {
+            const q = distube.getQueue(interaction.guildId);
+            if (q) q._batchLoading = true;
+            for (let i = 1; i < tracks.length; i++) {
+              try {
+                await distube.play(voiceChannel, tracks[i], { ...playOptions });
+              } catch {}
+              // تأخير خفيف بين كل أغنية
+              await new Promise(r => setTimeout(r, 400));
+            }
+            const qEnd = distube.getQueue(interaction.guildId);
+            if (qEnd) {
+              qEnd._batchLoading = false;
+              qEnd.textChannel?.send({
+                embeds: [new EmbedBuilder().setColor(0x66FCF1).setDescription(`✅ أُضيفت **${tracks.length} أغنية** من Spotify للقائمة`)],
+              }).catch(() => {});
+            }
+          })();
+        }
+      }
 
     } else if (sourceType === 'youtube' || sourceType === 'soundcloud') {
       // ── روابط YouTube / SoundCloud مباشرة ──
