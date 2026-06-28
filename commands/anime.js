@@ -1075,6 +1075,12 @@ export function scheduleAnimeNews(client, db) {
     }
     if (!thread) return;
 
+    // لو الثريد مقفول افتحه مؤقتاً
+    const wasLocked = thread.locked;
+    if (wasLocked) {
+      try { await thread.setLocked(false); } catch { return; }
+    }
+
     // جيب قائمة الأنمي اللي بتعرض دلوقتي
     let airingList;
     try {
@@ -1136,6 +1142,11 @@ export function scheduleAnimeNews(client, db) {
     // حفظ المعرفات المنشورة (نحتفظ بآخر 500 بس عشان الملف ما يكبرش)
     const updatedList = [...postedIds].slice(-500);
     db.setConfig("animeNewsPosted", updatedList);
+
+    // لو كان مقفول قبل كده، قفله تاني
+    if (wasLocked) {
+      try { await thread.setLocked(true); } catch {}
+    }
   }
 
   // تشغيل فوري بعد دقيقتين من بدء البوت، ثم كل ساعة
