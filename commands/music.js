@@ -84,13 +84,26 @@ async function fetchSpotifyViaYtDlp(url) {
 
 // ─── Spotify token helper ──────────────────────────────────────
 async function getSpotifyToken() {
+  const clientId     = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error('SPOTIFY_CLIENT_ID أو SPOTIFY_CLIENT_SECRET غير موجودين في المتغيرات');
+
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
   const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=client_credentials&client_id=${process.env.SPOTIFY_CLIENT_ID}&client_secret=${process.env.SPOTIFY_CLIENT_SECRET}`,
+    headers: {
+      'Authorization': `Basic ${basic}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
   });
-  const data = await tokenRes.json();
-  if (!data.access_token) throw new Error('فشل الحصول على Spotify token — تأكد من SPOTIFY_CLIENT_ID و SPOTIFY_CLIENT_SECRET');
+
+  const raw = await tokenRes.text();
+  let data;
+  try { data = JSON.parse(raw); }
+  catch { throw new Error(`Spotify token error (${tokenRes.status}): ${raw.slice(0, 200)}`); }
+
+  if (!data.access_token) throw new Error(`Spotify token فشل: ${data.error_description || data.error || JSON.stringify(data)}`);
   return data.access_token;
 }
 
