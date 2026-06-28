@@ -13,6 +13,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
 } from 'discord.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -207,21 +208,49 @@ async function generateMusicCard(song, currentTime = 0, queue = null) {
   }
 }
 
-function buildMusicRows(song) {
+// ─── بناء الأزرار + select menu ───────────────────────────────
+function buildMusicRows(song, queue = null) {
+  const songs = queue?.songs || [];
+
+  // ── صف 1: التحكم الأساسي (5 أزرار) ──────────────────────────
   const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('music_prev').setLabel('⏮️ السابق').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('music_pause').setLabel('⏸ وقف').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('music_resume').setLabel('▶️ كمل').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('music_skip').setLabel('⏭️ التالية').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_stop').setLabel('⏹️ اطلع').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('music_lyrics').setLabel('📝 كلمات').setStyle(ButtonStyle.Secondary),
   );
+
+  // ── صف 2: الصوت + تكرار + كلمات + رابط (5 عناصر) ────────────
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉-').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_repeat').setLabel('🔁 تكرار').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('music_lyrics').setLabel('📝 كلمات').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setLabel('🔗 افتح في Spotify').setStyle(ButtonStyle.Link).setURL(song.url || 'https://open.spotify.com'),
   );
-  return [row1, row2];
+
+  const rows = [row1, row2];
+
+  // ── صف 3: select menu للقائمة (لو فيه أغاني بعد الحالية) ─────
+  if (songs.length > 1) {
+    const upcomingSongs = songs.slice(1, 26); // max 25 option
+    const options = upcomingSongs.map((s, i) => {
+      const label = `${i + 1}. ${(s.name || s.title || 'أغنية').slice(0, 95)}`;
+      const desc  = s.formattedDuration ? s.formattedDuration.slice(0, 50) : undefined;
+      return { label, value: String(i + 1), ...(desc ? { description: desc } : {}) };
+    });
+
+    const row3 = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('music_queue_select')
+        .setPlaceholder(`🎵 القائمة — ${songs.length - 1} أغنية قادمة`)
+        .addOptions(options),
+    );
+    rows.push(row3);
+  }
+
+  return rows;
 }
 
 export async function sendMusicCard(queue, song, textChannel) {
@@ -232,7 +261,7 @@ export async function sendMusicCard(queue, song, textChannel) {
     if (!cardBuf) return;
     if (!textChannel?.send) return;
 
-    const rows = buildMusicRows(song);
+    const rows = buildMusicRows(song, queue);
     const msg = await textChannel.send({
       files: [new AttachmentBuilder(cardBuf, { name: 'musiccard.png' })],
       components: rows,
@@ -255,9 +284,12 @@ export async function sendMusicCard(queue, song, textChannel) {
         const updated = await generateMusicCard(song, currentTime, queue);
         if (!updated) { clearInterval(interval); return; }
 
+        // إعادة بناء الأزرار بالقائمة الحية (قد تتغير)
+        const liveRows = buildMusicRows(song, queue);
+
         await queue.currentMessage.edit({
           files: [new AttachmentBuilder(updated, { name: 'musiccard.png' })],
-          components: rows,
+          components: liveRows,
         });
 
         if (currentTime >= total) clearInterval(interval);

@@ -26,6 +26,10 @@ function detectSourceType(query) {
 
 let distube = null;
 
+// ─── تتبع الأغنية السابقة لكل سيرفر ──────────────────────────
+export const previousSongsMap = new Map(); // guildId → Song السابقة
+const _currentSongTracker    = new Map(); // guildId → Song الحالية (داخلي)
+
 // ─── تهيئة DisTube ────────────────────────────────────────────
 export function initMusicSystem(client) {
   if (distube) return distube;
@@ -87,6 +91,11 @@ export function initMusicSystem(client) {
 
   distube.on('playSong', async (queue, song) => {
     try {
+      // حفظ الأغنية الحالية كـ "سابقة" قبل ما نبدأ الجديدة
+      const prevSong = _currentSongTracker.get(queue.id);
+      if (prevSong) previousSongsMap.set(queue.id, prevSong);
+      _currentSongTracker.set(queue.id, song);
+
       if (queue.currentMessage) {
         await queue.currentMessage.delete().catch(() => {});
         queue.currentMessage = null;
@@ -645,5 +654,47 @@ export async function handleLyrics(interaction) {
   } catch (e) {
     console.error('❌ [Lyrics]', e.message);
     try { await interaction.editReply({ content: `❌ ${e.message}` }); } catch {}
+  }
+}
+
+// ─── handlePrevious ────────────────────────────────────────────
+export async function handlePrevious(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+
+    const prev = previousSongsMap.get(interaction.guildId);
+    if (!prev) return interaction.reply({ content: '⏮️ مفيش أغنية سابقة!', ephemeral: true });
+
+    // أدخّل الأغنية السابقة مباشرة في الـ index 1 بدون ما يتبعت event addSong
+    q.songs.splice(1, 0, prev);
+    await distube.skip(interaction.guildId);
+    await interaction.reply({ content: `⏮️ بيرجع لـ **${prev.name}**`, ephemeral: true });
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
+// ─── handleQueueJump (للـ select menu) ────────────────────────
+export async function handleQueueJump(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+
+    const idx = parseInt(interaction.values[0], 10); // 0-based index in q.songs
+    if (isNaN(idx) || idx < 1 || idx >= q.songs.length) {
+      return interaction.reply({ content: '❌ الأغنية دي مش موجودة في القائمة!', ephemeral: true });
+    }
+
+    const targetSong = q.songs[idx];
+    await distube.jump(interaction.guildId, idx);
+    await interaction.reply({
+      content: `⏩ بتخطى لـ **${targetSong.name}**`,
+      ephemeral: true,
+    });
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
   }
 }

@@ -16,7 +16,7 @@ import config from "./config.js";
 import Database from "./database.js";
 import Logger from "./logger.js";
 import ModerationListener from "./helpers/moderation-listener.js";
-import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics } from "./commands/music.js";
+import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics, handlePrevious, handleQueueJump } from "./commands/music.js";
 import { registerCleanChapterCommand, handleCleanChapter } from "./commands/image-cleaner.js";
 import { registerTranslateChapterCommand, handleTranslateChapter } from "./commands/translator.js";
 import {
@@ -4102,6 +4102,7 @@ client.on("interactionCreate", async (interaction) => {
       // ─── أزرار التحكم في الموسيقى ────────────────────────────────
       if (interaction.customId.startsWith("music_")) {
         const id = interaction.customId;
+        if (id === "music_prev")       return await handlePrevious(interaction);
         if (id === "music_pause")      return await handlePause(interaction);
         if (id === "music_resume")     return await handleResume(interaction);
         if (id === "music_skip")       return await handleSkip(interaction);
@@ -5498,6 +5499,11 @@ client.on("interactionCreate", async (interaction) => {
   // ─── قوائم الاختيار (Select Menus) ──────────────────────────────
   if (interaction.isStringSelectMenu()) {
     try {
+      // ─── قائمة الأغاني في الموسيقى ────────────────────────────────
+      if (interaction.customId === "music_queue_select") {
+        return await handleQueueJump(interaction);
+      }
+
       // ─── قوائم نظام الأنمي ─────────────────────────────────────────
       if (interaction.customId === "anime_select_result") {
         return await handleAnimeSelectResult(interaction, db);
