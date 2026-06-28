@@ -1,9 +1,9 @@
 // ════════════════════════════════════════════════════════════════
 //  نظام الموسيقى — بوت زنجي
-//  DisTube v5 + SpotifyPlugin + YtDlpPlugin + SoundCloudPlugin
-//  الترتيب: رابط Spotify أغنية → Spotify API → YouTube
-//           رابط Spotify playlist/album → SpotifyPlugin scraping
-//           بحث نصي → YouTube مباشرة
+//  DisTube v5 + SoundCloudPlugin + YtDlpPlugin
+//  الترتيب: رابط Spotify أي نوع → spotify-url-info (بدون API key)
+//                                 → أسماء الأغاني → بحث SoundCloud
+//           بحث نصي / YouTube / SoundCloud → مباشرة
 // ════════════════════════════════════════════════════════════════
 
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
@@ -36,173 +36,46 @@ function detectSourceType(query) {
   return 'text';
 }
 
-// ─── استخراج بلاي ليست سبوتيفاي عن طريق yt-dlp مباشرة ─────────
-async function fetchSpotifyViaYtDlp(url) {
-  const { execFile } = await import('child_process');
-  const { promisify } = await import('util');
-  const execFileAsync = promisify(execFile);
-
-  // حل الـ short link الأول
-  let resolvedUrl = url;
-  if (/spotify\.link\//i.test(url)) {
-    const { default: nodeFetch } = await import('node-fetch');
-    const res = await nodeFetch(url, { redirect: 'follow', timeout: 8000 });
-    resolvedUrl = res.url;
-  }
-
-  try {
-    const { stdout } = await execFileAsync('yt-dlp', [
-      '--dump-json',
-      '--flat-playlist',
-      '--no-warnings',
-      '--no-check-certificate',
-      resolvedUrl,
-    ], { timeout: 60000, maxBuffer: 10 * 1024 * 1024 });
-
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const tracks = [];
-    let playlistName = 'بلاي ليست سبوتيفاي';
-
-    for (const line of lines) {
-      try {
-        const item = JSON.parse(line);
-        if (item.playlist_title) playlistName = item.playlist_title;
-        const title = item.title || item.track || '';
-        const artist = item.artist || item.uploader || '';
-        if (title) {
-          tracks.push(artist ? `${artist} ${title}`.trim() : title);
-        }
-      } catch {}
-    }
-
-    if (!tracks.length) throw new Error('مش لاقي أغاني في البلاي ليست دي');
-    return { type: 'playlist', name: playlistName, tracks: tracks.slice(0, 100) };
-  } catch (err) {
-    throw new Error(`yt-dlp فشل: ${err.message}`);
-  }
-}
-
-// ─── Spotify token helper ──────────────────────────────────────
-async function getSpotifyToken() {
-  const clientId     = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error('SPOTIFY_CLIENT_ID أو SPOTIFY_CLIENT_SECRET غير موجودين في المتغيرات');
-
-  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-  const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${basic}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  });
-
-  const raw = await tokenRes.text();
-  let data;
-  try { data = JSON.parse(raw); }
-  catch { throw new Error(`Spotify token error (${tokenRes.status}): ${raw.slice(0, 200)}`); }
-
-  if (!data.access_token) throw new Error(`Spotify token فشل: ${data.error_description || data.error || JSON.stringify(data)}`);
-  return data.access_token;
-}
-
-// ─── جيب كل أغاني Spotify (track/album/playlist/artist/short) ──
+// ─── جيب كل أغاني Spotify بدون API key (spotify-url-info) ──────
 // بيرجع: { type, name, tracks: string[] }
 async function fetchSpotifyContent(rawQuery) {
   const q = rawQuery.trim();
 
-  // — حل الـ Spotify URI إلى URL ويب عادي —
+  // حوّل spotify: URI لـ URL عادي
   let url = q;
   if (/^spotify:/i.test(q)) {
-    const parts = q.split(':'); // ['spotify','type','id']
+    const parts = q.split(':');
     url = `https://open.spotify.com/${parts[1]}/${parts[2]}`;
   }
 
-  // — حل الـ short link —
-  if (/spotify\.link\//i.test(url)) {
-    const { default: nodeFetch } = await import('node-fetch');
-    const res = await nodeFetch(url, { redirect: 'follow', timeout: 8000 });
-    url = res.url; // الرابط النهائي بعد redirect
+  // spotify-url-info — بيجيب البيانات من صفحات Embed بدون API key
+  const { default: spotifyUrlInfo } = await import('spotify-url-info');
+  const { getDetails } = spotifyUrlInfo(fetch);
+
+  let details;
+  try {
+    details = await getDetails(url);
+  } catch (err) {
+    throw new Error(`مش قادر أجيب بيانات الرابط ده — تأكد إن الرابط صح وإن البلاي ليست عامة (🔓 Public)\n${err.message}`);
   }
 
-  const token = await getSpotifyToken();
-  const headers = { Authorization: `Bearer ${token}` };
+  const { preview, tracks: rawTracks } = details || {};
 
-  // — Track —
-  const trackMatch = url.match(/open\.spotify\.com\/track\/([a-zA-Z0-9]+)/i);
-  if (trackMatch) {
-    const res = await fetch(`https://api.spotify.com/v1/tracks/${trackMatch[1]}`, { headers });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    if (!data.name) throw new Error('مش لاقي بيانات الأغنية');
-    const searchQ = `${data.artists?.[0]?.name || ''} ${data.name}`.trim();
-    return { type: 'track', name: data.name, tracks: [searchQ] };
+  // حوّل الـ tracks لأسماء قابلة للبحث
+  const tracks = [];
+  for (const t of (rawTracks || [])) {
+    const name   = t?.name;
+    const artist = t?.artist || '';
+    if (name) tracks.push(`${artist} ${name}`.trim());
   }
 
-  // — Playlist —
-  const plMatch = url.match(/open\.spotify\.com\/playlist\/([a-zA-Z0-9]+)/i);
-  if (plMatch) {
-    const tracks = [];
-    let endpoint = `https://api.spotify.com/v1/playlists/${plMatch[1]}/tracks?limit=50&fields=next,items(track(name,artists,is_local))`;
-    let playlistName = 'بلاي ليست';
-    let first = true;
-    while (endpoint && tracks.length < 100) {
-      const res = await fetch(endpoint, { headers });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      if (first) { playlistName = data.name || playlistName; first = false; }
-      for (const item of (data.items || [])) {
-        const t = item?.track;
-        if (!t || t.is_local || !t.name) continue;
-        tracks.push(`${t.artists?.[0]?.name || ''} ${t.name}`.trim());
-        if (tracks.length >= 100) break;
-      }
-      endpoint = data.next || null;
-    }
-    if (!tracks.length) throw new Error('البلاي ليست فاضية أو private — جرب بلاي ليست عامة (🔓 Public)');
-    return { type: 'playlist', name: playlistName, tracks };
-  }
+  if (!tracks.length) throw new Error('البلاي ليست/الألبوم ده فاضي أو private — جرب رابط عام (🔓 Public)');
 
-  // — Album —
-  const albMatch = url.match(/open\.spotify\.com\/album\/([a-zA-Z0-9]+)/i);
-  if (albMatch) {
-    const tracks = [];
-    let endpoint = `https://api.spotify.com/v1/albums/${albMatch[1]}/tracks?limit=50`;
-    let albumName = 'ألبوم';
-    let first = true;
-    while (endpoint && tracks.length < 100) {
-      const res = await fetch(endpoint, { headers });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-      if (first) { albumName = data.name || albumName; first = false; }
-      for (const t of (data.items || [])) {
-        if (!t || !t.name) continue;
-        tracks.push(`${t.artists?.[0]?.name || ''} ${t.name}`.trim());
-        if (tracks.length >= 100) break;
-      }
-      endpoint = data.next || null;
-    }
-    if (!tracks.length) throw new Error('الألبوم ده فاضي أو مش متاح');
-    return { type: 'album', name: albumName, tracks };
-  }
-
-  // — Artist (top tracks) —
-  const artMatch = url.match(/open\.spotify\.com\/artist\/([a-zA-Z0-9]+)/i);
-  if (artMatch) {
-    const [artRes, topRes] = await Promise.all([
-      fetch(`https://api.spotify.com/v1/artists/${artMatch[1]}`, { headers }),
-      fetch(`https://api.spotify.com/v1/artists/${artMatch[1]}/top-tracks?market=US`, { headers }),
-    ]);
-    const artData = await artRes.json();
-    const topData = await topRes.json();
-    if (artData.error) throw new Error(artData.error.message);
-    const tracks = (topData.tracks || []).slice(0, 20).map(t => `${artData.name} ${t.name}`.trim());
-    if (!tracks.length) throw new Error('مش لاقي أغاني للفنان ده');
-    return { type: 'artist', name: artData.name, tracks };
-  }
-
-  throw new Error('نوع رابط Spotify غير مدعوم');
+  return {
+    type:   preview?.type  || 'playlist',
+    name:   preview?.title || 'مجموعة أغاني',
+    tracks,
+  };
 }
 
 let distube = null;
