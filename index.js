@@ -1266,7 +1266,7 @@ async function ensureSuggestionsPanel(clientInstance, force = false) {
 }
 
 // ✅ [تعديل 4] deferReply أول سطر لمنع Rate Limit تحت الضغط
-async function handleSuggestionModalSubmit(interaction, suggestionText, imageUrl = null) {
+async function handleSuggestionModalSubmit(interaction, suggestionText) {
   // deferReply فوراً قبل أي عملية ثقيلة
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferReply({ ephemeral: true });
@@ -1278,10 +1278,6 @@ async function handleSuggestionModalSubmit(interaction, suggestionText, imageUrl
       content: "❌ لا يمكن إرسال اقتراح فارغ. يرجى كتابة اقتراحك بالتفصيل.",
     });
   }
-
-  // تحقق من رابط الصورة لو موجود
-  const validImage = imageUrl && /^https?:\/\/.+\.(png|jpe?g|gif|webp)/i.test(imageUrl.trim())
-    ? imageUrl.trim() : null;
 
   const suggestionsChannel = await interaction.client.channels
     .fetch(SUGGESTIONS_CHANNEL_ID)
@@ -1298,7 +1294,6 @@ async function handleSuggestionModalSubmit(interaction, suggestionText, imageUrl
   }
 
   const publicEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" });
-  if (validImage) publicEmbed.setImage(validImage);
 
   const publicMessage = await suggestionsChannel.send({
     embeds: [publicEmbed],
@@ -1329,9 +1324,47 @@ async function handleSuggestionModalSubmit(interaction, suggestionText, imageUrl
     components: [buildSuggestionsPanelRow()],
   }).catch(() => {});
 
-  return interaction.editReply({
-    content: "✅ **شكراً لك!** تم استلام اقتراحك بنجاح وسيتم مراجعته من قبل الإدارة قريباً. 🙏",
+  // ── إبلاغ المستخدم واستقبال صورة اختيارية ──────────────────────
+  await interaction.editReply({
+    content: "✅ **اتبعت اقتراحك!** 🎉\n📸 **عايز تضيف صورة؟** ابعتها كرسالة عادية هنا في الشات ده خلال **60 ثانية**، ولو مش عايز صورة مش لازم تعمل حاجة.",
   });
+
+  // Collector لاستقبال صورة من نفس المستخدم في الـ channel نفسه
+  try {
+    const filter = (m) =>
+      m.author.id === interaction.user.id &&
+      m.attachments.size > 0 &&
+      m.attachments.some(a => /\.(png|jpe?g|gif|webp)$/i.test(a.url));
+
+    const collected = await interaction.channel.awaitMessages({
+      filter,
+      max: 1,
+      time: 60_000,
+      errors: [],
+    });
+
+    if (collected && collected.size > 0) {
+      const imgAttachment = collected.first().attachments.find(a =>
+        /\.(png|jpe?g|gif|webp)$/i.test(a.url)
+      );
+      if (imgAttachment) {
+        // حذف رسالة الصورة من الـ chat عشان ما تبوظش الشات
+        collected.first().delete().catch(() => {});
+
+        // تعديل الـ embed العام بالصورة
+        const updatedEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
+          .setImage(imgAttachment.url);
+        await publicMessage.edit({ embeds: [updatedEmbed] }).catch(() => {});
+
+        await interaction.followUp({
+          content: "🖼️ **اتضافت الصورة لاقتراحك!** ✅",
+          ephemeral: true,
+        }).catch(() => {});
+      }
+    }
+  } catch {
+    // انتهى الوقت أو مفيش صورة — مشكلش
+  }
 }
 
 function showSuggestionModal(interaction) {
@@ -2955,7 +2988,7 @@ client.on("interactionCreate", async (interaction) => {
 
       // Music Commands
       // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      const MUSIC_CMDS = ["شغل","شغل-اغنية","تخطي","skip","وقف","خروج","قائمة","queue","بوز","pause","كمل","resume","شغال-ايه","nowplaying","صوت","volume","تكرار","خلط","تخطى-لـ","احذف","كلمات"];
+      const MUSIC_CMDS = ["شغل","شغل-اغنية","تخطي","skip","خروج","قائمة","queue","بوز","pause","كمل","resume","شغال-ايه","nowplaying","صوت","volume","تكرار","خلط","تخطى-لـ","احذف","كلمات"];
       if (MUSIC_CMDS.includes(cmd)) {
         let musicInteraction = interaction;
         if (isFromDM && guild) {
@@ -4670,15 +4703,6 @@ client.on("interactionCreate", async (interaction) => {
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
               .setMaxLength(2000)
-          ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("suggest_image")
-              .setLabel("رابط صورة (اختياري — PNG/JPG/GIF)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(false)
-              .setMaxLength(500)
-              .setPlaceholder("https://...")
           )
         );
         return await interaction.showModal(modal);
@@ -4696,15 +4720,6 @@ client.on("interactionCreate", async (interaction) => {
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
               .setMaxLength(2000)
-          ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("bug_image")
-              .setLabel("رابط صورة توضيحية (اختياري)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(false)
-              .setMaxLength(500)
-              .setPlaceholder("https://...")
           )
         );
         return await interaction.showModal(modal);
@@ -4722,15 +4737,6 @@ client.on("interactionCreate", async (interaction) => {
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
               .setMaxLength(2000)
-          ),
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("other_image")
-              .setLabel("رابط صورة (اختياري)")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(false)
-              .setMaxLength(500)
-              .setPlaceholder("https://...")
           )
         );
         return await interaction.showModal(modal);
@@ -5221,19 +5227,16 @@ client.on("interactionCreate", async (interaction) => {
 
       // ✅ [تعديل 5] معالجة مودالات الأزرار الثلاثة
       if (interaction.customId === "modal_suggest_idea") {
-        const text  = interaction.fields.getTextInputValue("suggest_text");
-        const image = interaction.fields.getTextInputValue("suggest_image").trim() || null;
-        return await handleSuggestionModalSubmit(interaction, text, image);
+        const text = interaction.fields.getTextInputValue("suggest_text");
+        return await handleSuggestionModalSubmit(interaction, text);
       }
       if (interaction.customId === "modal_suggest_bug") {
-        const text  = interaction.fields.getTextInputValue("bug_text");
-        const image = interaction.fields.getTextInputValue("bug_image").trim() || null;
-        return await handleSuggestionModalSubmit(interaction, text, image);
+        const text = interaction.fields.getTextInputValue("bug_text");
+        return await handleSuggestionModalSubmit(interaction, text);
       }
       if (interaction.customId === "modal_suggest_other") {
-        const text  = interaction.fields.getTextInputValue("other_text");
-        const image = interaction.fields.getTextInputValue("other_image").trim() || null;
-        return await handleSuggestionModalSubmit(interaction, text, image);
+        const text = interaction.fields.getTextInputValue("other_text");
+        return await handleSuggestionModalSubmit(interaction, text);
       }
 
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {

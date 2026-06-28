@@ -233,7 +233,7 @@ export async function registerMusicCommands() {
   return [
     { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية من Spotify أو ابحث بالاسم').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها من Spotify').setRequired(true)), execute: handlePlay },
     { data: new SlashCommandBuilder().setName('تخطي').setDescription('⏭️ تخطي الأغنية الحالية'), execute: handleSkip },
-    { data: new SlashCommandBuilder().setName('وقف').setDescription('⏹️ إيقاف الموسيقى والخروج من القناة'), execute: handleStop },
+    { data: new SlashCommandBuilder().setName('خروج').setDescription('⏹️ إيقاف الموسيقى والخروج من القناة'), execute: handleStop },
     { data: new SlashCommandBuilder().setName('قائمة').setDescription('📋 عرض قائمة التشغيل').addIntegerOption(o => o.setName('صفحة').setDescription('رقم الصفحة').setRequired(false).setMinValue(1)), execute: handleQueue },
     { data: new SlashCommandBuilder().setName('بوز').setDescription('⏸️ إيقاف مؤقت للأغنية'), execute: handlePause },
     { data: new SlashCommandBuilder().setName('كمل').setDescription('▶️ استئناف التشغيل'), execute: handleResume },
@@ -364,10 +364,18 @@ export async function handleStop(interaction) {
     }
     if (q) q.currentMessage = null;
 
-    if (q) await distube.stop(interaction.guildId);
+    if (q) {
+      await distube.stop(interaction.guildId).catch(() => {});
+    }
+
+    // خروج صريح من القناة الصوتية لو البوت لسه فيها
+    const vc = interaction.guild?.members?.me?.voice?.channel;
+    if (vc) {
+      interaction.guild.members.me.voice.disconnect().catch(() => {});
+    }
 
     if (!isButton) {
-      await interaction.reply({ content: '⏹️ اتوقف وخرجت من القناة!', ephemeral: true });
+      await interaction.reply({ content: '👋 خرجت من القناة وإيقاف الموسيقى!', ephemeral: true });
     }
   } catch (e) {
     try {
