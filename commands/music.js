@@ -16,12 +16,134 @@ import { sendMusicCard } from '../helpers/music-card.js';
 // ─── كشف نوع الإدخال ──────────────────────────────────────────
 function detectSourceType(query) {
   const q = query.trim();
-  if (/open\.spotify\.com\/(playlist|album)/i.test(q)) return 'spotify_playlist';
-  if (/open\.spotify\.com\/track/i.test(q))            return 'spotify_track';
-  if (/open\.spotify\.com/i.test(q))                   return 'spotify_track';
+  // Spotify URIs: spotify:track:xxx / spotify:playlist:xxx / spotify:album:xxx / spotify:artist:xxx
+  if (/^spotify:(track|playlist|album|artist):[a-zA-Z0-9]+$/i.test(q)) {
+    const kind = q.split(':')[1].toLowerCase();
+    if (kind === 'track')  return 'spotify_track';
+    if (kind === 'artist') return 'spotify_artist';
+    return 'spotify_collection'; // playlist / album
+  }
+  // Spotify short links
+  if (/spotify\.link\//i.test(q))                      return 'spotify_short';
+  // Spotify web URLs
+  if (/open\.spotify\.com\/(playlist|album)/i.test(q)) return 'spotify_collection';
+  if (/open\.spotify\.com\/artist/i.test(q))            return 'spotify_artist';
+  if (/open\.spotify\.com\/track/i.test(q))             return 'spotify_track';
+  if (/open\.spotify\.com/i.test(q))                    return 'spotify_track';
+  // Other
   if (/youtube\.com|youtu\.be/i.test(q))               return 'youtube';
   if (/soundcloud\.com/i.test(q))                      return 'soundcloud';
   return 'text';
+}
+
+// ─── Spotify token helper ──────────────────────────────────────
+async function getSpotifyToken() {
+  const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=client_credentials&client_id=${process.env.SPOTIFY_CLIENT_ID}&client_secret=${process.env.SPOTIFY_CLIENT_SECRET}`,
+  });
+  const data = await tokenRes.json();
+  if (!data.access_token) throw new Error('فشل الحصول على Spotify token — تأكد من SPOTIFY_CLIENT_ID و SPOTIFY_CLIENT_SECRET');
+  return data.access_token;
+}
+
+// ─── جيب كل أغاني Spotify (track/album/playlist/artist/short) ──
+// بيرجع: { type, name, tracks: string[] }
+async function fetchSpotifyContent(rawQuery) {
+  const q = rawQuery.trim();
+
+  // — حل الـ Spotify URI إلى URL ويب عادي —
+  let url = q;
+  if (/^spotify:/i.test(q)) {
+    const parts = q.split(':'); // ['spotify','type','id']
+    url = `https://open.spotify.com/${parts[1]}/${parts[2]}`;
+  }
+
+  // — حل الـ short link —
+  if (/spotify\.link\//i.test(url)) {
+    const { default: nodeFetch } = await import('node-fetch');
+    const res = await nodeFetch(url, { redirect: 'follow', timeout: 8000 });
+    url = res.url; // الرابط النهائي بعد redirect
+  }
+
+  const token = await getSpotifyToken();
+  const headers = { Authorization: `Bearer ${token}` };
+
+  // — Track —
+  const trackMatch = url.match(/open\.spotify\.com\/track\/([a-zA-Z0-9]+)/i);
+  if (trackMatch) {
+    const res = await fetch(`https://api.spotify.com/v1/tracks/${trackMatch[1]}`, { headers });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    if (!data.name) throw new Error('مش لاقي بيانات الأغنية');
+    const searchQ = `${data.artists?.[0]?.name || ''} ${data.name}`.trim();
+    return { type: 'track', name: data.name, tracks: [searchQ] };
+  }
+
+  // — Playlist —
+  const plMatch = url.match(/open\.spotify\.com\/playlist\/([a-zA-Z0-9]+)/i);
+  if (plMatch) {
+    const tracks = [];
+    let endpoint = `https://api.spotify.com/v1/playlists/${plMatch[1]}/tracks?limit=50&fields=next,items(track(name,artists,is_local))`;
+    let playlistName = 'بلاي ليست';
+    let first = true;
+    while (endpoint && tracks.length < 100) {
+      const res = await fetch(endpoint, { headers });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      if (first) { playlistName = data.name || playlistName; first = false; }
+      for (const item of (data.items || [])) {
+        const t = item?.track;
+        if (!t || t.is_local || !t.name) continue;
+        tracks.push(`${t.artists?.[0]?.name || ''} ${t.name}`.trim());
+        if (tracks.length >= 100) break;
+      }
+      endpoint = data.next || null;
+    }
+    if (!tracks.length) throw new Error('البلاي ليست فاضية أو private — جرب بلاي ليست عامة (🔓 Public)');
+    return { type: 'playlist', name: playlistName, tracks };
+  }
+
+  // — Album —
+  const albMatch = url.match(/open\.spotify\.com\/album\/([a-zA-Z0-9]+)/i);
+  if (albMatch) {
+    const tracks = [];
+    let endpoint = `https://api.spotify.com/v1/albums/${albMatch[1]}/tracks?limit=50`;
+    let albumName = 'ألبوم';
+    let first = true;
+    while (endpoint && tracks.length < 100) {
+      const res = await fetch(endpoint, { headers });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      if (first) { albumName = data.name || albumName; first = false; }
+      for (const t of (data.items || [])) {
+        if (!t || !t.name) continue;
+        tracks.push(`${t.artists?.[0]?.name || ''} ${t.name}`.trim());
+        if (tracks.length >= 100) break;
+      }
+      endpoint = data.next || null;
+    }
+    if (!tracks.length) throw new Error('الألبوم ده فاضي أو مش متاح');
+    return { type: 'album', name: albumName, tracks };
+  }
+
+  // — Artist (top tracks) —
+  const artMatch = url.match(/open\.spotify\.com\/artist\/([a-zA-Z0-9]+)/i);
+  if (artMatch) {
+    const [artRes, topRes] = await Promise.all([
+      fetch(`https://api.spotify.com/v1/artists/${artMatch[1]}`, { headers }),
+      fetch(`https://api.spotify.com/v1/artists/${artMatch[1]}/top-tracks?market=US`, { headers }),
+    ]);
+    const artData = await artRes.json();
+    const topData = await topRes.json();
+    if (artData.error) throw new Error(artData.error.message);
+    const tracks = (topData.tracks || []).slice(0, 20).map(t => `${artData.name} ${t.name}`.trim());
+    if (!tracks.length) throw new Error('مش لاقي أغاني للفنان ده');
+    return { type: 'artist', name: artData.name, tracks };
+  }
+
+  throw new Error('نوع رابط Spotify غير مدعوم');
 }
 
 let distube = null;
@@ -271,6 +393,17 @@ export async function registerMusicCommands() {
   ];
 }
 
+// ─── بناء Embed للأغنية الواحدة / المجموعة ────────────────────
+function buildPlayEmbed(sp) {
+  const icons = { track: '🎵', playlist: '📋', album: '💿', artist: '🎤', collection: '🎵' };
+  const icon = icons[sp.type] || '🎵';
+  const typeAr = { track: 'أغنية', playlist: 'بلاي ليست', album: 'ألبوم', artist: 'فنان' }[sp.type] || 'محتوى';
+  const desc = sp.tracks.length === 1
+    ? `${icon} جاري تشغيل: **${sp.name}**`
+    : `${icon} جاري تشغيل **${sp.type === 'artist' ? `أفضل أغاني ${sp.name}` : sp.name}** — **${sp.tracks.length} أغنية** (${typeAr} Spotify)`;
+  return new EmbedBuilder().setColor(0x1DB954).setDescription(desc);
+}
+
 // ─── handlePlay ────────────────────────────────────────────────
 export async function handlePlay(interaction) {
   try {
@@ -287,139 +420,57 @@ export async function handlePlay(interaction) {
     const sourceType = detectSourceType(query);
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
 
-    if (sourceType === 'spotify_track') {
-      // ── رابط أغنية Spotify منفردة ──
-      // نجيب اسمها عن طريق Spotify API ونبحث عليها على YouTube
+    // ── كل أنواع Spotify تمر من fetchSpotifyContent ──────────────
+    if (sourceType.startsWith('spotify_')) {
+      const typeLabels = {
+        spotify_track:      '🎵 جاري جلب الأغنية من Spotify...',
+        spotify_collection: '📋 جاري تحميل المجموعة من Spotify...',
+        spotify_artist:     '🎤 جاري جلب أغاني الفنان من Spotify...',
+        spotify_short:      '🔗 جاري تحليل الرابط...',
+      };
+      await interaction.editReply({ content: typeLabels[sourceType] || '🎵 جاري جلب المحتوى من Spotify...' });
+
+      let sp;
       try {
-        const trackId = query.match(/track\/([a-zA-Z0-9]+)/)?.[1];
-        if (!trackId) throw new Error('رابط Spotify غير صحيح');
-
-        await interaction.editReply({ content: '🎵 جاري جلب معلومات الأغنية من Spotify...' });
-
-        const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `grant_type=client_credentials&client_id=${process.env.SPOTIFY_CLIENT_ID}&client_secret=${process.env.SPOTIFY_CLIENT_SECRET}`,
-        });
-        const { access_token } = await tokenRes.json();
-
-        const trackRes = await fetch(`https://api.spotify.com/v1/tracks/${trackId}`, {
-          headers: { Authorization: `Bearer ${access_token}` },
-        });
-        const track = await trackRes.json();
-        if (!track?.name) throw new Error('مش لاقي بيانات الأغنية');
-
-        const searchQuery = `${track.artists[0].name} ${track.name}`;
-        await interaction.editReply({ content: `🔍 جاري البحث عن: **${searchQuery}**...` });
-        await distube.play(voiceChannel, searchQuery, playOptions);
-
-      } catch (spErr) {
-        console.error('❌ [Music] Spotify API فشل:', spErr.message);
-        // fallback: جرب نجيب اسم الأغنية من صفحة Spotify (og:title) ونبحث على YouTube
-        try {
-          await interaction.editReply({ content: '🔍 جاري البحث عن الأغنية...' });
-          let ytQuery = query;
-          try {
-            const { default: nodeFetch } = await import('node-fetch');
-            const pageRes = await nodeFetch(query, {
-              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ZangiBot/1.0)' },
-              timeout: 6000,
-            });
-            const html = await pageRes.text();
-            const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/)?.[1]
-                         || html.match(/<title>([^<]+)<\/title>/)?.[1]?.replace(/ [|\-–—] Spotify.*$/i, '').trim();
-            if (ogTitle) {
-              ytQuery = ogTitle.replace(/\s*\|.*$/, '').trim();
-              await interaction.editReply({ content: `🔍 بحث عن: **${ytQuery}**...` });
-            }
-          } catch {}
-          await distube.play(voiceChannel, ytQuery, playOptions);
-        } catch (fbErr) {
-          return interaction.editReply({ content: `❌ فشل تحميل الأغنية: ${fbErr.message.slice(0, 200)}` });
-        }
-      }
-
-    } else if (sourceType === 'spotify_playlist') {
-      // ── بلاي ليست / ألبوم Spotify — جيب الأغاني يدوياً من API ──
-      await interaction.editReply({ content: '🎵 جاري تحميل البلاي ليست من Spotify...' });
-
-      let tracks = [];
-      try {
-        // احصل على access_token
-        const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `grant_type=client_credentials&client_id=${process.env.SPOTIFY_CLIENT_ID}&client_secret=${process.env.SPOTIFY_CLIENT_SECRET}`,
-        });
-        const { access_token } = await tokenRes.json();
-        if (!access_token) throw new Error('فشل الحصول على Spotify token');
-
-        const isAlbum = /open\.spotify\.com\/album/i.test(query);
-        const idMatch = query.match(/(?:playlist|album)\/([a-zA-Z0-9]+)/);
-        if (!idMatch) throw new Error('رابط Spotify غير صحيح');
-        const spotifyId = idMatch[1];
-
-        // جيب أول 50 أغنية (max per request)
-        const endpoint = isAlbum
-          ? `https://api.spotify.com/v1/albums/${spotifyId}/tracks?limit=50`
-          : `https://api.spotify.com/v1/playlists/${spotifyId}/tracks?limit=50&fields=items(track(name,artists,is_local))`;
-
-        const plRes = await fetch(endpoint, {
-          headers: { Authorization: `Bearer ${access_token}` },
-        });
-        const plData = await plRes.json();
-
-        if (plData.error) throw new Error(plData.error.message || 'فشل تحميل البلاي ليست');
-
-        tracks = (plData.items || [])
-          .map(item => {
-            const t = isAlbum ? item : item?.track;
-            if (!t || t.is_local || !t.name) return null;
-            const artist = t.artists?.[0]?.name || '';
-            return `${artist} ${t.name}`.trim();
-          })
-          .filter(Boolean)
-          .slice(0, 50);
-
-        if (!tracks.length) throw new Error('البلاي ليست فاضية أو private — جرب بلاي ليست عامة');
-
+        sp = await fetchSpotifyContent(query);
       } catch (apiErr) {
-        // fallback: جرب SpotifyPlugin مباشرة
-        console.warn('⚠️ [Music] Spotify API playlist fetch فشل:', apiErr.message, '— هجرب SpotifyPlugin');
-        await distube.play(voiceChannel, query, playOptions);
-        tracks = []; // SpotifyPlugin شغّل، مش محتاج نكمل
+        console.error('❌ [Music] fetchSpotifyContent فشل:', apiErr.message);
+        return interaction.editReply({ content: `❌ ${apiErr.message}` });
       }
 
-      if (tracks.length) {
-        await interaction.editReply({ content: `🎵 لاقيت **${tracks.length} أغنية** — جاري التشغيل...` });
+      if (sp.tracks.length === 1) {
+        // أغنية واحدة
+        await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+        await distube.play(voiceChannel, sp.tracks[0], playOptions);
+      } else {
+        // مجموعة — شغّل الأولى وأضيف الباقي في background
+        await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+        await distube.play(voiceChannel, sp.tracks[0], playOptions);
 
-        // شغّل الأغنية الأولى
-        await distube.play(voiceChannel, tracks[0], playOptions);
-
-        // أضيف الباقي للقائمة بـ flag يمنع فيضان رسايل addSong
-        if (tracks.length > 1) {
-          (async () => {
-            const q = distube.getQueue(interaction.guildId);
-            if (q) q._batchLoading = true;
-            for (let i = 1; i < tracks.length; i++) {
-              try {
-                await distube.play(voiceChannel, tracks[i], { ...playOptions });
-              } catch {}
-              // تأخير خفيف بين كل أغنية
-              await new Promise(r => setTimeout(r, 400));
-            }
-            const qEnd = distube.getQueue(interaction.guildId);
-            if (qEnd) {
-              qEnd._batchLoading = false;
-              qEnd.textChannel?.send({
-                embeds: [new EmbedBuilder().setColor(0x66FCF1).setDescription(`✅ أُضيفت **${tracks.length} أغنية** من Spotify للقائمة`)],
-              }).catch(() => {});
-            }
-          })();
-        }
+        // أضيف الباقي بدون إزعاج
+        ;(async () => {
+          const q = distube.getQueue(interaction.guildId);
+          if (q) q._batchLoading = true;
+          for (let i = 1; i < sp.tracks.length; i++) {
+            try { await distube.play(voiceChannel, sp.tracks[i], { ...playOptions }); } catch {}
+            await new Promise(r => setTimeout(r, 350));
+          }
+          const qEnd = distube.getQueue(interaction.guildId);
+          if (qEnd) {
+            qEnd._batchLoading = false;
+            qEnd.textChannel?.send({
+              embeds: [new EmbedBuilder()
+                .setColor(0x1DB954)
+                .setDescription(`✅ أُضيفت **${sp.tracks.length} أغنية** من Spotify للقائمة 🎵`)],
+            }).catch(() => {});
+          }
+        })();
       }
 
-    } else if (sourceType === 'youtube' || sourceType === 'soundcloud') {
+      return; // ← خروج بعد Spotify
+    }
+
+    if (sourceType === 'youtube' || sourceType === 'soundcloud') {
       // ── روابط YouTube / SoundCloud مباشرة ──
       await interaction.editReply({ content: '🔍 جاري التحميل...' });
       await distube.play(voiceChannel, query, playOptions);
