@@ -2221,6 +2221,11 @@ client.on("messageCreate", async (msg) => {
     question = rawText;
   }
 
+  // لو منشن البوت بدون كلام — يرد بتحية
+  if (!question && (isBotDirectMention || isReplyToBot)) {
+    question = "[حد منشنك أو عمل ريبلاي على رسالتك بدون كلام — رد عليه بشكل طبيعي ومرح]";
+  }
+
   if (!question || !_geminiReady) return;
 
   const now = Date.now();
