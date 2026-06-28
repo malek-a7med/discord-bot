@@ -291,10 +291,25 @@ export async function handlePlay(interaction) {
 
       } catch (spErr) {
         console.error('❌ [Music] Spotify API فشل:', spErr.message);
-        // fallback: جرب SpotifyPlugin مباشرة
+        // fallback: جرب نجيب اسم الأغنية من صفحة Spotify (og:title) ونبحث على YouTube
         try {
-          await interaction.editReply({ content: '🎵 جاري التحميل من Spotify...' });
-          await distube.play(voiceChannel, query, playOptions);
+          await interaction.editReply({ content: '🔍 جاري البحث عن الأغنية...' });
+          let ytQuery = query;
+          try {
+            const { default: nodeFetch } = await import('node-fetch');
+            const pageRes = await nodeFetch(query, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ZangiBot/1.0)' },
+              timeout: 6000,
+            });
+            const html = await pageRes.text();
+            const ogTitle = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/)?.[1]
+                         || html.match(/<title>([^<]+)<\/title>/)?.[1]?.replace(/ [|\-–—] Spotify.*$/i, '').trim();
+            if (ogTitle) {
+              ytQuery = ogTitle.replace(/\s*\|.*$/, '').trim();
+              await interaction.editReply({ content: `🔍 بحث عن: **${ytQuery}**...` });
+            }
+          } catch {}
+          await distube.play(voiceChannel, ytQuery, playOptions);
         } catch (fbErr) {
           return interaction.editReply({ content: `❌ فشل تحميل الأغنية: ${fbErr.message.slice(0, 200)}` });
         }

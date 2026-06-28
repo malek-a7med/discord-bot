@@ -24,15 +24,23 @@ import config from "../config.js";
 // ─── Gemini للترجمة فقط ────────────────────────────────────
 const _genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 async function translateAnimeQuery(arabicQuery) {
-  try {
-    const model = _genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const res = await model.generateContent(
-      `ترجم اسم الأنمي ده للإنجليزي فقط، ارجع الاسم الإنجليزي بس بدون أي كلام تاني: "${arabicQuery}"`
-    );
-    return res.response.text().trim().replace(/^["']|["']$/g, "");
-  } catch {
-    return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const model = _genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const res = await model.generateContent(
+        `أنت مساعد ترجمة. ارجع اسم الأنمي ده بالإنجليزي فقط بدون أي شرح أو كلام زيادة أو علامات ترقيم.\nاسم الأنمي: ${arabicQuery}\nالإجابة:`
+      );
+      const text = res.response.text()
+        .trim()
+        .replace(/^["'`\s]+|["'`\s]+$/g, "")
+        .split(/[\n\r]/)[0]
+        .trim();
+      if (text && text.length > 0 && text.length < 200) return text;
+    } catch {
+      if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
+    }
   }
+  return null;
 }
 
 // ─── Jikan API v4 ────────────────────────────────────────────

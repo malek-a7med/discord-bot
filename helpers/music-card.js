@@ -83,6 +83,18 @@ async function getThumb(url) {
   }
 }
 
+const BG_IMAGE_PATH = join(__dirname, '..', 'data', 'music-bg.png');
+let _cachedBg = null;
+async function loadBgImage() {
+  if (_cachedBg) return _cachedBg;
+  try {
+    _cachedBg = await loadImage(BG_IMAGE_PATH);
+    return _cachedBg;
+  } catch {
+    return null;
+  }
+}
+
 async function generateMusicCard(song, currentTime = 0, queue = null) {
   ensureFonts();
   try {
@@ -91,12 +103,20 @@ async function generateMusicCard(song, currentTime = 0, queue = null) {
     const ctx = canvas.getContext('2d');
     ctx.antialias = 'subpixel';
 
-    // خلفية
-    const bg = ctx.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#141E30');
-    bg.addColorStop(1, '#243B55');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, H);
+    // خلفية — صورة مخصصة أو gradient احتياطي
+    const bgImg = await loadBgImage();
+    if (bgImg) {
+      ctx.drawImage(bgImg, 0, 0, W, H);
+      // طبقة شفافية داكنة فوق الصورة عشان النص يبان
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#141E30');
+      bg.addColorStop(1, '#243B55');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+    }
 
     // صورة مصغرة
     const thumbSize = 300;

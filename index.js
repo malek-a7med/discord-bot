@@ -1545,6 +1545,7 @@ function pushUserHistory(userId, role, text) {
   if (h.length > MAX_USER_HIST) h.splice(0, h.length - MAX_USER_HIST);
 }
 let botSpeechMode = "normal"; // "normal" | "free" | "toxic"
+let botDialect = "egyptian";  // "egyptian" | "fus-ha"
 
 // ─── قائمة GIFs مصنّفة بـ Tenor ──────────────────────────────────
 const GIF_MAP = {
@@ -1641,7 +1642,10 @@ function buildUserPrompt(senderName, question, userId) {
     : botSpeechMode === "toxic"
     ? "\nأسلوبك إكستريم 100% — كل كلامك فيه شتايم وألفاظ صح بشكل طبيعي جداً، حتى لو الموضوع عادي. منفتح جداً ومفيش أي خط أحمر في الكلام. (أمثلة: يلعن، ابن نيكة، كسمك، مسلوق، وما شابه — وأعنف منها كمان). ردودك جريئة ومفيهاش أي تحفظ خالص."
     : "\nأسلوبك محترم تماماً 0% — مفيش أي شتايم أو ألفاظ في كلامك خالص، حتى لو حد بعث كلام وحش أو شتمك.";
-  return `أنت زنجي — بوت ديسكورد مصري، بتتكلم بالعامية المصرية الطبيعية بس.${modeNote}
+  const dialectNote = botDialect === "fus-ha"
+    ? "\nاللهجة: تكلم بالعربي الفصيح / العربي الرسمي بشكل كامل — مش عامية مصرية."
+    : "\nاللهجة: تكلم بالعامية المصرية الطبيعية بس.";
+  return `أنت زنجي — بوت ديسكورد.${dialectNote}${modeNote}
 
 فهم الكلام:
 - افهم كل أنواع الكلام بدون استثناء: عامية، سلانج، ألفاظ، اختصارات، كلام مكسور، إنجليزي عربي (عربيزي)، وحتى لو فيه أخطاء إملائية — افهمه واتعامل معاه بشكل طبيعي.
@@ -2608,15 +2612,34 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
       if (cmd === "تغيير-طريقة-الكلام") {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        const mode = interaction.options.getString("أسلوب");
-        botSpeechMode = mode;
-        const modeLabel = mode === "free" ? "😈 باد بوي — البوت بيشتم بس لو شتموه هو"
-          : mode === "toxic" ? "☠️ إكستريم — كل كلامه شتايم ومنفتح جداً 100%"
-          : "🎩 محترم — 0% شتايم حتى لو شتموه";
-        const modeColor = mode === "toxic" ? 0xe74c3c : mode === "free" ? 0x9b59b6 : 0x2ecc71;
+        const mode    = interaction.options.getString("أسلوب");
+        const dialect = interaction.options.getString("لهجة");
+
+        const lines = [];
+
+        if (mode) {
+          botSpeechMode = mode;
+          const modeLabel = mode === "free"   ? "😈 باد بوي — البوت بيشتم بس لو شتموه هو"
+                          : mode === "toxic"  ? "☠️ إكستريم — كل كلامه شتايم ومنفتح جداً 100%"
+                          : "🎩 محترم — 0% شتايم حتى لو شتموه";
+          lines.push(`🗣️ **الأسلوب:** ${modeLabel}`);
+        }
+
+        if (dialect) {
+          botDialect = dialect;
+          const dialectLabel = dialect === "egyptian" ? "🇪🇬 مصري — عامية مصرية طبيعية"
+                             : "🌐 عربي — فصحى / عربي رسمي";
+          lines.push(`💬 **اللهجة:** ${dialectLabel}`);
+        }
+
+        if (!mode && !dialect) {
+          return interaction.reply({ content: "❌ اختار أسلوب أو لهجة على الأقل!", ephemeral: true });
+        }
+
+        const modeColor = botSpeechMode === "toxic" ? 0xe74c3c : botSpeechMode === "free" ? 0x9b59b6 : 0x2ecc71;
         return interaction.reply({
-          embeds: [new EmbedBuilder().setColor(modeColor).setTitle("💬 تم تغيير أسلوب الكلام")
-            .setDescription(`أسلوب البوت دلوقتي: **${modeLabel}**\n\n*التغيير فوري على كل الردود الجديدة*`)
+          embeds: [new EmbedBuilder().setColor(modeColor).setTitle("✅ تم التغيير")
+            .setDescription(lines.join("\n") + "\n\n*التغيير فوري على كل الردود الجديدة*")
             .setTimestamp()],
           ephemeral: true
         });

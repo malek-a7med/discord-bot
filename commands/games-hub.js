@@ -54,11 +54,18 @@ export const speechModeCommand = new SlashCommandBuilder()
   .setName("تغيير-طريقة-الكلام")
   .setDescription("💬 غيّر أسلوب كلام البوت في الشات [أونر فقط]")
   .addStringOption(opt =>
-    opt.setName("أسلوب").setDescription("اختر الأسلوب المطلوب").setRequired(true)
+    opt.setName("أسلوب").setDescription("اختر الأسلوب المطلوب").setRequired(false)
       .addChoices(
         { name: "🎩 محترم — 0% شتايم", value: "normal" },
         { name: "😈 باد بوي — 50%", value: "free" },
         { name: "☠️ إكستريم — 100%", value: "toxic" },
+      )
+  )
+  .addStringOption(opt =>
+    opt.setName("لهجة").setDescription("اختر لهجة البوت").setRequired(false)
+      .addChoices(
+        { name: "🇪🇬 مصري — عامية مصرية طبيعية", value: "egyptian" },
+        { name: "🌐 عربي — فصحى / عربي رسمي", value: "fus-ha" },
       )
   );
 
