@@ -1,517 +1,821 @@
 // ═══════════════════════════════════════════════════════════════
-//  نظام Auto-Mod الذكي — زنجي Bot  v3.0
+//  نظام Auto-Mod العملاق — زنجي Bot  v5.0
 //
-//  المنطق:
-//  ┌──────────────────────────────────────────────────────────┐
-//  │  Layer 1 – Instant Regex                                 │
-//  │    أشياء مؤكدة 100% (CSAM / تفجيرات / إرهاب)           │
-//  │    → CRITICAL فوراً بدون Gemini                          │
-//  │                                                          │
-//  │  Layer 2 – Gemini AI (النص)                             │
-//  │    تحليل عميق مع context (تاريخ القناة + سجل المستخدم)  │
-//  │    → يرجع SAFE/LOW/MEDIUM/HIGH/CRITICAL                  │
-//  │                                                          │
-//  │  Layer 3 – Gemini Vision (الصور)                        │
-//  │    تحليل نفس المستويات على الصور                         │
-//  └──────────────────────────────────────────────────────────┘
+//  الطبقات:
+//  Layer 0 – Raid Detection          (دخول جماعي مشبوه)
+//  Layer 1 – Honeypot                (قناة مخفية = بوت/هاكر فوري)
+//  Layer 2 – Cross-Channel Flood     (بعت في 5+ قنوات في 10 ثواني)
+//  Layer 3 – Bot Behavioral Fingerprint (كشف البوتات من السلوك)
+//  Layer 4 – Spam & Flood            (flood/duplicate/mention/caps/emoji)
+//  Layer 5 – Instant Critical Regex  (CSAM/تفجيرات/إرهاب)
+//  Layer 6 – Smart Link Scanner      (Gemini يحلل الرابط + سياقه)
+//  Layer 7 – Account Age Check       (حساب جديد + مشبوه = أشد)
+//  Layer 8 – Warning Patterns        (نفس الرابط من 3 ناس = حجب فوري)
+//  Layer 9 – Night Mode              (threshold أشد بعد منتص الليل)
+//  Layer 10 – Gemini Deep Analysis   (نص + صور + reputation)
 //
-//  الفلسفة:
-//  ✅ الشتيمة العادية في سياق أصحاب = SAFE
-//  ✅ كلام حماسي في الألعاب = SAFE
-//  ✅ نقاشات دينية وسياسية = SAFE (إلا التحريض المباشر)
-//  ✅ اقتباسات من أغاني / أفلام = SAFE
-//  ✅ التعبير عن الإحباط = SAFE
-//  ❌ تهديد شخص بعينه = HIGH/CRITICAL
-//  ❌ محتوى إباحي صريح = HIGH/CRITICAL
-//  ❌ تحريض إرهابي = CRITICAL
-//  ❌ محتوى يتعلق بأطفال = CRITICAL
+//  Reputation System: كل يوزر عنده score 0-100 بيتراكم
+//  Daily Stats: إحصائيات يومية كاملة
 // ═══════════════════════════════════════════════════════════════
 
 import config from "../config.js";
 
 // ─── مستويات الخطورة ──────────────────────────────────────────
 export const DANGER = Object.freeze({
-  SAFE:     0,  // لا شيء
-  LOW:      1,  // تسجيل فقط — بدون حذف أو عقوبة
-  MEDIUM:   2,  // حذف + تنبيه هادئ
-  HIGH:     3,  // حذف + تحذير رسمي + إسكات عند التكرار
-  CRITICAL: 4,  // حذف + إجراء فوري
+  SAFE: 0, LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4,
 });
-
 const DANGER_LABEL = ["SAFE", "LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
-// ─── Layer 1: Regex فوري للأشياء المؤكدة 100% ─────────────────
-// فقط الأشياء اللي مفيش فيها سياق بيجعلها مقبولة إطلاقاً
-const INSTANT_CRITICAL_PATTERNS = [
-  // CSAM / استغلال أطفال
-  /(?:أطفال|طفل|صغير|minor|child)\s*(?:سكس|sex|إباحي|porn|naked|عاري|ينيك|ينيكه)/gi,
-  // تعليمات تفجير حقيقية
-  /(?:كيفية?\s*(?:صنع|عمل|تصنيع)\s*(?:قنبلة|متفجرات|عبوة\s*ناسفة|سكين\s*إلكتروني))/gi,
-  // تجنيد إرهابي صريح
-  /(?:انضم|انضمي|بايعوا)\s*(?:داعش|القاعدة|النصرة|ISIS|ISIL|تنظيم)/gi,
+// ═══════════════════════════════════════════════════════════════
+//  Reputation System
+// ═══════════════════════════════════════════════════════════════
+const _reputation = new Map();
+const REP_DECAY_MS = 24 * 60 * 60 * 1000;
+
+function getReputation(userId) {
+  const now = Date.now();
+  let rep = _reputation.get(userId) || { score: 75, lastDecay: now };
+  const days = Math.floor((now - rep.lastDecay) / REP_DECAY_MS);
+  if (days > 0) {
+    rep.score = Math.min(100, rep.score + days * 5);
+    rep.lastDecay = now;
+    _reputation.set(userId, rep);
+  }
+  return rep.score;
+}
+
+function changeRep(userId, delta) {
+  const rep = _reputation.get(userId) || { score: 75, lastDecay: Date.now() };
+  rep.score = Math.max(0, Math.min(100, rep.score + delta));
+  _reputation.set(userId, rep);
+}
+
+function getRepLabel(score) {
+  if (score >= 80) return "🟢 موثوق";
+  if (score >= 60) return "🟡 عادي";
+  if (score >= 40) return "🟠 مشبوه";
+  return "🔴 خطر";
+}
+
+export function getUserReputation(userId) {
+  const score = getReputation(userId);
+  return { score, label: getRepLabel(score) };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 0 — Raid Detection
+// ═══════════════════════════════════════════════════════════════
+const _joinTracker = { joins: [], lockdown: false, lockdownUntil: 0 };
+const RAID_CONFIG = {
+  WINDOW_MS: 60_000,      // دقيقة واحدة
+  MAX_JOINS: 5,           // ماكس 5 أعضاء جدد
+  MIN_ACCOUNT_AGE: 7,     // أقل من 7 أيام = مشبوه
+  LOCKDOWN_MS: 10 * 60_000, // lockdown 10 دقايق
+};
+
+export async function checkRaid(member, notifyOwner) {
+  const now = Date.now();
+  _joinTracker.joins = _joinTracker.joins.filter(t => now - t < RAID_CONFIG.WINDOW_MS);
+  _joinTracker.joins.push(now);
+
+  const accountAgeMs = now - member.user.createdTimestamp;
+  const accountAgeDays = accountAgeMs / (24 * 60 * 60 * 1000);
+  const isNewAccount = accountAgeDays < RAID_CONFIG.MIN_ACCOUNT_AGE;
+
+  if (_joinTracker.joins.length >= RAID_CONFIG.MAX_JOINS && !_joinTracker.lockdown) {
+    _joinTracker.lockdown = true;
+    _joinTracker.lockdownUntil = now + RAID_CONFIG.LOCKDOWN_MS;
+
+    try {
+      // كيك الحسابات الجديدة جداً (أقل من يوم)
+      if (accountAgeDays < 1 && member.kickable) {
+        await member.kick("Auto-Mod: Raid Detection — حساب جديد جداً").catch(() => {});
+      }
+    } catch {}
+
+    await notifyOwner(null, null,
+      `🚨 RAID DETECTED — ${_joinTracker.joins.length} عضو دخلوا في دقيقة واحدة! السيرفر في وضع الحماية لـ 10 دقايق.`,
+      0
+    ).catch(() => {});
+
+    return true;
+  }
+
+  // Lockdown منتهي؟
+  if (_joinTracker.lockdown && now > _joinTracker.lockdownUntil) {
+    _joinTracker.lockdown = false;
+  }
+
+  // حساب جديد جداً في وقت lockdown → كيك
+  if (_joinTracker.lockdown && accountAgeDays < 1 && member.kickable) {
+    await member.kick("Auto-Mod: Lockdown Mode").catch(() => {});
+    return true;
+  }
+
+  return false;
+}
+
+export function isLockdown() {
+  return _joinTracker.lockdown && Date.now() < _joinTracker.lockdownUntil;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 1 — Honeypot
+// ═══════════════════════════════════════════════════════════════
+// أي رسالة في القناة المخفية = بوت أو هاكر فوراً
+// اسم القناة يتحدد في config أو env
+const HONEYPOT_CHANNEL_IDS = [
+  "1517362832063074324",
+  ...(process.env.HONEYPOT_CHANNEL ? [process.env.HONEYPOT_CHANNEL] : []),
 ];
 
-// ─── Pre-screen: تصفية سريعة قبل Gemini (توفير API calls) ────
-// لو الرسالة بيضاء تماماً → SAFE فوراً
+function isHoneypotChannel(channelName, channelId) {
+  if (HONEYPOT_CHANNEL_IDS.includes(channelId)) return true;
+  if (!channelName) return false;
+  return ["honeypot-dont-send", "honeypot", "trap-channel"]
+    .some(n => channelName.toLowerCase().includes(n));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 2 — Cross-Channel Flood
+// ═══════════════════════════════════════════════════════════════
+const _crossChannel = new Map(); // userId → Set<channelId> with timestamps
+const CROSS_WINDOW_MS = 10_000;
+const MAX_CHANNELS = 5;
+
+function checkCrossChannelFlood(userId, channelId) {
+  const now = Date.now();
+  let data = _crossChannel.get(userId) || { channels: new Map(), firstAt: now };
+
+  if (now - data.firstAt > CROSS_WINDOW_MS) {
+    data = { channels: new Map(), firstAt: now };
+  }
+
+  data.channels.set(channelId, now);
+  _crossChannel.set(userId, data);
+
+  if (data.channels.size >= MAX_CHANNELS) {
+    changeRep(userId, -30);
+    return {
+      type: "cross_channel_flood",
+      reason: `بعت في ${data.channels.size} قنوات في 10 ثواني — هاكر محتمل!`,
+      level: DANGER.CRITICAL,
+    };
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 3 — Bot Behavioral Fingerprint
+// ═══════════════════════════════════════════════════════════════
+const _behaviorTracker = new Map(); // userId → behavioral data
+const BOT_SIGNALS = {
+  MIN_MESSAGES_TO_JUDGE: 8,
+  MAX_RESPONSE_TIME_VARIANCE: 200,  // ms — البوت بيرد في نفس الوقت دايماً
+  MIN_MSG_LENGTH_VARIANCE: 5,       // البوت رسائله متشابهة في الطول
+  MAX_TYPO_RATIO: 0.0,              // البوت مش بيغلط
+};
+
+function trackBehavior(msg) {
+  const userId = msg.author.id;
+  const now = Date.now();
+  const content = msg.content || "";
+
+  let data = _behaviorTracker.get(userId) || {
+    messages: [],
+    lastMsgTime: now,
+    responseTimes: [],
+  };
+
+  const responseTime = now - data.lastMsgTime;
+  if (responseTime < 60_000) {
+    data.responseTimes.push(responseTime);
+    if (data.responseTimes.length > 20) data.responseTimes.shift();
+  }
+
+  data.messages.push({
+    time: now,
+    length: content.length,
+    hasTypos: /[a-zA-Z]{15,}/.test(content) === false, // كلمات طويلة غير واقعية = بوت
+    channelId: msg.channel.id,
+  });
+
+  if (data.messages.length > 20) data.messages.shift();
+  data.lastMsgTime = now;
+  _behaviorTracker.set(userId, data);
+
+  // نحكم بعد 8+ رسائل
+  if (data.messages.length < BOT_SIGNALS.MIN_MESSAGES_TO_JUDGE) return null;
+
+  // فحص variance في الـ response times
+  const times = data.responseTimes.slice(-10);
+  if (times.length >= 5) {
+    const avg = times.reduce((a, b) => a + b, 0) / times.length;
+    const variance = times.reduce((sum, t) => sum + Math.pow(t - avg, 2), 0) / times.length;
+    const stdDev = Math.sqrt(variance);
+
+    // البوت بيرد في نفس الوقت بالظبط — variance منخفضة جداً
+    if (stdDev < BOT_SIGNALS.MAX_RESPONSE_TIME_VARIANCE && avg < 2000) {
+      // فحص إن الرسائل من قنوات متعددة (broadcast bot)
+      const uniqueChannels = new Set(data.messages.slice(-10).map(m => m.channelId)).size;
+      if (uniqueChannels >= 3) {
+        changeRep(userId, -25);
+        return {
+          type: "bot_behavior",
+          reason: `سلوك بوت مكتشف — ردود منتظمة في ${uniqueChannels} قنوات (std: ${stdDev.toFixed(0)}ms)`,
+          level: DANGER.HIGH,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 4 — Spam & Flood
+// ═══════════════════════════════════════════════════════════════
+const _spamTracker = new Map();
+const SPAM_CONFIG = {
+  WINDOW_MS: 5_000,
+  MAX_MESSAGES: 5,
+  MAX_DUPLICATES: 3,
+  MAX_MENTIONS: 5,
+  MIN_CAPS_RATIO: 0.8,
+  MIN_CAPS_LENGTH: 20,
+  EMOJI_FLOOD: 15,
+};
+
+function checkSpam(msg) {
+  const userId = msg.author.id;
+  const content = msg.content || "";
+  const now = Date.now();
+
+  const mentionCount = msg.mentions.users.size + msg.mentions.roles.size +
+    (msg.mentions.everyone ? 1 : 0);
+  if (mentionCount >= SPAM_CONFIG.MAX_MENTIONS) {
+    changeRep(userId, -10);
+    return { type: "mass_mention", reason: `منشن مفرط (${mentionCount})`, level: DANGER.HIGH };
+  }
+
+  // @everyone أو @here من غير صلاحية
+  if (msg.mentions.everyone && !msg.member?.permissions.has("MentionEveryone")) {
+    changeRep(userId, -20);
+    return { type: "everyone_mention", reason: "محاولة منشن @everyone بدون صلاحية", level: DANGER.HIGH };
+  }
+
+  const emojiCount = (content.match(/\p{Emoji}/gu) || []).length;
+  if (emojiCount >= SPAM_CONFIG.EMOJI_FLOOD) {
+    changeRep(userId, -5);
+    return { type: "emoji_flood", reason: `إيموجي مفرط (${emojiCount})`, level: DANGER.MEDIUM };
+  }
+
+  if (content.length >= SPAM_CONFIG.MIN_CAPS_LENGTH) {
+    const letters = content.replace(/[^a-zA-Zا-ي]/g, "");
+    if (letters.length > 0) {
+      const capsRatio = content.replace(/[^A-Z]/g, "").length / letters.length;
+      if (capsRatio >= SPAM_CONFIG.MIN_CAPS_RATIO) {
+        changeRep(userId, -3);
+        return { type: "caps_flood", reason: "كابس فلود", level: DANGER.LOW };
+      }
+    }
+  }
+
+  let tracker = _spamTracker.get(userId) || { messages: [], lastReset: now };
+  if (now - tracker.lastReset > SPAM_CONFIG.WINDOW_MS) {
+    tracker = { messages: [], lastReset: now };
+  }
+  tracker.messages.push({ content, time: now });
+  tracker.messages = tracker.messages.filter(m => now - m.time < SPAM_CONFIG.WINDOW_MS);
+  _spamTracker.set(userId, tracker);
+
+  if (tracker.messages.length > SPAM_CONFIG.MAX_MESSAGES) {
+    changeRep(userId, -15);
+    return { type: "flood", reason: `فيضان (${tracker.messages.length} رسائل/5ث)`, level: DANGER.HIGH };
+  }
+
+  const last = tracker.messages.slice(-SPAM_CONFIG.MAX_DUPLICATES).map(m => m.content);
+  if (last.length >= SPAM_CONFIG.MAX_DUPLICATES && last.every(c => c === last[0]) && last[0].length > 3) {
+    changeRep(userId, -10);
+    return { type: "duplicate", reason: "تكرار رسائل متطابقة", level: DANGER.MEDIUM };
+  }
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 5 — Instant Critical Regex
+// ═══════════════════════════════════════════════════════════════
+const INSTANT_CRITICAL_PATTERNS = [
+  /(?:أطفال|طفل|صغير|minor|child)\s*(?:سكس|sex|إباحي|porn|naked|عاري)/gi,
+  /(?:كيفية?\s*(?:صنع|عمل|تصنيع)\s*(?:قنبلة|متفجرات|عبوة\s*ناسفة))/gi,
+  /(?:انضم|انضمي|بايعوا)\s*(?:داعش|القاعدة|النصرة|ISIS|ISIL)/gi,
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 6 — Smart Link Scanner (Gemini-powered)
+// ═══════════════════════════════════════════════════════════════
+const _linkHistory = new Map();   // url → { count, users: Set, firstAt }
+const _scannedLinks = new Map();  // url → { safe, reason, scannedAt }
+const LINK_CACHE_MS = 30 * 60_000;
+
+const INSTANT_BAD_DOMAINS = [
+  "grabify.link", "iplogger.org", "blasze.tk", "urlz.fr", "psty.io",
+  "2no.co", "yip.su", "discordnitro-free", "discord-gift", "free-nitro",
+  "steamcommunity.ru", "steamcommunity.tk",
+];
+
+const INSTANT_BAD_PATTERNS = [
+  /free.{0,10}nitro/i, /discord.{0,5}gift/i,
+  /steam.{0,5}(?:free|gift)/i, /click.{0,10}(?:win|prize)/i,
+];
+
+// Warning Patterns — نفس الرابط من 3 ناس مختلفين = حجب فوري
+function trackLinkHistory(url, userId) {
+  const now = Date.now();
+  let rec = _linkHistory.get(url) || { count: 0, users: new Set(), firstAt: now };
+
+  if (now - rec.firstAt > 60 * 60_000) {
+    rec = { count: 0, users: new Set(), firstAt: now };
+  }
+
+  rec.count++;
+  rec.users.add(userId);
+  _linkHistory.set(url, rec);
+
+  if (rec.users.size >= 3 && rec.count >= 5) {
+    return {
+      type: "coordinated_link",
+      reason: `رابط مشبوه منتشر — ${rec.users.size} ناس مختلفين بعتوه ${rec.count} مرات`,
+      level: DANGER.HIGH,
+    };
+  }
+  return null;
+}
+
+async function scanLinkWithGemini(url, context, geminiTextModel) {
+  if (!geminiTextModel) return null;
+
+  // فحص الـ cache
+  const cached = _scannedLinks.get(url);
+  if (cached && Date.now() - cached.scannedAt < LINK_CACHE_MS) {
+    return cached.safe ? null : { type: "bad_link", reason: cached.reason, level: DANGER.HIGH };
+  }
+
+  try {
+    const prompt = `أنت نظام فحص روابط لسيرفر Discord. فحص هذا الرابط وقيّمه.
+
+الرابط: ${url}
+سياق الرسالة: "${context.slice(0, 200)}"
+
+قيّم هل الرابط:
+1. آمن تماماً (موقع معروف، لعبة، مقطع فيديو، صورة، إلخ)
+2. مشبوه (IP grabber، فيشينج، scam، برامج ضارة)
+
+أجب بـ JSON فقط:
+{
+  "safe": true | false,
+  "reason": "سبب قصير بالعربي",
+  "confidence": 0-100
+}`;
+
+    const result = await geminiTextModel.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    _scannedLinks.set(url, { safe: parsed.safe, reason: parsed.reason, scannedAt: Date.now() });
+
+    if (!parsed.safe && parsed.confidence > 70) {
+      return { type: "bad_link_ai", reason: `رابط مشبوه: ${parsed.reason}`, level: DANGER.HIGH };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function checkLinks(content, userId, geminiTextModel) {
+  const urlMatches = content.match(/https?:\/\/[^\s]+/g) || [];
+  if (urlMatches.length === 0) return null;
+
+  for (const url of urlMatches) {
+    // فحص فوري
+    for (const domain of INSTANT_BAD_DOMAINS) {
+      if (url.toLowerCase().includes(domain)) {
+        changeRep(userId, -25);
+        return { type: "bad_domain", reason: `رابط ضار (${domain})`, level: DANGER.HIGH };
+      }
+    }
+    for (const pattern of INSTANT_BAD_PATTERNS) {
+      if (pattern.test(url) || pattern.test(content)) {
+        changeRep(userId, -20);
+        return { type: "phishing", reason: "رابط فيشينج", level: DANGER.HIGH };
+      }
+    }
+
+    // Warning Pattern — نفس الرابط من ناس كتير
+    const coordResult = trackLinkHistory(url, userId);
+    if (coordResult) {
+      changeRep(userId, -15);
+      return coordResult;
+    }
+
+    // Gemini فحص ذكي (async في الخلفية — مش بيعطل)
+    if (geminiTextModel) {
+      scanLinkWithGemini(url, content, geminiTextModel).then(result => {
+        if (result) {
+          // نسجل في الـ history بس — الرسالة اتمرت بالفعل
+          console.warn(`⚠️ [AutoMod] Gemini flagged link: ${url} — ${result.reason}`);
+        }
+      }).catch(() => {});
+    }
+  }
+
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 7 — Account Age Check
+// ═══════════════════════════════════════════════════════════════
+function getAccountAgeFactor(member) {
+  if (!member?.user?.createdTimestamp) return 1;
+  const ageDays = (Date.now() - member.user.createdTimestamp) / (24 * 60 * 60 * 1000);
+  if (ageDays < 1)  return 3;   // أقل من يوم = خطر عالي جداً
+  if (ageDays < 7)  return 2;   // أقل من أسبوع = ضاعف الـ threat
+  if (ageDays < 30) return 1.5; // أقل من شهر = حذر
+  return 1;                     // عادي
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Layer 9 — Night Mode
+// ═══════════════════════════════════════════════════════════════
+function isNightMode() {
+  const hour = new Date().getUTCHours() + 2; // Egypt UTC+2
+  return hour >= 0 && hour < 7; // من 12 الليل لـ 7 الصبح
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  Pre-screen
+// ═══════════════════════════════════════════════════════════════
 const SAFE_PRESCREEN = [
-  // روابط عادية
-  /^https?:\/\//,
-  // إيموجي فقط
   /^[\p{Emoji}\s]+$/u,
-  // أرقام/حروف قليلة
   /^.{1,3}$/,
 ];
 
-// ─── Throttle per-user (مش global) ───────────────────────────
-const _userLastCall = new Map(); // userId → timestamp
-const USER_THROTTLE_MS = 1500;    // 1.5 ثانية بين calls لنفس المستخدم
-
-// ─── Cache context القناة (آخر 5 رسائل per channel) ──────────
-const _channelContext = new Map(); // channelId → Message[]
-
-// ─── مشتبه بيهم (لو أخد 2+ flags في 5 دقايق) ──────────────
-const _suspectTracker = new Map(); // userId → { count, firstAt }
-const SUSPECT_WINDOW_MS = 5 * 60 * 1000;
+// ═══════════════════════════════════════════════════════════════
+//  Throttle & Context
+// ═══════════════════════════════════════════════════════════════
+const _userLastCall = new Map();
+const USER_THROTTLE_MS = 1500;
+const _suspectTracker = new Map();
+const SUSPECT_WINDOW_MS = 5 * 60_000;
+const _channelContext = new Map();
 
 function trackSuspect(userId) {
-  const now  = Date.now();
-  const rec  = _suspectTracker.get(userId) || { count: 0, firstAt: now };
-  if (now - rec.firstAt > SUSPECT_WINDOW_MS) {
-    _suspectTracker.set(userId, { count: 1, firstAt: now });
-    return 1;
-  }
+  const now = Date.now();
+  const rec = _suspectTracker.get(userId) || { count: 0, firstAt: now };
+  if (now - rec.firstAt > SUSPECT_WINDOW_MS) { _suspectTracker.set(userId, { count: 1, firstAt: now }); return 1; }
   rec.count++;
   _suspectTracker.set(userId, rec);
   return rec.count;
 }
 
-// ─── جلب context القناة (آخر 5 رسائل) ──────────────────────
 async function getChannelContext(msg) {
   try {
     const cached = _channelContext.get(msg.channel.id);
     if (cached && Date.now() - cached._ts < 10_000) return cached.messages;
-
     const fetched = await msg.channel.messages.fetch({ limit: 6, before: msg.id });
     const messages = [...fetched.values()]
       .filter(m => !m.author.bot && m.id !== msg.id)
-      .slice(0, 5)
-      .reverse()
+      .slice(0, 5).reverse()
       .map(m => `${m.author.username}: ${m.content.slice(0, 120)}`);
-
     _channelContext.set(msg.channel.id, { messages, _ts: Date.now() });
     return messages;
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Gemini Text Analysis — القلب الذكي للنظام
+//  Layer 10 — Gemini Deep Analysis
 // ═══════════════════════════════════════════════════════════════
-async function analyzeWithGemini(msg, db, geminiTextModel) {
-  if (!geminiTextModel) return { level: DANGER.SAFE, reason: "لا يوجد نموذج AI" };
-
-  // throttle per user
-  const now  = Date.now();
+async function analyzeWithGemini(msg, db, geminiTextModel, ageFactor) {
+  if (!geminiTextModel) return { level: DANGER.SAFE, reason: "لا يوجد AI" };
+  const now = Date.now();
   const last = _userLastCall.get(msg.author.id) || 0;
   if (now - last < USER_THROTTLE_MS) return { level: DANGER.SAFE, reason: "throttle" };
   _userLastCall.set(msg.author.id, now);
 
-  // جلب context
   const contextMessages = await getChannelContext(msg);
-  const warnings        = db.getWarnings(msg.author.id).length;
-  const suspectCount    = _suspectTracker.get(msg.author.id)?.count || 0;
+  const warnings = db.getWarnings(msg.author.id).length;
+  const suspectCount = _suspectTracker.get(msg.author.id)?.count || 0;
+  const repScore = getReputation(msg.author.id);
+  const nightMode = isNightMode();
 
   const contextBlock = contextMessages.length > 0
-    ? `\nالسياق (آخر رسائل في القناة):\n${contextMessages.map(m => `  • ${m}`).join("\n")}`
+    ? `\nالسياق:\n${contextMessages.map(m => `  • ${m}`).join("\n")}`
     : "";
 
-  const prompt = `أنت نظام مراقبة ذكي لسيرفر Discord عربي. مهمتك تحليل الرسائل بدقة عالية.
+  const strictnessNote = [
+    repScore < 40 ? "⚠️ مستخدم بسجل سيئ — كن صارماً جداً." : "",
+    ageFactor > 1 ? `⚠️ حساب جديد (عمر أقل من ${ageFactor > 2 ? "يوم" : "أسبوع"}) — حذر مضاعف.` : "",
+    nightMode ? "🌙 وضع الليل — threshold أشد." : "",
+  ].filter(Boolean).join("\n");
 
-═══ الرسالة المراد تحليلها ═══
+  const prompt = `أنت نظام مراقبة ذكي لسيرفر Discord عربي.
+
+═══ الرسالة ═══
 المرسل: ${msg.member?.displayName || msg.author.username}
 المحتوى: "${msg.content.slice(0, 600)}"${contextBlock}
 
 ═══ معلومات المرسل ═══
-عدد التحذيرات السابقة: ${warnings}
-مرات الإشارة المشبوهة اليوم: ${suspectCount}
+تحذيرات: ${warnings} | مشبوه اليوم: ${suspectCount}
+سمعة: ${repScore}/100 (${getRepLabel(repScore)})
+${strictnessNote}
 
-═══ تعليمات التحليل ═══
+═══ قواعد التحليل ═══
+🟢 SAFE (90%+ الرسائل): شتايم عادية بين أصحاب، مجادلات، كلام حماسي في ألعاب، اقتباسات، نقاشات دينية/سياسية، إحباط وغضب عام
+🟡 LOW: معلومات مضللة خطيرة فعلاً
+🟠 MEDIUM: محتوى جنسي صريح جداً، دوكسينج
+🔴 HIGH: تهديد جسدي صريح لشخص بعينه، خطاب كراهية منظم، مضايقة ممنهجة
+⛔ CRITICAL: استغلال أطفال، تعليمات أسلحة حقيقية، تحريض إرهابي
 
-⚠️ قاعدة ذهبية: الغالبية العظمى من الرسائل = SAFE. التدخل بس لما في خطر حقيقي واضح.
-
-🟢 SAFE — تجاهل تماماً (90%+ من الرسائل):
-• أي شتيمة أو كلام وحش بين أصحاب أو في نقاش عادي — حتى لو موجهة
-• "اخرس"، "أنت غبي"، "مسخرة"، "يلعن"، "كسمك"، "ابن نيك" — كلها عادية في السيرفرات العربية
-• أي تلاسن أو مجادلة حتى لو فيها سب
-• كلام حماسي / تنافسي في الألعاب
-• اقتباسات من أغاني أو أفلام أو ميمز
-• نقاش ديني أو سياسي مهما اشتد
-• تعبير عن إحباط أو غضب عام
-• أي حاجة مش فيها خطر فعلي على شخص أو ضرر حقيقي
-
-🟡 LOW — حالات نادرة جداً، تسجيل بس بدون أي إجراء:
-• معلومات مضللة خطيرة فعلاً (مش مجرد رأي غلط)
-
-🟠 MEDIUM — مخالفة صريحة تستحق الحذف:
-• محتوى جنسي وصفي صريح جداً (مش مجرد تلميح)
-• دوكسينج: نشر عنوان / رقم تليفون / بيانات شخصية حقيقية لشخص
-
-🔴 HIGH — خطر حقيقي واضح:
-• تهديد صريح بالأذى الجسدي لشخص بعينه مع تفاصيل (مش مجرد "هقتلك" في سياق ألعاب)
-• خطاب كراهية منظم وعدائي موجه لفئة بسبب دين/عرق/جنس بنية إيذاء
-• حملة مضايقة ممنهجة موثقة
-
-⛔ CRITICAL — تصرف فوري (نادر جداً):
-• أي محتوى يتعلق باستغلال أطفال
-• تعليمات تصنيع أسلحة / مواد متفجرة فعلية
-• تحريض إرهابي أو تجنيد لجماعات متطرفة
-• تهديد قتل مع تفاصيل حقيقية وقابلة للتنفيذ
-
-═══ الإجابة المطلوبة ═══
-أجب بـ JSON فقط بدون أي نص إضافي:
+أجب بـ JSON فقط:
 {
-  "level": "SAFE" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL",
-  "category": "NONE" | "HARASSMENT" | "THREAT" | "HATE_SPEECH" | "EXPLICIT" | "DANGEROUS_INFO" | "EXTREMISM",
-  "reason": "سبب قصير بالعربي (جملة واحدة)",
-  "delete": true | false,
+  "level": "SAFE"|"LOW"|"MEDIUM"|"HIGH"|"CRITICAL",
+  "category": "NONE"|"HARASSMENT"|"THREAT"|"HATE_SPEECH"|"EXPLICIT"|"DANGEROUS_INFO"|"EXTREMISM",
+  "reason": "سبب قصير بالعربي",
+  "delete": true|false,
   "confidence": 0-100
 }`;
 
   try {
     const result = await geminiTextModel.generateContent(prompt);
-    const raw    = result.response.text().trim();
-
-    // استخراج JSON من الرد
+    const raw = result.response.text().trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("لا يوجد JSON في الرد");
-
+    if (!jsonMatch) throw new Error("no JSON");
     const parsed = JSON.parse(jsonMatch[0]);
-
     const levelMap = { SAFE: 0, LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
-    const level    = levelMap[parsed.level?.toUpperCase()] ?? DANGER.SAFE;
+    let level = levelMap[parsed.level?.toUpperCase()] ?? DANGER.SAFE;
+
+    // Night Mode + حساب جديد = رفع المستوى درجة
+    if (nightMode && level === DANGER.MEDIUM) level = DANGER.HIGH;
+    if (ageFactor > 1.5 && level === DANGER.MEDIUM) level = DANGER.HIGH;
+
+    if (level >= DANGER.HIGH) changeRep(msg.author.id, -20);
+    else if (level === DANGER.MEDIUM) changeRep(msg.author.id, -8);
+    else if (level === DANGER.LOW) changeRep(msg.author.id, -3);
+    else changeRep(msg.author.id, 1);
 
     return {
       level,
-      category:   parsed.category || "NONE",
-      reason:     parsed.reason   || "محتوى مخالف",
+      category: parsed.category || "NONE",
+      reason: parsed.reason || "محتوى مخالف",
       shouldDelete: parsed.delete !== false,
       confidence: parsed.confidence || 80,
     };
   } catch (e) {
-    console.warn("⚠️ [AutoMod] Gemini parse error:", e.message, "| Raw:", (await geminiTextModel.generateContent(prompt).catch(() => null))?.response?.text()?.slice(0, 100));
+    console.warn("⚠️ [AutoMod] Gemini error:", e.message);
     return { level: DANGER.SAFE, reason: "خطأ في التحليل" };
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  Gemini Vision Analysis — تحليل الصور
-// ═══════════════════════════════════════════════════════════════
 async function analyzeImageWithGemini(imageUrl, geminiVisionModel) {
   if (!geminiVisionModel) return { level: DANGER.SAFE };
   try {
-    const res    = await fetch(imageUrl);
+    const res = await fetch(imageUrl);
     if (!res.ok) return { level: DANGER.SAFE };
-    const buf    = await res.arrayBuffer();
+    const buf = await res.arrayBuffer();
     const base64 = Buffer.from(buf).toString("base64");
-    const mime   = res.headers.get("content-type") || "image/jpeg";
-
+    const mime = res.headers.get("content-type") || "image/jpeg";
     const result = await geminiVisionModel.generateContent([
       { inlineData: { data: base64, mimeType: mime } },
-      `أنت نظام مراقبة صور لسيرفر Discord. حلل هذه الصورة وقيّم خطورتها.
-
-أجب بـ JSON فقط:
-{
-  "level": "SAFE" | "MEDIUM" | "HIGH" | "CRITICAL",
-  "reason": "وصف قصير بالعربي",
-  "confidence": 0-100
-}
-
-معايير التقييم:
-SAFE: صور عادية، مضحكة، ألعاب، أنيمي، طبيعة، أشخاص عاديين، ميمز
-MEDIUM: محتوى جنسي ضمني أو عنف معتدل
-HIGH: محتوى جنسي صريح أو عنف شديد
-CRITICAL: استغلال أطفال أو إرهاب أو دماء مفرطة جداً`,
+      `حلل هذه الصورة لسيرفر Discord. أجب بـ JSON فقط:
+{"level":"SAFE"|"MEDIUM"|"HIGH"|"CRITICAL","reason":"وصف قصير","confidence":0-100}
+SAFE: عادية/أنيمي/ألعاب/ميمز. MEDIUM: جنسي ضمني/عنف معتدل. HIGH: جنسي صريح/عنف شديد. CRITICAL: أطفال/إرهاب`,
     ]);
-
-    const raw       = result.response.text().trim();
+    const raw = result.response.text().trim();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { level: DANGER.SAFE };
-
-    const parsed   = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]);
     const levelMap = { SAFE: 0, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
-
-    return {
-      level:      levelMap[parsed.level?.toUpperCase()] ?? DANGER.SAFE,
-      reason:     parsed.reason || "محتوى بصري مخالف",
-      confidence: parsed.confidence || 80,
-    };
-  } catch {
-    return { level: DANGER.SAFE };
-  }
+    return { level: levelMap[parsed.level?.toUpperCase()] ?? DANGER.SAFE, reason: parsed.reason || "محتوى بصري مخالف", confidence: parsed.confidence || 80 };
+  } catch { return { level: DANGER.SAFE }; }
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  محرك القرار — يحدد الإجراء بناءً على المستوى والتاريخ
+//  محرك القرار
 // ═══════════════════════════════════════════════════════════════
 const TIMEOUT_2H  = 2  * 60 * 60 * 1000;
 const TIMEOUT_24H = 24 * 60 * 60 * 1000;
 
 async function executeAction(msg, db, notifyOwner, assessment) {
   const { level, reason, shouldDelete, category } = assessment;
-  const member     = msg.member;
-  const user       = msg.author;
-  const warnings   = db.getWarnings(user.id).length;
+  const member = msg.member;
+  const user = msg.author;
+  const warnings = db.getWarnings(user.id).length;
   const suspectHits = trackSuspect(user.id);
+  const repScore = getReputation(user.id);
+  const isLowRep = repScore < 40;
 
-  // ── LOW: تسجيل فقط بدون تدخل ──────────────────────────────
   if (level === DANGER.LOW) {
-    return {
-      triggered: true,
-      action:    "log_only",
-      warnCount: warnings,
-      logData:   buildLogData(msg, reason, category, level, 0),
-    };
+    return { triggered: true, action: "log_only", warnCount: warnings, logData: buildLogData(msg, reason, category, level, 0) };
   }
 
-  // ── حفظ محتوى الرسالة قبل الحذف ────────────────────────────
-  const savedContent     = msg.content || "";
+  const savedContent = msg.content || "";
   const savedAttachments = [...msg.attachments.values()].map(a => a.url);
+  if (shouldDelete !== false) await msg.delete().catch(() => {});
 
-  // ── حذف الرسالة (MEDIUM+) ───────────────────────────────────
-  if (shouldDelete !== false) {
-    await msg.delete().catch(() => {});
-  }
-
-  // ── MEDIUM: تنبيه هادئ بدون تحذير رسمي ──────────────────────
   if (level === DANGER.MEDIUM) {
-    // رسالة في القناة تختفي بعد 8 ثواني
-    const notice = await msg.channel.send(
-      `> 💬 ${user} رسالتك اتحذفت — **${reason}**\n> حافظ على جو السيرفر 🙏`
-    ).catch(() => null);
+    const notice = await msg.channel.send(`> 💬 ${user} رسالتك اتحذفت — **${reason}**\n> حافظ على جو السيرفر 🙏`).catch(() => null);
     if (notice) setTimeout(() => notice.delete().catch(() => {}), 8_000);
-
-    // DM للمستخدم
-    user.send([
-      `⚠️ **تنبيه من زنجي Bot** — ${msg.guild.name}`,
-      `السبب: **${reason}**`,
-      `دي مش تحذير رسمي، بس خلي بالك من طريقة كلامك. 🙏`,
-    ].join("\n")).catch(() => {});
-
-    return {
-      triggered: true,
-      action:    "soft_warn",
-      warnCount: warnings,
-      logData:   buildLogData(msg, reason, category, level, warnings, savedContent, savedAttachments),
-    };
+    user.send([`⚠️ **تنبيه من زنجي Bot** — ${msg.guild.name}`, `السبب: **${reason}**`, `دي مش تحذير رسمي 🙏`].join("\n")).catch(() => {});
+    return { triggered: true, action: "soft_warn", warnCount: warnings, logData: buildLogData(msg, reason, category, level, warnings, savedContent, savedAttachments) };
   }
 
-  // ── HIGH/CRITICAL: تحذير رسمي ──────────────────────────────
   db.addWarning(user.id, reason, "AUTO_MOD");
   const newWarnCount = db.getWarnings(user.id).length;
+  const effectiveWarnCount = isLowRep ? newWarnCount + 1 : newWarnCount;
+  const isCritical = level === DANGER.CRITICAL;
   let action = "warn";
 
-  // تصعيد العقوبة بناءً على التاريخ والمستوى
-  const isRepeatOffender = newWarnCount >= 3 || suspectHits >= 3;
-  const isCritical       = level === DANGER.CRITICAL;
-
-  if (isCritical && newWarnCount >= 3) {
-    // CRITICAL + تاريخ طويل → باند
-    if (member?.bannable) {
-      try {
-        await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 });
-        db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD");
-        action = "ban";
-      } catch { action = "owner_report"; }
-    } else {
-      action = "owner_report";
-    }
+  if (isCritical && effectiveWarnCount >= 3) {
+    if (member?.bannable) { try { await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 }); db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD"); action = "ban"; } catch { action = "owner_report"; } }
+    else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-
-  } else if (isCritical && newWarnCount >= 2) {
-    // CRITICAL + تحذيرين → طرد
-    if (member?.kickable) {
-      try { await member.kick(`Auto-Mod: ${reason}`); action = "kick"; }
-      catch { action = "owner_report"; }
-    } else {
-      action = "owner_report";
-    }
+  } else if (isCritical && effectiveWarnCount >= 2) {
+    if (member?.kickable) { try { await member.kick(`Auto-Mod: ${reason}`); action = "kick"; } catch { action = "owner_report"; } }
+    else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-
   } else if (isCritical) {
-    // CRITICAL أول مرة → إسكات 24 ساعة
-    if (member?.manageable) {
-      try { await member.timeout(TIMEOUT_24H, `Auto-Mod: ${reason}`); action = "timeout_24h"; }
-      catch { action = "warn"; }
-    }
+    if (member?.manageable) { try { await member.timeout(TIMEOUT_24H, `Auto-Mod: ${reason}`); action = "timeout_24h"; } catch { action = "warn"; } }
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-
-  } else if (newWarnCount >= 5) {
-    // HIGH + 5 تحذيرات → باند
-    if (member?.bannable) {
-      try {
-        await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 });
-        db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD");
-        action = "ban";
-      } catch { action = "owner_report"; }
-    } else {
-      action = "owner_report";
-    }
+  } else if (effectiveWarnCount >= 5) {
+    if (member?.bannable) { try { await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 }); db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD"); action = "ban"; } catch { action = "owner_report"; } }
+    else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-
-  } else if (newWarnCount >= 4) {
-    // HIGH + 4 تحذيرات → طرد
-    if (member?.kickable) {
-      try { await member.kick(`Auto-Mod: ${reason}`); action = "kick"; }
-      catch { action = "owner_report"; }
-    } else {
-      action = "owner_report";
-    }
+  } else if (effectiveWarnCount >= 4) {
+    if (member?.kickable) { try { await member.kick(`Auto-Mod: ${reason}`); action = "kick"; } catch { action = "owner_report"; } }
+    else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-
-  } else if (newWarnCount >= 3 || isRepeatOffender) {
-    // HIGH + تكرار → إسكات ساعتين
-    if (member?.manageable) {
-      try { await member.timeout(TIMEOUT_2H, `Auto-Mod: ${reason}`); action = "timeout"; }
-      catch { action = "warn"; }
-    }
+  } else if (effectiveWarnCount >= 3 || suspectHits >= 3) {
+    if (member?.manageable) { try { await member.timeout(TIMEOUT_2H, `Auto-Mod: ${reason}`); action = "timeout"; } catch { action = "warn"; } }
   }
 
-  // ── رسالة تحذير في القناة ───────────────────────────────────
-  const actionEmoji = {
-    ban:          "🔨 **باند تلقائي!**",
-    kick:         "👢 **طرد تلقائي!**",
-    timeout_24h:  "🔇 **إسكات 24 ساعة!**",
-    timeout:      "🔇 **إسكات ساعتين!**",
-    owner_report: "🚨 **بُلّغت الإدارة!**",
-    warn:         "⚠️ استمرار التصرف هيجيب عقوبة!",
-  }[action] || "";
+  const actionEmoji = { ban: "🔨 **باند تلقائي!**", kick: "👢 **طرد تلقائي!**", timeout_24h: "🔇 **إسكات 24 ساعة!**", timeout: "🔇 **إسكات ساعتين!**", owner_report: "🚨 **بُلّغت الإدارة!**", warn: "⚠️ استمرار التصرف هيجيب عقوبة!" }[action] || "";
 
-  const warnMsg = await msg.channel.send(
-    `🛡️ ${user} | **تحذير ${newWarnCount}** — ${reason}\n${actionEmoji}`
-  ).catch(() => null);
+  const warnMsg = await msg.channel.send(`🛡️ ${user} | **تحذير ${newWarnCount}** — ${reason}\n${actionEmoji}\n> السمعة: ${getRepLabel(repScore)}`).catch(() => null);
   if (warnMsg) setTimeout(() => warnMsg.delete().catch(() => {}), 10_000);
 
-  // ── DM للمستخدم ─────────────────────────────────────────────
   if (action !== "ban") {
-    user.send([
-      `🛡️ **تحذير رسمي — زنجي Bot**`,
-      `السيرفر: **${msg.guild.name}**`,
-      `السبب: **${reason}**`,
-      `تحذيراتك: **${newWarnCount}**`,
-      action === "kick"        ? "\n👢 اتطردت من السيرفر." :
-      action === "timeout_24h" ? "\n🔇 تم إسكاتك 24 ساعة." :
-      action === "timeout"     ? "\n🔇 تم إسكاتك ساعتين." :
-                                 "\n📌 تراكم التحذيرات بيأدي لإسكات ثم طرد ثم حظر.",
+    user.send([`🛡️ **تحذير رسمي — زنجي Bot**`, `السيرفر: **${msg.guild.name}**`, `السبب: **${reason}**`, `تحذيراتك: **${newWarnCount}** | سمعتك: **${repScore}/100**`,
+      action === "kick" ? "\n👢 اتطردت." : action === "timeout_24h" ? "\n🔇 إسكات 24 ساعة." : action === "timeout" ? "\n🔇 إسكات ساعتين." : "\n📌 تراكم التحذيرات → إسكات → طرد → حظر."
     ].join("\n")).catch(() => {});
   }
 
-  return {
-    triggered:  true,
-    action,
-    warnCount:  newWarnCount,
-    aiLevel:    DANGER_LABEL[level],
-    aiCategory: category,
-    logData:    buildLogData(msg, reason, category, level, newWarnCount, savedContent, savedAttachments),
-  };
+  return { triggered: true, action, warnCount: newWarnCount, aiLevel: DANGER_LABEL[level], aiCategory: category, repScore, logData: buildLogData(msg, reason, category, level, newWarnCount, savedContent, savedAttachments) };
 }
 
-// ─── بناء بيانات اللوج ────────────────────────────────────────
 function buildLogData(msg, reason, category, level, warnCount, savedContent = "", savedAttachments = []) {
   return {
-    savedContent,
-    savedAttachments,
-    userId:      msg.author.id,
-    username:    msg.author.username,
-    userAvatar:  msg.author.displayAvatarURL(),
-    channelId:   msg.channel.id,
-    channelName: msg.channel.name || "unknown",
-    guildName:   msg.guild?.name || "unknown",
-    reason,
-    category,
-    aiLevel:    DANGER_LABEL[level] || "UNKNOWN",
-    warnCount,
-    timestamp:  Date.now(),
+    savedContent, savedAttachments,
+    userId: msg.author.id, username: msg.author.username,
+    userAvatar: msg.author.displayAvatarURL(),
+    channelId: msg.channel.id, channelName: msg.channel.name || "unknown",
+    guildName: msg.guild?.name || "unknown",
+    reason, category, aiLevel: DANGER_LABEL[level] || "UNKNOWN",
+    warnCount, repScore: getReputation(msg.author.id), timestamp: Date.now(),
   };
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  scanMessage — الواجهة الرئيسية (نفس الـ interface القديم)
+//  Daily Stats
+// ═══════════════════════════════════════════════════════════════
+const _stats = { scanned: 0, triggered: 0, actions: {}, topOffenders: new Map(), resetAt: Date.now() };
+
+function updateStats(result, userId) {
+  _stats.scanned++;
+  if (result?.triggered) {
+    _stats.triggered++;
+    const a = result.action || "unknown";
+    _stats.actions[a] = (_stats.actions[a] || 0) + 1;
+    _stats.topOffenders.set(userId, (_stats.topOffenders.get(userId) || 0) + 1);
+  }
+}
+
+export function getDailyReport() {
+  return {
+    scanned: _stats.scanned,
+    triggered: _stats.triggered,
+    triggerRate: _stats.scanned > 0 ? `${((_stats.triggered / _stats.scanned) * 100).toFixed(1)}%` : "0%",
+    actions: _stats.actions,
+    topOffenders: [..._stats.topOffenders.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5),
+    hoursUp: Math.floor((Date.now() - _stats.resetAt) / 3_600_000),
+    lockdown: isLockdown(),
+    nightMode: isNightMode(),
+  };
+}
+
+export function resetDailyStats() {
+  _stats.scanned = 0; _stats.triggered = 0; _stats.actions = {};
+  _stats.topOffenders.clear(); _stats.resetAt = Date.now();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  scanMessage — الواجهة الرئيسية
 // ═══════════════════════════════════════════════════════════════
 export async function scanMessage(msg, db, geminiVisionModel, notifyOwner, geminiTextModel = null) {
-  if (msg.author.bot)              return { triggered: false };
+  if (msg.author.bot)                return { triggered: false };
   if (config.isOwner(msg.author.id)) return { triggered: false };
-  if (!msg.guild)                  return { triggered: false };
+  if (!msg.guild)                    return { triggered: false };
 
   const content = msg.content?.trim() || "";
+  const userId = msg.author.id;
 
-  // ── Pre-screen: رسائل بيضاء واضحة ────────────────────────
+  // ── Honeypot ─────────────────────────────────────────────────
+  if (isHoneypotChannel(msg.channel.name, msg.channel.id)) {
+    changeRep(userId, -50);
+    const assessment = { level: DANGER.CRITICAL, category: "DANGEROUS_INFO", reason: "🍯 Honeypot — بوت أو هاكر!", shouldDelete: true, confidence: 100 };
+    const result = await executeAction(msg, db, notifyOwner, assessment);
+    updateStats(result, userId);
+    return result;
+  }
+
+  // ── Cross-Channel Flood ──────────────────────────────────────
+  const crossResult = checkCrossChannelFlood(userId, msg.channel.id);
+  if (crossResult) {
+    const result = await executeAction(msg, db, notifyOwner, { ...crossResult, category: "HARASSMENT", shouldDelete: true, confidence: 95 });
+    updateStats(result, userId);
+    return result;
+  }
+
+  // ── Bot Behavioral Fingerprint ───────────────────────────────
+  const botResult = trackBehavior(msg);
+  if (botResult) {
+    const result = await executeAction(msg, db, notifyOwner, { ...botResult, category: "HARASSMENT", shouldDelete: false, confidence: 85 });
+    updateStats(result, userId);
+    return result;
+  }
+
+  // ── Pre-screen ────────────────────────────────────────────────
   const isObviouslySafe = SAFE_PRESCREEN.some(rx => rx.test(content));
-  const hasText         = content.length > 3;
-  const hasImages       = msg.attachments.size > 0 &&
-    [...msg.attachments.values()].some(a => a.contentType?.startsWith("image/"));
+  const hasText = content.length > 3;
+  const hasImages = msg.attachments.size > 0 && [...msg.attachments.values()].some(a => a.contentType?.startsWith("image/"));
+  if (isObviouslySafe && !hasImages) { updateStats({ triggered: false }, userId); return { triggered: false }; }
 
-  if (isObviouslySafe && !hasImages) return { triggered: false };
+  // ── Account Age Factor ────────────────────────────────────────
+  const ageFactor = getAccountAgeFactor(msg.member);
 
-  // ── Layer 1: Instant Critical Regex ───────────────────────
+  // ── Spam & Flood ──────────────────────────────────────────────
+  const spamResult = checkSpam(msg);
+  if (spamResult) {
+    const result = await executeAction(msg, db, notifyOwner, { ...spamResult, category: "HARASSMENT", shouldDelete: spamResult.level >= DANGER.MEDIUM, confidence: 95 });
+    updateStats(result, userId);
+    return result;
+  }
+
+  // ── Instant Critical Regex ────────────────────────────────────
   if (hasText) {
     for (const pattern of INSTANT_CRITICAL_PATTERNS) {
       pattern.lastIndex = 0;
       if (pattern.test(content)) {
         pattern.lastIndex = 0;
-        const assessment = {
-          level:    DANGER.CRITICAL,
-          category: "DANGEROUS_INFO",
-          reason:   "محتوى خطير جداً (تشغيل فوري)",
-          shouldDelete: true,
-          confidence: 100,
-        };
-        return executeAction(msg, db, notifyOwner, assessment);
+        const result = await executeAction(msg, db, notifyOwner, { level: DANGER.CRITICAL, category: "DANGEROUS_INFO", reason: "محتوى خطير جداً", shouldDelete: true, confidence: 100 });
+        updateStats(result, userId);
+        return result;
       }
     }
   }
 
-  // ── Layer 2: Gemini Text Analysis ─────────────────────────
-  let textAssessment = { level: DANGER.SAFE };
-  if (hasText && geminiTextModel) {
-    textAssessment = await analyzeWithGemini(msg, db, geminiTextModel).catch(() => ({ level: DANGER.SAFE }));
-  }
-
-  // ── Layer 3: Image Analysis ───────────────────────────────
-  let imageAssessment = { level: DANGER.SAFE };
-  if (hasImages && geminiVisionModel) {
-    const imageUrls = [...msg.attachments.values()]
-      .filter(a => a.contentType?.startsWith("image/"))
-      .map(a => a.url);
-
-    const imageResults = await Promise.all(
-      imageUrls.map(url => analyzeImageWithGemini(url, geminiVisionModel).catch(() => ({ level: DANGER.SAFE })))
-    );
-
-    // خذ أعلى مستوى من الصور
-    const maxImageResult = imageResults.reduce(
-      (best, cur) => cur.level > best.level ? cur : best,
-      { level: DANGER.SAFE }
-    );
-
-    if (maxImageResult.level > DANGER.SAFE) {
-      imageAssessment = {
-        ...maxImageResult,
-        category:     "EXPLICIT",
-        shouldDelete: true,
-      };
+  // ── Link Scanner ──────────────────────────────────────────────
+  if (hasText) {
+    const linkResult = await checkLinks(content, userId, geminiTextModel);
+    if (linkResult) {
+      const result = await executeAction(msg, db, notifyOwner, { ...linkResult, category: "DANGEROUS_INFO", shouldDelete: true, confidence: 90 });
+      updateStats(result, userId);
+      return result;
     }
   }
 
-  // ── أخذ التقييم الأعلى ───────────────────────────────────
-  const finalAssessment = textAssessment.level >= imageAssessment.level
-    ? textAssessment
-    : imageAssessment;
+  // ── Gemini Text ───────────────────────────────────────────────
+  let textAssessment = { level: DANGER.SAFE };
+  if (hasText && geminiTextModel) {
+    textAssessment = await analyzeWithGemini(msg, db, geminiTextModel, ageFactor).catch(() => ({ level: DANGER.SAFE }));
+  }
 
-  // ── SAFE / أقل من threshold ──────────────────────────────
-  if (finalAssessment.level === DANGER.SAFE) return { triggered: false };
+  // ── Gemini Vision ─────────────────────────────────────────────
+  let imageAssessment = { level: DANGER.SAFE };
+  if (hasImages && geminiVisionModel) {
+    const urls = [...msg.attachments.values()].filter(a => a.contentType?.startsWith("image/")).map(a => a.url);
+    const results = await Promise.all(urls.map(url => analyzeImageWithGemini(url, geminiVisionModel).catch(() => ({ level: DANGER.SAFE }))));
+    const max = results.reduce((best, cur) => cur.level > best.level ? cur : best, { level: DANGER.SAFE });
+    if (max.level > DANGER.SAFE) imageAssessment = { ...max, category: "EXPLICIT", shouldDelete: true };
+  }
 
-  // ── LOW: نسجّل بس ─────────────────────────────────────────
-  // نوصله لـ index.js عشان يطلع في لوج المشرفين بشكل هادئ
-  return executeAction(msg, db, notifyOwner, finalAssessment);
+  const final = textAssessment.level >= imageAssessment.level ? textAssessment : imageAssessment;
+  if (final.level === DANGER.SAFE) { updateStats({ triggered: false }, userId); return { triggered: false }; }
+
+  const result = await executeAction(msg, db, notifyOwner, final);
+  updateStats(result, userId);
+  return result;
 }
