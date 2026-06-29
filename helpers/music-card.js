@@ -255,8 +255,6 @@ function buildMusicRows(song, queue = null) {
     new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉-').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_repeat').setLabel('🔁 تكرار').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('music_lyrics').setLabel('📝 كلمات').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setLabel('🔗 افتح في Spotify').setStyle(ButtonStyle.Link).setURL(song.url || 'https://open.spotify.com'),
   );
 
   const rows = [row1, row2];
