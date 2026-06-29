@@ -1769,9 +1769,21 @@ client.on("messageCreate", async (msg) => {
   processedMessages.add(msg.id);
   setTimeout(() => processedMessages.delete(msg.id), 60_000);
 
-  // ── روم الاقتراحات: احذف أي رسالة عادية بصمت ────────────────
+  // ── روم الاقتراحات: احذف الرسايل وفرّق بين النص والصور ─────────
   if (msg.guild && msg.channel.id === SUGGESTIONS_CHANNEL_ID) {
     await msg.delete().catch(() => {});
+    // صورة أو ملف → امسح بصمت بس (ممكن تكون جزء من collector الاقتراح)
+    if (msg.attachments.size > 0) return;
+    // رسالة نصية عادية → ذكّر المستخدم بالخاص
+    msg.author.send(
+      "👋 يا صاحبي!\n" +
+      `روم <#${SUGGESTIONS_CHANNEL_ID}> بيشتغل عن طريق الأزرار بس — ما ينفعش تكتب فيه مباشرة.\n\n` +
+      "استخدم الأزرار الموجودة في الروم:\n" +
+      "💡 **اقتراح** — عشان تقترح فكرة جديدة\n" +
+      "🔴 **مشكلة** — عشان تبلّغ عن مشكلة\n" +
+      "💬 **تعليق** — عشان تبعت تعليق أو ملاحظة\n\n" +
+      "شكراً لتفهمك! 🙏"
+    ).catch(() => {});
     return;
   }
 
