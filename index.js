@@ -1309,11 +1309,12 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
     inline: false,
   });
 
+  let adminMessage = null;
   if (adminChannel?.isTextBased()) {
-    await adminChannel.send({
+    adminMessage = await adminChannel.send({
       embeds: [adminEmbed],
       components: [buildAdminActionRow(false), buildAdminSolvedRow(false)],
-    });
+    }).catch(() => null);
   } else {
     logger.warn("⚠️ روم إدارة الاقتراحات غير متاح");
   }
@@ -1348,13 +1349,23 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
         /\.(png|jpe?g|gif|webp)$/i.test(a.url)
       );
       if (imgAttachment) {
-        // حذف رسالة الصورة من الـ chat عشان ما تبوظش الشات
+        // حذف رسالة الصورة بصمت
         collected.first().delete().catch(() => {});
 
-        // تعديل الـ embed العام بالصورة
-        const updatedEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
-          .setImage(imgAttachment.url);
-        await publicMessage.edit({ embeds: [updatedEmbed] }).catch(() => {});
+        const imageUrl = imgAttachment.url;
+
+        // تحديث الروم العام بالصورة
+        const updatedPublicEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
+          .setImage(imageUrl);
+        await publicMessage.edit({ embeds: [updatedPublicEmbed] }).catch(() => {});
+
+        // تحديث روم الإدارة بالصورة
+        if (adminMessage) {
+          const updatedAdminEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
+            .addFields({ name: SUGGESTION_REF_FIELD, value: `${publicMessage.id}|${interaction.user.id}`, inline: false })
+            .setImage(imageUrl);
+          await adminMessage.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
+        }
 
         await interaction.followUp({
           content: "🖼️ **اتضافت الصورة لاقتراحك!** ✅",
@@ -1758,18 +1769,9 @@ client.on("messageCreate", async (msg) => {
   processedMessages.add(msg.id);
   setTimeout(() => processedMessages.delete(msg.id), 60_000);
 
-  // ── روم الاقتراحات: احذف أي رسالة عادية وذكّر بالأزرار ────────
+  // ── روم الاقتراحات: احذف أي رسالة عادية بصمت ────────────────
   if (msg.guild && msg.channel.id === SUGGESTIONS_CHANNEL_ID) {
     await msg.delete().catch(() => {});
-    await msg.author.send(
-      "👋 يا صاحبي!\n" +
-      `روم <#${SUGGESTIONS_CHANNEL_ID}> بيشتغل عن طريق الأزرار بس — ما ينفعش تكتب فيه مباشرة.\n\n` +
-      "استخدم الأزرار الموجودة في الروم:\n" +
-      "💡 **اقتراح** — عشان تقترح فكرة جديدة\n" +
-      "🔴 **مشكلة** — عشان تبلّغ عن مشكلة\n" +
-      "💬 **تعليق** — عشان تبعت تعليق أو ملاحظة\n\n" +
-      "شكراً لتفهمك! 🙏"
-    ).catch(() => {});
     return;
   }
 
