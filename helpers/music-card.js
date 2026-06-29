@@ -8,6 +8,7 @@ const { createCanvas, loadImage, registerFont } = pkg;
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import sharp from 'sharp';
+import { getTrackInfo, formatPlays } from './lastfm.js';
 import {
   AttachmentBuilder,
   ActionRowBuilder,
@@ -99,7 +100,7 @@ async function loadBgImage() {
   }
 }
 
-async function generateMusicCard(song, currentTime = 0, queue = null) {
+async function generateMusicCard(song, currentTime = 0, queue = null, lastfmData = null) {
   ensureFonts();
   try {
     const W = 1200, H = 500;
@@ -111,7 +112,6 @@ async function generateMusicCard(song, currentTime = 0, queue = null) {
     const bgImg = await loadBgImage();
     if (bgImg) {
       ctx.drawImage(bgImg, 0, 0, W, H);
-      // طبقة شفافية داكنة فوق الصورة عشان النص يبان
       ctx.fillStyle = 'rgba(0,0,0,0.55)';
       ctx.fillRect(0, 0, W, H);
     } else {
@@ -149,7 +149,7 @@ async function generateMusicCard(song, currentTime = 0, queue = null) {
     const textX = thumbX + thumbSize + 40;
     const textW = W - textX - 40;
 
-    // اسم الأغنية — DisTube بيستخدم song.name
+    // اسم الأغنية
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 50px Roboto';
     ctx.textBaseline = 'top';
@@ -158,6 +158,38 @@ async function generateMusicCard(song, currentTime = 0, queue = null) {
     wrapTruncate(ctx, song.name || song.title || 'أغنية', textX, 50, textW, 50, 60);
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
+
+    // اسم الفنان من Last.fm أو uploader
+    const artistName = lastfmData?.artist || song.uploader?.name || '';
+    if (artistName) {
+      ctx.fillStyle = '#A8A8B3';
+      ctx.font = '26px Roboto';
+      wrapTruncate(ctx, artistName, textX, 140, textW, 45, 32);
+    }
+
+    // Tags (جنس الموسيقى) من Last.fm
+    if (lastfmData?.tags?.length) {
+      ctx.fillStyle = '#45A29E';
+      ctx.font = '22px Roboto';
+      ctx.fillText(lastfmData.tags.map(t => `#${t}`).join('  '), textX, 185);
+    }
+
+    // عدد الاستماعات من Last.fm
+    if (lastfmData?.plays) {
+      const playsStr = formatPlays(lastfmData.plays);
+      const listenersStr = formatPlays(lastfmData.listeners);
+      ctx.fillStyle = '#C5C6C7';
+      ctx.font = '22px Roboto';
+      if (playsStr) ctx.fillText(`▶ ${playsStr} تشغيل`, textX, 220);
+      if (listenersStr) ctx.fillText(`👥 ${listenersStr} مستمع`, textX + 250, 220);
+    }
+
+    // ألبوم من Last.fm
+    if (lastfmData?.albumName) {
+      ctx.fillStyle = '#888';
+      ctx.font = 'italic 20px Roboto';
+      wrapTruncate(ctx, `💿 ${lastfmData.albumName}`, textX, 255, textW, 50, 25);
+    }
 
     // طالب الأغنية
     ctx.fillStyle = '#66FCF1';
@@ -208,11 +240,9 @@ async function generateMusicCard(song, currentTime = 0, queue = null) {
   }
 }
 
-// ─── بناء الأزرار + select menu ───────────────────────────────
 function buildMusicRows(song, queue = null) {
   const songs = queue?.songs || [];
 
-  // ── صف 1: التحكم الأساسي (5 أزرار) ──────────────────────────
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('music_prev').setLabel('⏮️ السابق').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('music_pause').setLabel('⏸ وقف').setStyle(ButtonStyle.Secondary),
@@ -221,7 +251,6 @@ function buildMusicRows(song, queue = null) {
     new ButtonBuilder().setCustomId('music_stop').setLabel('⏹️ اطلع').setStyle(ButtonStyle.Danger),
   );
 
-  // ── صف 2: الصوت + تكرار + كلمات + رابط (5 عناصر) ────────────
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉-').setStyle(ButtonStyle.Primary),
@@ -232,9 +261,8 @@ function buildMusicRows(song, queue = null) {
 
   const rows = [row1, row2];
 
-  // ── صف 3: select menu للقائمة (لو فيه أغاني بعد الحالية) ─────
   if (songs.length > 1) {
-    const upcomingSongs = songs.slice(1, 26); // max 25 option
+    const upcomingSongs = songs.slice(1, 26);
     const options = upcomingSongs.map((s, i) => {
       const label = `${i + 1}. ${(s.name || s.title || 'أغنية').slice(0, 95)}`;
       const desc  = s.formattedDuration ? s.formattedDuration.slice(0, 50) : undefined;
@@ -257,7 +285,16 @@ export async function sendMusicCard(queue, song, textChannel) {
   try {
     let currentTime = 0;
 
-    const cardBuf = await generateMusicCard(song, currentTime, queue);
+    // جيب بيانات Last.fm في الخلفية (max 3 ثواني)
+    let lastfmData = null;
+    try {
+      lastfmData = await Promise.race([
+        getTrackInfo(song.name || song.title || '', song.uploader?.name || ''),
+        new Promise(r => setTimeout(() => r(null), 3000)),
+      ]);
+    } catch {}
+
+    const cardBuf = await generateMusicCard(song, currentTime, queue, lastfmData);
     if (!cardBuf) return;
     if (!textChannel?.send) return;
 
@@ -270,7 +307,7 @@ export async function sendMusicCard(queue, song, textChannel) {
     queue.currentMessage = msg;
     queue.initiatorId = song.user?.id;
 
-    // تحديث كل 5 ثواني عشان منضغطش على Discord API
+    // تحديث كل 5 ثواني
     const interval = setInterval(async () => {
       try {
         if (!queue || queue.paused || queue.destroyed || !queue.currentMessage) {
@@ -281,10 +318,9 @@ export async function sendMusicCard(queue, song, textChannel) {
         const total = song.duration || 1;
         if (currentTime > total) currentTime = total;
 
-        const updated = await generateMusicCard(song, currentTime, queue);
+        const updated = await generateMusicCard(song, currentTime, queue, lastfmData);
         if (!updated) { clearInterval(interval); return; }
 
-        // إعادة بناء الأزرار بالقائمة الحية (قد تتغير)
         const liveRows = buildMusicRows(song, queue);
 
         await queue.currentMessage.edit({
