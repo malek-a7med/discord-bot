@@ -7,11 +7,20 @@
 // ════════════════════════════════════════════════════════════════
 
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { getVoiceConnection } from '@discordjs/voice';
 import { DisTube } from 'distube';
 import { SpotifyPlugin } from '@distube/spotify';
 import { YtDlpPlugin } from '@distube/yt-dlp';
 import { SoundCloudPlugin } from '@distube/soundcloud';
 import { sendMusicCard } from '../helpers/music-card.js';
+
+// ─── كسر اتصال الصوت مباشرة بغض النظر عن الـ queue ─────────
+function destroyVoiceConnection(guildId) {
+  try {
+    const conn = getVoiceConnection(guildId);
+    if (conn) conn.destroy();
+  } catch {}
+}
 
 // ─── كشف نوع الإدخال ──────────────────────────────────────────
 function detectSourceType(query) {
@@ -115,9 +124,8 @@ export function initMusicSystem(client) {
         q.currentMessage = null;
       }
       if (q) await distube.stop(guild.id).catch(() => {});
-      // تأكد من الخروج حتى لو مفيش queue
-      const botVC = guild.members.me?.voice?.channel;
-      if (botVC) await guild.members.me.voice.disconnect().catch(() => {});
+      // كسر اتصال الصوت مباشرة من @discordjs/voice
+      destroyVoiceConnection(guild.id);
       textChannel?.send({
         embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription('👋 القناة فاضية — خرجت تلقائياً!')],
       }).catch(() => {});
@@ -491,11 +499,8 @@ export async function handleStop(interaction) {
     // وقّف الموسيقى
     if (q) await distube.stop(interaction.guildId).catch(() => {});
 
-    // خروج مضمون من القناة الصوتية حتى لو مفيش queue
-    const botMember = interaction.guild?.members?.me;
-    if (botMember?.voice?.channel) {
-      await botMember.voice.disconnect().catch(() => {});
-    }
+    // كسر اتصال الصوت مباشرة — يشتغل حتى لو مفيش queue
+    destroyVoiceConnection(interaction.guildId);
 
     if (!isButton) {
       await interaction.reply({ content: '👋 خرجت من القناة وإيقاف الموسيقى!', ephemeral: true });
