@@ -6,6 +6,8 @@ import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle,
 } from "discord.js";
+import { recordActivity } from '../helpers/rpg-system.js';
+import { recordGameWin } from '../helpers/server-memory.js';
 
 // ─── حالة الألعاب في الذاكرة ─────────────────────────────────
 export const rouletteGames = new Map(); // gameId → state
@@ -357,7 +359,13 @@ export async function handleRouletteButton(interaction, db) {
       if (state.alive.size <= 1) {
         const winner = [...state.alive][0];
         const prize  = (state.players.length - 1) * 300;
-        if (winner) db.updateUser(winner, { coins: (db.getUser(winner).coins || 0) + prize });
+        if (winner) {
+          const wu = db.getUser(winner);
+          wu.coins = (wu.coins || 0) + prize;
+          recordActivity(wu, "game_win");
+          recordGameWin(winner, "روليت");
+          db.updateUser(winner, wu);
+        }
         rouletteGames.delete(gameId);
         channelGames.delete(state.channelId);
         const winEmbed = new EmbedBuilder()
@@ -429,7 +437,11 @@ export async function handleRouletteButton(interaction, db) {
     if (!used) return interaction.reply({ content: "❌ ما عندكش نيوك!", ephemeral: true });
 
     const prize = (state.players.length - 1) * 300;
-    db.updateUser(currentPlayerId, { coins: (db.getUser(currentPlayerId).coins || 0) + prize });
+    const nukeWinnerData = db.getUser(currentPlayerId);
+    nukeWinnerData.coins = (nukeWinnerData.coins || 0) + prize;
+    recordActivity(nukeWinnerData, "game_win");
+    recordGameWin(currentPlayerId, "روليت-نيوك");
+    db.updateUser(currentPlayerId, nukeWinnerData);
     rouletteGames.delete(gameId);
     channelGames.delete(state.channelId);
 
@@ -1347,9 +1359,17 @@ export async function handleTTTButton(interaction, db) {
         const winnerId = result === "X" ? state.playerX : (state.isAI ? AI_PLAYER_ID : state.playerO);
         finishGame(winnerId);
         if (!state.isAI && winnerId !== AI_PLAYER_ID) {
-          db.updateUser(winnerId, { coins: (db.getUser(winnerId).coins || 0) + 150 });
+          const wu = db.getUser(winnerId);
+          wu.coins = (wu.coins || 0) + 150;
+          recordActivity(wu, "game_win");
+          recordGameWin(winnerId, "XO");
+          db.updateUser(winnerId, wu);
         } else if (state.isAI && winnerId === state.playerX) {
-          db.updateUser(state.playerX, { coins: (db.getUser(state.playerX).coins || 0) + 200 });
+          const wu = db.getUser(state.playerX);
+          wu.coins = (wu.coins || 0) + 200;
+          recordActivity(wu, "game_win");
+          recordGameWin(state.playerX, "XO-AI");
+          db.updateUser(state.playerX, wu);
         }
       }
       const embed = buildTTTEmbed(state);

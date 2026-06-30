@@ -3,6 +3,7 @@
 //  أول واحد يجاوب صح يكسب الكوينز — بدون أمر مستقل، من /الألعاب بس
 // ═══════════════════════════════════════════════════════════════
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
+import { recordActivity } from '../helpers/rpg-system.js';
 
 export const quizChannelMap = new Map(); // channelId → game state
 
@@ -113,7 +114,7 @@ export async function handleQuizButton(interaction, db) {
     if (db) {
       const u = db.getUser(interaction.user.id);
       u.coins = (u.coins || 0) + COINS_REWARD;
-      u.xp    = (u.xp    || 0) + 30;
+      recordActivity(u, "quiz_correct", 30);
       db.updateUser(interaction.user.id, u);
     }
     await interaction.update({

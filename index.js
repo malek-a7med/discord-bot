@@ -26,7 +26,10 @@ import {
   handleOcrUpload
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
-import { scanMessage as autoModScan } from "./helpers/auto-mod.js";
+import { scanMessage as autoModScan, getDailyReport, resetDailyStats, getUserReputation } from "./helpers/auto-mod.js";
+import { recordActivity, checkNewAchievements, formatProfileSummary, CLASSES, TITLES, ACHIEVEMENTS, ensureRpgData, getCurrentTitle, calculateStats } from "./helpers/rpg-system.js";
+import { registerRpgCommands, setRpgDatabase, handleClassSelect, handleTitleSelect, handleClass, handleProfile, handleAchievements, handleTitles } from "./commands/rpg.js";
+import { recordEvent, recordMessage, recordGameWin, generateSummary, resetDailyCounts } from "./helpers/server-memory.js";
 import { handleRouletteCommand, handleMafiaCommand, handleTTTCommand, handleRPSCommand, handleRPSButton, handleGameButton, channelGames, rpsChannelMap, rpsGames, handleRPSBasicCommand, handleRPSBasicButton, rpsBasicGames, rpsBasicChannelMap, RPS_ICON, RPS_BEATS, rouletteGames, mafiaGames, tttGames } from "./commands/games.js";
 import { bankLifeCommand, handleBankLifeCommand, handleBankLifeButton } from "./commands/bank-life.js";
 import { handleBankLuckCommand, handleBankLuckButton, luckGames, luckChannelMap } from "./commands/bank-luck.js";
@@ -143,6 +146,8 @@ const logger = new Logger(null); // Will set client reference in ready event
     db.setConfig("reactionRoles", reactionRoles);
   }
 }
+
+setRpgDatabase(db);
 
 // ───────────────────────────────────────────────────────────────
 //  Legacy Database Functions (for backward compatibility)
@@ -413,6 +418,7 @@ const LEGACY_COMMANDS = [
         .addStringOption((o) => o.setName("عضو").setDescription("اسم العضو أو ID (اتركه فاضي عشان تشوف تحذيراتك)"))
     ),
   new SlashCommandBuilder().setName("مساعدة").setDescription("قائمة جميع الأوامر / Help"),
+  new SlashCommandBuilder().setName("ملخص-السيرفر").setDescription("📊 اعرض ملخص نشاط السيرفر [أونر فقط]"),
   new SlashCommandBuilder()
     .setName("ليدربورد")
     .setDescription("أفضل 10 أعضاء في السيرفر / Top 10 leaderboard")
@@ -723,11 +729,14 @@ async function getAdvancedCommands() {
   const translateCommand = await registerTranslateChapterCommand(null);
   const whitenCommands = await registerWhitenCommands(null);
 
+  const rpgCommands = await registerRpgCommands();
+
   return [
     cleanCommand.data,
     translateCommand.data,
     ...musicCommands.map(cmd => cmd.data),
-    ...whitenCommands.map(cmd => cmd.data)
+    ...whitenCommands.map(cmd => cmd.data),
+    ...rpgCommands.map(cmd => cmd.data),
   ];
 }
 
@@ -1466,6 +1475,24 @@ client.once("clientReady", async (c) => {
   await ensureSuggestionsPanel(c);
   setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
+
+  // ── ملخص السيرفر الأسبوعي التلقائي ────────────────────────────
+  const SUMMARY_CHANNEL_ID = process.env.SERVER_SUMMARY_CHANNEL_ID || null;
+  if (SUMMARY_CHANNEL_ID) {
+    setInterval(async () => {
+      try {
+        const channel = await c.channels.fetch(SUMMARY_CHANNEL_ID).catch(() => null);
+        if (!channel) return;
+        const summary = await generateSummary(geminiModel(), "الأسبوع", 7 * 24 * 60 * 60 * 1000, c, channel.guild.id);
+        if (!summary) return;
+        await channel.send({
+          embeds: [new EmbedBuilder().setColor(0x66FCF1).setTitle("📊 ملخص السيرفر الأسبوعي").setDescription(summary).setTimestamp()],
+        }).catch(() => {});
+        resetDailyCounts();
+      } catch (e) { logger.error("[ServerMemory] خطأ في الملخص الأسبوعي:", e); }
+    }, 7 * 24 * 60 * 60 * 1000);
+    logger.info("📊 نظام ملخص السيرفر الأسبوعي جاهز");
+  }
   scheduleDailyChallenge(c, db);
   scheduleAnimeNews(c, db);
 
@@ -2118,12 +2145,23 @@ client.on("messageCreate", async (msg) => {
     if (userData._lastXpMsg === msg.id) return;
 
     const oldLevel = userData.level;
-    userData.xp += 5;
+    recordMessage(msg.author.id);
+    const { newAchievements } = recordActivity(userData, "message", 5);
     userData.level = calcLevel(userData.xp);
     userData._lastXpMsg = msg.id;
     db.updateUser(msg.author.id, userData);
 
+    // إنجازات جديدة → إشعار
+    if (newAchievements && newAchievements.length > 0) {
+      newAchievements.forEach(a => recordEvent("achievement", { userId: msg.author.id, achievementName: a.name }));
+      const achText = newAchievements.map(a => `${a.name} — ${a.desc} (+${a.xpReward} XP)`).join("\n");
+      msg.channel.send({
+        embeds: [new EmbedBuilder().setColor(0x9b59b6).setTitle("🏅 إنجاز جديد!").setDescription(`${msg.author} فتح إنجاز جديد!\n${achText}`).setTimestamp()],
+      }).catch(() => {});
+    }
+
     if (userData.level > oldLevel) {
+      recordEvent("level_up", { userId: msg.author.id, level: userData.level });
       const embed = new EmbedBuilder()
         .setColor(0xffd700)
         .setTitle("🎉 مبروك! ارتقيت مستوى!")
@@ -4103,6 +4141,24 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ ...panel, ephemeral: true });
       }
 
+      // ── RPG Commands ───────────────────────────────────────────────
+      if (cmd === "كلاسي")        return await handleClass(interaction);
+      if (cmd === "بروفايل-rpg")  return await handleProfile(interaction);
+      if (cmd === "الانجازات")    return await handleAchievements(interaction);
+      if (cmd === "الالقاب")      return await handleTitles(interaction);
+
+      if (cmd === "ملخص-السيرفر") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        await interaction.deferReply();
+        const summary = await generateSummary(geminiModel(), "الفترة الأخيرة", 7 * 24 * 60 * 60 * 1000, client, guild?.id);
+        if (!summary) return interaction.editReply({ content: "📊 مفيش بيانات كافية دلوقتي." });
+        return interaction.editReply({
+          embeds: [new EmbedBuilder().setColor(0x66FCF1).setTitle("📊 ملخص السيرفر").setDescription(summary).setTimestamp()],
+        });
+      }
+
     } catch (err) {
       logger.error("خطأ في تنفيذ الأمر:", err);
       return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
@@ -5529,6 +5585,14 @@ client.on("interactionCreate", async (interaction) => {
       // ─── قائمة اختيار وضع AI Spymaster في كود نيمز ────────────────
       if (interaction.customId.startsWith("cdn_aiset_")) {
         return await handleCodenamesAISelect(interaction);
+      }
+
+      // ─── RPG: اختيار الكلاس واللقب ────────────────────────────────
+      if (interaction.customId === "rpg_select_class") {
+        return await handleClassSelect(interaction);
+      }
+      if (interaction.customId === "rpg_select_title") {
+        return await handleTitleSelect(interaction);
       }
     } catch (err) {
       logger.error("خطأ في معالجة القائمة:", err);
