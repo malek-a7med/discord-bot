@@ -228,10 +228,20 @@ export function initMusicSystem(client) {
   });
 
   distube.on('error', (error, queue) => {
-    console.error('❌ [DisTube]', error?.message || error);
+    const msg = error?.message || String(error);
+    console.error('❌ [DisTube]', msg);
     try {
+      // FFMPEG_EXITED أو مش لاقي الأغنية → تخطى تلقائي بدون رسالة
+      const isSkippable = /FFMPEG_EXITED|ffmpeg exited|no result|not found|Cannot find/i.test(msg);
+      if (isSkippable) {
+        // تخطى للأغنية الجاية لو في قائمة
+        if (queue && queue.songs.length > 1) {
+          distube.skip(queue.id).catch(() => {});
+        }
+        return;
+      }
       queue?.textChannel?.send({
-        embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription(`⛔ حصل خطأ: ${String(error).slice(0, 500)}`)],
+        embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription(`⛔ حصل خطأ: ${msg.slice(0, 300)}`)],
       }).catch(() => {});
     } catch {}
   });
