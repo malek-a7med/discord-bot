@@ -56,6 +56,10 @@ import {
   handleAnimeSubscribe,
   scheduleAnimeNews,
 } from "./commands/anime.js";
+import { coinsShopCommand, handleCoinsShop, SHOP_ITEMS } from "./commands/coins-shop-extended.js";
+import { fullProfileCommand, handleFullProfile } from "./commands/full-profile.js";
+import { serverStatsCommand, handleServerStats } from "./commands/server-stats-live.js";
+import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -637,6 +641,39 @@ const LEGACY_COMMANDS = [
   bankLifeCommand,
   bankLuckEgCommand.data,
   animeCommand,
+  coinsShopCommand,
+  fullProfileCommand,
+  serverStatsCommand,
+  new SlashCommandBuilder()
+    .setName("يومي")
+    .setDescription("🎁 استلم مكافأتك اليومية من الكوينز"),
+  new SlashCommandBuilder()
+    .setName("تحويل")
+    .setDescription("💸 حوّل كوينز لشخص تاني")
+    .addUserOption(o => o.setName("عضو").setDescription("الشخص اللي هتحوله").setRequired(true))
+    .addIntegerOption(o => o.setName("كمية").setDescription("عدد الكوينز").setRequired(true).setMinValue(1)),
+  new SlashCommandBuilder()
+    .setName("ميوت")
+    .setDescription("🔇 ميوت مؤقت لعضو مع إرجاعه تلقائياً [مشرف]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+    .addUserOption(o => o.setName("عضو").setDescription("العضو المراد إسكاته").setRequired(true))
+    .addStringOption(o =>
+      o.setName("مدة").setDescription("المدة: 5m, 1h, 1d (دقائق/ساعات/أيام)").setRequired(true)
+    )
+    .addStringOption(o => o.setName("سبب").setDescription("السبب (اختياري)")),
+  new SlashCommandBuilder()
+    .setName("ليدربورد-ألعاب")
+    .setDescription("🎮 ليدربورد انتصارات الألعاب — روليت / اكس اوه / مافيا")
+    .addStringOption(o =>
+      o.setName("لعبة").setDescription("اختار اللعبة").setRequired(false)
+        .addChoices(
+          { name: "🎰 روليت", value: "roulette" },
+          { name: "❌ اكس اوه", value: "xo" },
+          { name: "🕵️ مافيا", value: "mafia" },
+          { name: "✌️ حجر ورقة مقص", value: "rps" },
+          { name: "📊 إجمالي", value: "total" },
+        )
+    ),
   new SlashCommandBuilder()
     .setName("حالة-الحماية")
     .setDescription("🛡️ عرض حالة كل أنظمة الحماية في البوت [أونر فقط]"),
@@ -691,7 +728,7 @@ function validateLatestFeatures(allCommands) {
     const skipList = [
       "ping","hello","roll","serverinfo","userinfo",
       "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة","إيمبد","إيمبد-تعديل",
-      "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد",
+      "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد","ميوت","تحويل","ليدربورد-ألعاب","متجر","إحصائيات-السيرفر",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة","عقوبة",
@@ -1728,6 +1765,24 @@ ${senderName}: ${question}
 [META:react=😂,gif=funny]`;
 }
 
+// ─── دوال المساعدة للمدة الزمنية ────────────────────────────────
+function parseDuration(str) {
+  if (!str) return null;
+  const match = str.trim().match(/^(\d+)(s|m|h|d)$/i);
+  if (!match) return null;
+  const n = parseInt(match[1]);
+  const unit = match[2].toLowerCase();
+  const multipliers = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+  return n * (multipliers[unit] || 0);
+}
+
+function formatDuration(ms) {
+  if (ms < 60_000) return `${Math.floor(ms / 1000)} ثانية`;
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)} دقيقة`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)} ساعة`;
+  return `${Math.floor(ms / 86_400_000)} يوم`;
+}
+
 const salaamCooldowns = new Map();
 
 // ─── Auto-Mod Log Channel ────────────────────────────────────────
@@ -1760,7 +1815,8 @@ async function sendModLog(type, modUser, targetId, reason, extra = {}) {
 
   try {
     const logCh = await client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID);
-    await logCh.send({ embeds: [embed] });
+    const ticketRow = new ActionRowBuilder().addComponents(buildTicketButton());
+    await logCh.send({ embeds: [embed], components: [ticketRow] });
   } catch { /* فشل اللوج — تجاهل */ }
 }
 
@@ -3820,10 +3876,39 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "ليدربورد") {
         const type = interaction.options.getString("نوع") ?? "coins";
         const allUsers = db.getAllData().users;
-        const sorted = Object.entries(allUsers).sort((a, b) => b[1][type] - a[1][type]).slice(0, 10);
-        let txt = `🏆 **قائمة الترتيب الأعلى (حسب ${type}):**\n`;
-        sorted.forEach(([id, data], i) => txt += `**#${i+1}** <@${id}> ⬅️ ${data[type]}\n`);
-        return interaction.reply({ content: txt });
+        const sorted = Object.entries(allUsers).sort((a, b) => (b[1][type] || 0) - (a[1][type] || 0)).slice(0, 10);
+        const typeLabel = type === "coins" ? "🪙 الكوينز" : "✨ الـ XP";
+        const embed = new EmbedBuilder()
+          .setColor(0xFFD700)
+          .setTitle(`🏆 ليدربورد ${typeLabel}`)
+          .setDescription(sorted.map(([id, data], i) =>
+            `**#${i+1}** <@${id}> — **${(data[type] || 0).toLocaleString()}** ${type === "coins" ? "🪙" : "XP"}`
+          ).join("\n") || "مفيش بيانات")
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed] });
+      }
+
+      if (cmd === "ليدربورد-ألعاب") {
+        const game = interaction.options.getString("لعبة") ?? "total";
+        const allUsers = db.getAllData().users;
+        const gameLabels = { roulette: "🎰 روليت", xo: "❌ اكس اوه", mafia: "🕵️ مافيا", rps: "✌️ حجر ورقة مقص", total: "📊 إجمالي" };
+        const sorted = Object.entries(allUsers).map(([id, d]) => {
+          const wins = d.gameWins || {};
+          const score = game === "total"
+            ? Object.values(wins).reduce((a, b) => a + b, 0)
+            : (wins[game] || 0);
+          return [id, score];
+        }).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+        const embed = new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setTitle(`🏆 ليدربورد ${gameLabels[game] || game}`)
+          .setDescription(sorted.length > 0
+            ? sorted.map(([id, s], i) => `**#${i+1}** <@${id}> — **${s}** انتصار`).join("\n")
+            : "مفيش انتصارات مسجلة بعد!")
+          .setFooter({ text: "الانتصارات بتتسجل تلقائياً من الألعاب" })
+          .setTimestamp();
+        return interaction.reply({ embeds: [embed] });
       }
 
       if (cmd === "ترحيب-قناة") {
@@ -3869,14 +3954,110 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "صورة") {
+        const desc = interaction.options.getString("وصف");
+        await interaction.deferReply();
+        try {
+          const encodedPrompt = encodeURIComponent(desc);
+          const seed = Math.floor(Math.random() * 1000000);
+          const imgUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?seed=${seed}&width=1024&height=1024&nologo=true&model=flux`;
+          const embed = new EmbedBuilder()
+            .setColor(0xA020F0)
+            .setTitle("🎨 صورة من وصفك")
+            .setDescription(`📝 **الوصف:** ${desc}`)
+            .setImage(imgUrl)
+            .setFooter({ text: "تولّدت بالـ AI — زنجي Bot 🤖" })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed] });
+        } catch (e) {
+          return interaction.editReply({ content: "❌ مقدرتش أولّد الصورة دلوقتي، حاول تاني بعد شوية!" });
+        }
+      }
+
+      if (cmd === "يومي") {
+        const uData = db.getUser(user.id);
+        const now = Date.now();
+        if (uData.lastDaily && now - uData.lastDaily < 86400000) {
+          const remaining = Math.ceil((86400000 - (now - uData.lastDaily)) / 3600000);
+          return interaction.reply({ content: `❌ أخدت مكافأتك النهارده خلاص يسطا! 🕐 جرّب تاني بعد **${remaining} ساعة**`, ephemeral: true });
+        }
+        const streak = ((uData.lastDaily && now - uData.lastDaily < 172800000) ? (uData.dailyStreak || 0) + 1 : 1);
+        const base = 200;
+        const bonus = Math.min(streak - 1, 6) * 50;
+        const total = base + bonus;
+        db.updateUser(user.id, { coins: (uData.coins || 0) + total, lastDaily: now, dailyStreak: streak });
+        const streakMsg = streak > 1 ? `\n🔥 **سلسلة ${streak} يوم!** (+${bonus} بونص)` : "";
         return interaction.reply({
           embeds: [new EmbedBuilder()
-            .setColor(0xe74c3c)
-            .setTitle("❌ ميزة غير متاحة")
-            .setDescription("توليد الصور بالذكاء الاصطناعي غير متاح حالياً.\nهذه الميزة تحتاج نموذج Gemini متخصص لتوليد الصور وهو غير مفعّل في هذا البوت.")
-            .setFooter({ text: "استخدم /زنجي لطلب أي حاجة تانية 😊" })],
-          ephemeral: true
+            .setColor(0xFFD700)
+            .setTitle("🎁 مكافأة يومية!")
+            .setDescription(`يا ${user}! استلمت **${total} 🪙** كوينز النهارده!${streakMsg}\n\n💰 رصيدك دلوقتي: **${(uData.coins || 0) + total} 🪙**`)
+            .setFooter({ text: "ارجع بكره عشان تاخد بونص سلسلة أكبر! 🔥" })
+            .setTimestamp()]
         });
+      }
+
+      if (cmd === "تحويل") {
+        const target = interaction.options.getUser("عضو");
+        const amount = interaction.options.getInteger("كمية");
+        if (target.id === user.id) return interaction.reply({ content: "❌ مقدرش تحول لنفسك يسطا!", ephemeral: true });
+        if (target.bot) return interaction.reply({ content: "❌ مقدرش تحول للبوتات!", ephemeral: true });
+        const senderData = db.getUser(user.id);
+        if ((senderData.coins || 0) < amount) {
+          return interaction.reply({ content: `❌ معندكش كوينز كفاية! عندك **${senderData.coins || 0} 🪙** وبتحاول تحول **${amount} 🪙**`, ephemeral: true });
+        }
+        const targetData = db.getUser(target.id);
+        db.updateUser(user.id, { coins: (senderData.coins || 0) - amount });
+        db.updateUser(target.id, { coins: (targetData.coins || 0) + amount });
+        return interaction.reply({
+          embeds: [new EmbedBuilder()
+            .setColor(0x2ecc71)
+            .setTitle("💸 تحويل كوينز")
+            .setDescription(`✅ حوّلت **${amount} 🪙** لـ ${target} بنجاح!\n\n💰 رصيدك دلوقتي: **${(senderData.coins || 0) - amount} 🪙**`)
+            .setTimestamp()]
+        });
+      }
+
+      if (cmd === "ميوت") {
+        const target = interaction.options.getUser("عضو");
+        const durationStr = interaction.options.getString("مدة");
+        const reason = interaction.options.getString("سبب") || "بدون سبب محدد";
+        const durationMs = parseDuration(durationStr);
+        if (!durationMs) return interaction.reply({ content: "❌ مدة غلط! استخدم مثلاً: `10m` أو `2h` أو `1d`", ephemeral: true });
+        if (durationMs > 28 * 24 * 60 * 60 * 1000) return interaction.reply({ content: "❌ الحد الأقصى للميوت 28 يوم!", ephemeral: true });
+        try {
+          const member = await guild.members.fetch(target.id);
+          await member.timeout(durationMs, reason);
+          db.addWarning(target.id, `[ميوت] ${reason}`, user.id);
+          db.addTimeout(target.id, durationMs, reason);
+          const readableDuration = formatDuration(durationMs);
+          sendModLog("mute", user, target.id, reason, { duration: readableDuration }).catch(() => {});
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0x3498db)
+              .setTitle("🔇 تم الإسكات")
+              .addFields(
+                { name: "👤 العضو", value: `${target}`, inline: true },
+                { name: "⏱️ المدة", value: readableDuration, inline: true },
+                { name: "📝 السبب", value: reason, inline: false },
+                { name: "🔓 يرجع في", value: `<t:${Math.floor((Date.now() + durationMs) / 1000)}:R>`, inline: true },
+              )
+              .setTimestamp()]
+          });
+        } catch (e) {
+          return interaction.reply({ content: `❌ مقدرتش أعمل ميوت: ${e.message}`, ephemeral: true });
+        }
+      }
+
+      if (cmd === "متجر") {
+        return handleCoinsShop(interaction, db);
+      }
+
+      if (cmd === "بروفايل") {
+        return handleFullProfile(interaction, db);
+      }
+
+      if (cmd === "إحصائيات-السيرفر") {
+        return handleServerStats(interaction, db);
       }
 
       if (cmd === "نسخة-احتياطية") {
@@ -4185,6 +4366,17 @@ client.on("interactionCreate", async (interaction) => {
   // التعامل مع الأزرار والمودال التفاعلية
   if (interaction.isButton()) {
     try {
+
+      // ─── أزرار نظام التذاكر ────────────────────────────────────────
+      if (interaction.customId === "open_ticket") {
+        return await handleTicketButton(interaction, db);
+      }
+      if (interaction.customId.startsWith("ticket_close|")) {
+        return await handleTicketClose(interaction, db);
+      }
+      if (interaction.customId.startsWith("ticket_claim|")) {
+        return await handleTicketClaim(interaction);
+      }
 
       // ─── أزرار التحكم في الموسيقى ────────────────────────────────
       if (interaction.customId.startsWith("music_")) {
@@ -5058,6 +5250,11 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      // ─── مودال نظام التذاكر ────────────────────────────────────────
+      if (interaction.customId === "ticket_modal") {
+        return await handleTicketModalSubmit(interaction, db);
+      }
+
       // ─── مودالات نظام الأنمي ───────────────────────────────────────
       if (interaction.customId === "anime_search_modal") {
         return await handleAnimeSearchModal(interaction, db);
@@ -5668,12 +5865,78 @@ function _dedupeLeave(key, ttl = 10000) {
   return true;
 }
 
+// ─── Anti-Raid: تتبّع انضمامات سريعة ──────────────────────────
+const _raidJoinBuffer = new Map(); // guildId → [{timestamp}]
+const _raidLockdownActive = new Map(); // guildId → boolean
+
+async function checkAntiRaid(member) {
+  const guildId = member.guild.id;
+  const now = Date.now();
+  const WINDOW = 30_000;    // 30 ثانية
+  const THRESHOLD = 5;      // 5 أعضاء في 30 ثانية → raid!
+  const LOCKDOWN_MINS = 10; // مدة الـ lockdown
+
+  if (!_raidJoinBuffer.has(guildId)) _raidJoinBuffer.set(guildId, []);
+  const buf = _raidJoinBuffer.get(guildId);
+  buf.push(now);
+  _raidJoinBuffer.set(guildId, buf.filter(t => now - t < WINDOW));
+
+  if (_raidJoinBuffer.get(guildId).length >= THRESHOLD && !_raidLockdownActive.get(guildId)) {
+    _raidLockdownActive.set(guildId, true);
+    console.warn(`[Anti-Raid] 🚨 Raid detected in ${member.guild.name}! Starting lockdown...`);
+
+    try {
+      const everyoneRole = member.guild.roles.everyone;
+      const textChannels = member.guild.channels.cache.filter(c => c.type === 0);
+      for (const [, ch] of textChannels) {
+        await ch.permissionOverwrites.edit(everyoneRole, { SendMessages: false })
+          .catch(() => {});
+      }
+
+      const logCh = await client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID).catch(() => null);
+      if (logCh) {
+        await logCh.send({
+          embeds: [new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle("🚨 تم اكتشاف RAID! — تفعيل الـ Lockdown تلقائياً")
+            .setDescription(
+              `تم رصد **${_raidJoinBuffer.get(guildId).length}+ انضمامات** خلال 30 ثانية!\n` +
+              `🔒 تم **إغلاق جميع القنوات** تلقائياً لمدة **${LOCKDOWN_MINS} دقيقة**.\n` +
+              `ستُفتح تلقائياً بعد انتهاء المدة.`
+            )
+            .setTimestamp()
+          ]
+        });
+      }
+
+      setTimeout(async () => {
+        for (const [, ch] of textChannels) {
+          await ch.permissionOverwrites.edit(everyoneRole, { SendMessages: null })
+            .catch(() => {});
+        }
+        _raidLockdownActive.set(guildId, false);
+        _raidJoinBuffer.set(guildId, []);
+        const logChEnd = await client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID).catch(() => null);
+        if (logChEnd) {
+          await logChEnd.send({ content: "✅ انتهى الـ Lockdown — فُتحت جميع القنوات تلقائياً." }).catch(() => {});
+        }
+      }, LOCKDOWN_MINS * 60_000);
+
+    } catch (e) {
+      console.error("[Anti-Raid] خطأ في الـ Lockdown:", e.message);
+      _raidLockdownActive.set(guildId, false);
+    }
+  }
+}
+
 client.on('guildMemberAdd', async (member) => {
   // ✅ FIX: تفعيل anti-raid من moderation-listener.js (كانت معمولة new بس مش مربوطة بأي event)
   //   بنستدعيها هنا بشكل مستقل عن منطق الترحيب عشان تشتغل دايمًا حتى لو الترحيب اتعمله dedupe
   moderation.scanGuildJoin(member).catch((err) => {
     logger.error("[Anti-Raid] خطأ في فحص انضمام العضو:", err);
   });
+
+  checkAntiRaid(member).catch(e => console.error("[Anti-Raid] خطأ:", e.message));
 
   if (!_dedupeWelcome(`${member.guild.id}-${member.id}`)) return;
 

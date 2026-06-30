@@ -363,7 +363,10 @@ export async function handleRouletteButton(interaction, db) {
           const wu = db.getUser(winner);
           wu.coins = (wu.coins || 0) + prize;
           recordActivity(wu, "game_win");
-          recordGameWin(winner, "روليت");
+          recordGameWin(winner, "roulette");
+          const gw = wu.gameWins || {};
+          gw.roulette = (gw.roulette || 0) + 1;
+          wu.gameWins = gw;
           db.updateUser(winner, wu);
         }
         rouletteGames.delete(gameId);
@@ -1362,13 +1365,19 @@ export async function handleTTTButton(interaction, db) {
           const wu = db.getUser(winnerId);
           wu.coins = (wu.coins || 0) + 150;
           recordActivity(wu, "game_win");
-          recordGameWin(winnerId, "XO");
+          recordGameWin(winnerId, "xo");
+          const gwX = wu.gameWins || {};
+          gwX.xo = (gwX.xo || 0) + 1;
+          wu.gameWins = gwX;
           db.updateUser(winnerId, wu);
         } else if (state.isAI && winnerId === state.playerX) {
           const wu = db.getUser(state.playerX);
           wu.coins = (wu.coins || 0) + 200;
           recordActivity(wu, "game_win");
-          recordGameWin(state.playerX, "XO-AI");
+          recordGameWin(state.playerX, "xo");
+          const gwAI = wu.gameWins || {};
+          gwAI.xo = (gwAI.xo || 0) + 1;
+          wu.gameWins = gwAI;
           db.updateUser(state.playerX, wu);
         }
       }
