@@ -16,6 +16,9 @@ import { sendMusicCard } from '../helpers/music-card.js';
 
 // ─── كسر اتصال الصوت مباشرة بغض النظر عن الـ queue ─────────
 function destroyVoiceConnection(guildId) {
+  // DisTube voice manager أولاً (الأضمن)
+  try { distube?.voices?.get(guildId)?.leave(); } catch {}
+  // fallback: @discordjs/voice مباشرة
   try {
     const conn = getVoiceConnection(guildId);
     if (conn) conn.destroy();
@@ -398,15 +401,18 @@ export async function handlePlay(interaction) {
 
       await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
 
+      // Spotify → بحث SoundCloud عشان YouTube مابيشتغلش
+      const scTrack = (name) => `scsearch:${name}`;
+
       if (sp.tracks.length === 1) {
-        await distube.play(voiceChannel, sp.tracks[0], playOptions);
+        await distube.play(voiceChannel, scTrack(sp.tracks[0]), playOptions);
       } else {
-        await distube.play(voiceChannel, sp.tracks[0], playOptions);
+        await distube.play(voiceChannel, scTrack(sp.tracks[0]), playOptions);
         ;(async () => {
           const q = distube.getQueue(interaction.guildId);
           if (q) q._batchLoading = true;
           for (let i = 1; i < sp.tracks.length; i++) {
-            try { await distube.play(voiceChannel, sp.tracks[i], { ...playOptions }); } catch {}
+            try { await distube.play(voiceChannel, scTrack(sp.tracks[i]), { ...playOptions }); } catch {}
             await new Promise(r => setTimeout(r, 350));
           }
           const qEnd = distube.getQueue(interaction.guildId);
@@ -424,15 +430,20 @@ export async function handlePlay(interaction) {
       return;
     }
 
-    if (sourceType === 'youtube' || sourceType === 'soundcloud') {
-      // ── روابط YouTube / SoundCloud مباشرة ──
+    if (sourceType === 'soundcloud') {
+      // ── رابط SoundCloud مباشرة ──
+      await interaction.editReply({ content: '🔍 جاري التحميل من SoundCloud...' });
+      await distube.play(voiceChannel, query, playOptions);
+
+    } else if (sourceType === 'youtube') {
+      // ── رابط YouTube مباشرة لـ yt-dlp ──
       await interaction.editReply({ content: '🔍 جاري التحميل...' });
       await distube.play(voiceChannel, query, playOptions);
 
     } else {
-      // ── بحث نصي → YouTube مباشرة (الأضمن) ──
-      await interaction.editReply({ content: '🔍 جاري البحث...' });
-      await distube.play(voiceChannel, query, playOptions);
+      // ── بحث نصي → SoundCloud ──
+      await interaction.editReply({ content: '🔍 جاري البحث على SoundCloud...' });
+      await distube.play(voiceChannel, `scsearch:${query}`, playOptions);
     }
 
     await interaction.editReply({ content: '✅ تم!' }).catch(() => {});
