@@ -6,7 +6,7 @@
 //  Layer 1 – Honeypot                (قناة مخفية = بوت/هاكر فوري)
 //  Layer 2 – Cross-Channel Flood     (بعت في 5+ قنوات في 10 ثواني)
 //  Layer 3 – Bot Behavioral Fingerprint (كشف البوتات من السلوك)
-//  Layer 4 – Spam & Flood            (flood/duplicate/mention/caps/emoji)
+//  Layer 4 – Spam & Flood            (flood/duplicate/mention/caps)
 //  Layer 5 – Instant Critical Regex  (CSAM/تفجيرات/إرهاب)
 //  Layer 6 – Smart Link Scanner      (Gemini يحلل الرابط + سياقه)
 //  Layer 7 – Account Age Check       (حساب جديد + مشبوه = أشد)
@@ -243,7 +243,6 @@ const SPAM_CONFIG = {
   MAX_MENTIONS: 5,
   MIN_CAPS_RATIO: 0.8,
   MIN_CAPS_LENGTH: 20,
-  EMOJI_FLOOD: 15,
 };
 
 function checkSpam(msg) {
