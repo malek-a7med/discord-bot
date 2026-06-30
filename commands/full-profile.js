@@ -26,10 +26,12 @@ export async function handleFullProfile(interaction, db) {
   const rpgData = userData.rpg || {};
   const cls = rpgData.class ? CLASSES[rpgData.class] : null;
   const stats = cls ? calculateStats(userData) : null;
-  const currentTitle = rpgData.currentTitle ? TITLES[rpgData.currentTitle]?.name : null;
-  const unlockedAchievements = Object.entries(ACHIEVEMENTS)
-    .filter(([k]) => rpgData.achievements?.[k])
-    .map(([, v]) => v.emoji || "🏅");
+  const currentTitleObj = getCurrentTitle(userData);
+  const currentTitleName = currentTitleObj?.name || null;
+
+  const unlockedAchievements = ACHIEVEMENTS.filter(a => {
+    try { return a.check(userData); } catch { return false; }
+  }).map(a => a.name.split(" ")[0]);
 
   const gameWins = userData.gameWins || {};
   const totalWins = Object.values(gameWins).reduce((a, b) => a + b, 0);
@@ -43,15 +45,17 @@ export async function handleFullProfile(interaction, db) {
   const xp = userData.xp || 0;
   const coins = userData.coins || 0;
   const nextLevelXp = (level + 1) * (level + 1) * 50;
+  const currLevelXp = level * level * 50;
+  const xpBar = buildBar(xp - currLevelXp, nextLevelXp - currLevelXp);
 
-  const xpBar = buildBar(xp - level * level * 50, nextLevelXp - level * level * 50);
-
-  const displayName = `${activeEmoji} ${member?.displayName || target.username}`.trim();
-  const titleLine = activeTitle || currentTitle ? `**${activeTitle || currentTitle}**\n` : "";
+  const displayEmoji = activeEmoji ? `${activeEmoji} ` : "";
+  const titleLine = activeTitle || currentTitleName
+    ? `**${activeTitle || currentTitleName}**\n`
+    : "";
 
   const embed = new EmbedBuilder()
     .setColor(cls?.color || 0xA020F0)
-    .setTitle(`${titleLine}📊 بروفايل ${displayName}`)
+    .setTitle(`${titleLine}📊 بروفايل ${displayEmoji}${member?.displayName || target.username}`)
     .setThumbnail(target.displayAvatarURL({ size: 256 }))
     .addFields(
       {
@@ -67,7 +71,7 @@ export async function handleFullProfile(interaction, db) {
       {
         name: "⚔️ الكلاس",
         value: cls
-          ? `${cls.emoji} **${cls.name}**\n💪${stats?.strength} 🧠${stats?.intelligence}\n✨${stats?.charisma} 🍀${stats?.luck}`
+          ? `${cls.emoji} **${cls.name}**\n💪 ${stats?.strength} 🧠 ${stats?.intelligence}\n✨ ${stats?.charisma} 🍀 ${stats?.luck}`
           : "❌ مش محدد — استخدم /كلاسي",
         inline: true
       },
@@ -89,7 +93,9 @@ export async function handleFullProfile(interaction, db) {
         inline: true
       },
     )
-    .setFooter({ text: `📅 عضو منذ: ${member ? new Date(member.joinedAt).toLocaleDateString("ar-EG") : "—"} | ${target.username}` })
+    .setFooter({
+      text: `📅 عضو منذ: ${member ? new Date(member.joinedAt).toLocaleDateString("ar-EG") : "—"} | ${target.username}`
+    })
     .setTimestamp();
 
   return interaction.editReply({ embeds: [embed] });
@@ -97,6 +103,7 @@ export async function handleFullProfile(interaction, db) {
 
 function buildBar(current, total, length = 10) {
   if (total <= 0) return "▓".repeat(length);
-  const filled = Math.max(0, Math.min(length, Math.round((current / total) * length)));
+  const pct = Math.max(0, Math.min(1, current / total));
+  const filled = Math.round(pct * length);
   return "▓".repeat(filled) + "░".repeat(length - filled);
 }
