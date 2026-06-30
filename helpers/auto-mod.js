@@ -264,11 +264,6 @@ function checkSpam(msg) {
     return { type: "everyone_mention", reason: "محاولة منشن @everyone بدون صلاحية", level: DANGER.HIGH };
   }
 
-  const emojiCount = (content.match(/\p{Emoji}/gu) || []).length;
-  if (emojiCount >= SPAM_CONFIG.EMOJI_FLOOD) {
-    changeRep(userId, -5);
-    return { type: "emoji_flood", reason: `إيموجي مفرط (${emojiCount})`, level: DANGER.MEDIUM };
-  }
 
   if (content.length >= SPAM_CONFIG.MIN_CAPS_LENGTH) {
     const letters = content.replace(/[^a-zA-Zا-ي]/g, "");
