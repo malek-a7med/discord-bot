@@ -1358,28 +1358,45 @@ async function handleSuggestionModalSubmit(interaction, suggestionText) {
         /\.(png|jpe?g|gif|webp)$/i.test(a.url)
       );
       if (imgAttachment) {
-        // حذف رسالة الصورة بصمت
+        // امسح رسالة الصورة بصمت
         collected.first().delete().catch(() => {});
 
-        const imageUrl = imgAttachment.url;
+        // حمّل الصورة كـ buffer وارفعها داخل الرسالة نفسها
+        try {
+          const imgRes  = await fetch(imgAttachment.url);
+          const imgBuf  = Buffer.from(await imgRes.arrayBuffer());
+          const ext     = (imgAttachment.url.match(/\.(png|jpe?g|gif|webp)/i) || ['', 'png'])[1].toLowerCase().replace('jpeg','jpg');
+          const fname   = `suggestion.${ext}`;
+          const file    = new AttachmentBuilder(imgBuf, { name: fname });
+          const imgRef  = `attachment://${fname}`;
 
-        // تحديث الروم العام بالصورة
-        const updatedPublicEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
-          .setImage(imageUrl);
-        await publicMessage.edit({ embeds: [updatedPublicEmbed] }).catch(() => {});
+          // الروم العام — ارفع الصورة داخل الرسالة
+          const updatedPublicEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
+            .setImage(imgRef);
+          await publicMessage.edit({ embeds: [updatedPublicEmbed], files: [file] }).catch(() => {});
 
-        // تحديث روم الإدارة بالصورة
-        if (adminMessage) {
-          const updatedAdminEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
-            .addFields({ name: SUGGESTION_REF_FIELD, value: `${publicMessage.id}|${interaction.user.id}`, inline: false })
-            .setImage(imageUrl);
-          await adminMessage.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
+          // روم الإدارة — نفس الصورة
+          if (adminMessage) {
+            const file2 = new AttachmentBuilder(imgBuf, { name: fname });
+            const updatedAdminEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
+              .addFields({ name: SUGGESTION_REF_FIELD, value: `${publicMessage.id}|${interaction.user.id}`, inline: false })
+              .setImage(imgRef);
+            await adminMessage.edit({ embeds: [updatedAdminEmbed], files: [file2] }).catch(() => {});
+          }
+
+          await interaction.followUp({ content: "🖼️ **اتضافت الصورة لاقتراحك!** ✅", ephemeral: true }).catch(() => {});
+        } catch {
+          // fallback: استخدم الرابط المباشر
+          const updatedPublicEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
+            .setImage(imgAttachment.url);
+          await publicMessage.edit({ embeds: [updatedPublicEmbed] }).catch(() => {});
+          if (adminMessage) {
+            const updatedAdminEmbed = buildSuggestionEmbed({ user: interaction.user, text: trimmedText, statusKey: "pending" })
+              .addFields({ name: SUGGESTION_REF_FIELD, value: `${publicMessage.id}|${interaction.user.id}`, inline: false })
+              .setImage(imgAttachment.url);
+            await adminMessage.edit({ embeds: [updatedAdminEmbed] }).catch(() => {});
+          }
         }
-
-        await interaction.followUp({
-          content: "🖼️ **اتضافت الصورة لاقتراحك!** ✅",
-          ephemeral: true,
-        }).catch(() => {});
       }
     }
   } catch {
