@@ -1477,7 +1477,7 @@ client.once("clientReady", async (c) => {
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
 
   // ── ملخص السيرفر الأسبوعي التلقائي ────────────────────────────
-  const SUMMARY_CHANNEL_ID = process.env.SERVER_SUMMARY_CHANNEL_ID || null;
+  const SUMMARY_CHANNEL_ID = process.env.SERVER_SUMMARY_CHANNEL_ID || "1517362832063074324";
   if (SUMMARY_CHANNEL_ID) {
     setInterval(async () => {
       try {

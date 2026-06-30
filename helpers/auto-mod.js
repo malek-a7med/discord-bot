@@ -250,14 +250,7 @@ function checkSpam(msg) {
   const content = msg.content || "";
   const now = Date.now();
 
-  const mentionCount = msg.mentions.users.size + msg.mentions.roles.size +
-    (msg.mentions.everyone ? 1 : 0);
-  if (mentionCount >= SPAM_CONFIG.MAX_MENTIONS) {
-    changeRep(userId, -10);
-    return { type: "mass_mention", reason: `منشن مفرط (${mentionCount})`, level: DANGER.HIGH };
-  }
-
-  // @everyone أو @here من غير صلاحية
+  // @everyone أو @here من غير صلاحية بس — المنشن العادي مسموح
   if (msg.mentions.everyone && !msg.member?.permissions.has("MentionEveryone")) {
     changeRep(userId, -20);
     return { type: "everyone_mention", reason: "محاولة منشن @everyone بدون صلاحية", level: DANGER.HIGH };
