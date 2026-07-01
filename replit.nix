@@ -1,5 +1,8 @@
 {pkgs}: {
   deps = [
+    pkgs.curl
+    pkgs.maven
+    pkgs.jdk17
     pkgs.yt-dlp
     pkgs.libuuid
     pkgs.pixman
