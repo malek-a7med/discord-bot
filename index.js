@@ -2236,6 +2236,14 @@ client.on("messageCreate", async (msg) => {
     if (userData.level > oldLevel) {
       recordEvent("level_up", { userId: msg.author.id, level: userData.level });
 
+      // ── إشعار الليفل الجديد ───────────────────────────────────
+      const lvlEmbed = new EmbedBuilder()
+        .setColor(0xffd700)
+        .setTitle("🎉 مبروك! ارتقيت مستوى!")
+        .setDescription(`${msg.author} وصل للمستوى **${userData.level}** 🚀`)
+        .setTimestamp();
+      msg.channel.send({ embeds: [lvlEmbed] }).catch(() => {});
+
       // ── Rank Roles تلقائي (ديناميكي) ─────────────────────────
       const currentRanks = getRanks(); // مرتبين من الأعلى للأدنى
       for (const rank of currentRanks) {
@@ -2250,13 +2258,6 @@ client.on("messageCreate", async (msg) => {
                 await freshMember.roles.remove(lower.roleId, "ترقي لرتبة أعلى").catch(() => {});
               }
             }
-            msg.channel.send({ embeds: [
-              new EmbedBuilder()
-                .setColor(0xFFD700)
-                .setTitle("🏆 رتبة جديدة!")
-                .setDescription(`مبروك ${msg.author}! وصلت للمستوى **${rank.level}** وكسبت رتبة **${rank.name}** 🎊`)
-                .setTimestamp()
-            ]}).catch(() => {});
           }
           break; // بس أعلى رتبة مستحقة
         }
