@@ -3,6 +3,7 @@ nixPkgs = ["nodejs_22", "ffmpeg", "python3", "yt-dlp", "vips", "pkg-config"]
 
 [phases.install]
 cmds = [
+  "pip install -q yt-dlp",
   "NODE_OPTIONS=--max-old-space-size=1024 npm ci --no-audit --ignore-scripts",
   "npm rebuild sharp --no-audit",
 ]

@@ -110,8 +110,8 @@ export function initMusicSystem(client) {
           ? { api: { clientId: process.env.SPOTIFY_CLIENT_ID, clientSecret: process.env.SPOTIFY_CLIENT_SECRET } }
           : {}
       ),
-      new YtDlpPlugin({ update: true }),
       new SoundCloudPlugin(),
+      new YtDlpPlugin({ update: true }),
     ],
   });
 
