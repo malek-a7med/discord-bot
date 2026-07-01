@@ -61,23 +61,150 @@ function destroyVoiceConnection(guildId) {
   } catch {}
 }
 
-// ─── كشف نوع الإدخال ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+//  كشف المصدر — نفس فكرة JMusicBot: كل مصدر ليه handler
+//  الترتيب: Spotify → Apple Music → Deezer → YouTube →
+//           SoundCloud → TikTok/Twitter/IG/FB → Twitch →
+//           Bandcamp → Vimeo → NicoNico → Bilibili →
+//           رابط صوت مباشر → راديو/stream → بحث نصي
+// ═══════════════════════════════════════════════════════════════
 function detectSourceType(query) {
   const q = query.trim();
+
+  // ── Spotify ────────────────────────────────────────────────
   if (/^spotify:(track|playlist|album|artist):[a-zA-Z0-9]+$/i.test(q)) {
     const kind = q.split(':')[1].toLowerCase();
     if (kind === 'track')  return 'spotify_track';
     if (kind === 'artist') return 'spotify_artist';
     return 'spotify_collection';
   }
-  if (/spotify\.link\//i.test(q))                      return 'spotify_short';
-  if (/open\.spotify\.com\/(playlist|album)/i.test(q)) return 'spotify_collection';
-  if (/open\.spotify\.com\/artist/i.test(q))            return 'spotify_artist';
-  if (/open\.spotify\.com\/track/i.test(q))             return 'spotify_track';
-  if (/open\.spotify\.com/i.test(q))                    return 'spotify_track';
-  if (/youtube\.com|youtu\.be/i.test(q))               return 'youtube';
-  if (/soundcloud\.com/i.test(q))                      return 'soundcloud';
+  if (/spotify\.link\//i.test(q))                       return 'spotify_short';
+  if (/open\.spotify\.com\/(playlist|album)/i.test(q))  return 'spotify_collection';
+  if (/open\.spotify\.com\/artist/i.test(q))             return 'spotify_artist';
+  if (/open\.spotify\.com\/track/i.test(q))              return 'spotify_track';
+  if (/open\.spotify\.com/i.test(q))                     return 'spotify_track';
+
+  // ── Apple Music ────────────────────────────────────────────
+  if (/music\.apple\.com/i.test(q))                      return 'apple_music';
+
+  // ── Deezer ─────────────────────────────────────────────────
+  if (/deezer\.com\/(track|album|playlist|artist)/i.test(q)) return 'deezer';
+
+  // ── YouTube ────────────────────────────────────────────────
+  if (/youtube\.com|youtu\.be/i.test(q))                 return 'youtube';
+
+  // ── SoundCloud ─────────────────────────────────────────────
+  if (/soundcloud\.com/i.test(q))                        return 'soundcloud';
+
+  // ── TikTok ────────────────────────────────────────────────
+  if (/tiktok\.com/i.test(q))                            return 'tiktok';
+
+  // ── Twitter / X ───────────────────────────────────────────
+  if (/twitter\.com|x\.com/i.test(q))                    return 'twitter';
+
+  // ── Instagram ─────────────────────────────────────────────
+  if (/instagram\.com\/(p|reel|tv)\//i.test(q))          return 'instagram';
+
+  // ── Facebook ──────────────────────────────────────────────
+  if (/facebook\.com|fb\.watch/i.test(q))                return 'facebook';
+
+  // ── Twitch ─────────────────────────────────────────────────
+  if (/twitch\.tv/i.test(q))                             return 'twitch';
+
+  // ── Bandcamp ──────────────────────────────────────────────
+  if (/bandcamp\.com/i.test(q))                          return 'bandcamp';
+
+  // ── Vimeo ─────────────────────────────────────────────────
+  if (/vimeo\.com/i.test(q))                             return 'vimeo';
+
+  // ── NicoNico ──────────────────────────────────────────────
+  if (/nicovideo\.jp|nico\.ms/i.test(q))                 return 'niconico';
+
+  // ── Bilibili ──────────────────────────────────────────────
+  if (/bilibili\.com|b23\.tv/i.test(q))                  return 'bilibili';
+
+  // ── رابط صوت مباشر (mp3/wav/flac/ogg/m4a/aac/opus/wma) ───
+  if (/\.(mp3|wav|flac|ogg|m4a|aac|opus|wma|webm)(\?.*)?$/i.test(q) &&
+      /^https?:\/\//i.test(q))                           return 'direct_audio';
+
+  // ── راديو / stream مباشر (icecast/shoutcast) ──────────────
+  if (/^https?:\/\/.+\.(pls|m3u8?|asx|xspf)(\?.*)?$/i.test(q) ||
+      /stream|radio|live/i.test(q) && /^https?:\/\//i.test(q))
+                                                          return 'stream';
+
+  // ── بحث نصي ──────────────────────────────────────────────
   return 'text';
+}
+
+// ─── رسائل التحميل لكل مصدر ──────────────────────────────────
+const SOURCE_LABELS = {
+  spotify_track:      '🎵 جاري جلب الأغنية من Spotify...',
+  spotify_collection: '📋 جاري تحميل المجموعة من Spotify...',
+  spotify_artist:     '🎤 جاري جلب أغاني الفنان من Spotify...',
+  spotify_short:      '🔗 جاري تحليل رابط Spotify...',
+  apple_music:        '🍎 جاري جلب المعلومات من Apple Music...',
+  deezer:             '🎶 جاري جلب المعلومات من Deezer...',
+  youtube:            '▶️ جاري التحميل من YouTube...',
+  soundcloud:         '☁️ جاري التحميل من SoundCloud...',
+  tiktok:             '🎵 جاري جلب الصوت من TikTok...',
+  twitter:            '🐦 جاري جلب الصوت من Twitter/X...',
+  instagram:          '📸 جاري جلب الصوت من Instagram...',
+  facebook:           '👥 جاري جلب الصوت من Facebook...',
+  twitch:             '🎮 جاري الاتصال بـ Twitch...',
+  bandcamp:           '🎸 جاري التحميل من Bandcamp...',
+  vimeo:              '🎬 جاري التحميل من Vimeo...',
+  niconico:           '🇯🇵 جاري التحميل من NicoNico...',
+  bilibili:           '📺 جاري التحميل من Bilibili...',
+  direct_audio:       '🔊 جاري تحميل ملف الصوت...',
+  stream:             '📻 جاري الاتصال بالبث المباشر...',
+  text:               '🔍 جاري البحث...',
+};
+
+// ─── جيب اسم الأغنية من Apple Music (بدون API key) ──────────
+async function fetchAppleMusicName(url) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; bot)' },
+    });
+    clearTimeout(timeout);
+    const html = await res.text();
+
+    // جرب og:title أولاً
+    const og = html.match(/<meta[^>]+property="og:title"[^>]+content="([^"]+)"/i);
+    if (og?.[1]) return og[1].replace(' on Apple Music', '').trim();
+
+    // title tag
+    const t = html.match(/<title>([^<]+)<\/title>/i);
+    if (t?.[1]) return t[1].replace(' on Apple Music', '').replace(' - Apple Music', '').trim();
+  } catch {}
+  return null;
+}
+
+// ─── جيب اسم الأغنية من Deezer (بدون API key) ───────────────
+async function fetchDeezerName(url) {
+  try {
+    // استخرج نوع ورقم من الـ URL
+    const match = url.match(/deezer\.com\/(track|album|playlist|artist)\/(\d+)/i);
+    if (!match) return null;
+    const [, type, id] = match;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const apiRes = await fetch(`https://api.deezer.com/${type}/${id}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const data = await apiRes.json();
+
+    if (type === 'track')   return `${data.artist?.name || ''} ${data.title || ''}`.trim();
+    if (type === 'artist')  return data.name;
+    if (type === 'album')   return `${data.artist?.name || ''} ${data.title || ''}`.trim();
+    if (type === 'playlist') return data.title;
+  } catch {}
+  return null;
 }
 
 // ─── جيب أغاني Spotify بدون API key ──────────────────────────
@@ -488,91 +615,190 @@ export async function registerMusicCommands() {
   ];
 }
 
-// ─── بناء Embed للأغنية الواحدة / المجموعة ────────────────────
-function buildPlayEmbed(sp) {
-  const icons = { track: '🎵', playlist: '📋', album: '💿', artist: '🎤', collection: '🎵' };
-  const icon = icons[sp.type] || '🎵';
-  const typeAr = { track: 'أغنية', playlist: 'بلاي ليست', album: 'ألبوم', artist: 'فنان' }[sp.type] || 'محتوى';
-  const desc = sp.tracks.length === 1
-    ? `${icon} جاري تشغيل: **${sp.name}**`
-    : `${icon} جاري تشغيل **${sp.type === 'artist' ? `أفضل أغاني ${sp.name}` : sp.name}** — **${sp.tracks.length} أغنية** (${typeAr} Spotify)`;
-  return new EmbedBuilder().setColor(0x1DB954).setDescription(desc);
+
+// ─── دالة مساعدة: تشغيل بـ fallback (يوتيوب ← ساوند كلاود) ───
+async function playWithFallback(voiceChannel, searchQuery, playOptions, guildId) {
+  // جرّب يوتيوب أولاً
+  try {
+    await distube.play(voiceChannel, `ytsearch:${searchQuery}`, playOptions);
+    return { ok: true, source: 'youtube' };
+  } catch (ytErr) {
+    console.warn(`⚠️ [Music] يوتيوب فشل (${searchQuery.slice(0, 40)}): ${ytErr.message}`);
+  }
+  // fallback: ساوند كلاود
+  try {
+    await distube.play(voiceChannel, `scsearch:${searchQuery}`, playOptions);
+    return { ok: true, source: 'soundcloud' };
+  } catch (scErr) {
+    console.warn(`⚠️ [Music] ساوند كلاود فشل: ${scErr.message}`);
+    throw new Error(`مش لاقي "${searchQuery}" — جرّب اسم تاني أو رابط مباشر`);
+  }
 }
 
-// ─── handlePlay ────────────────────────────────────────────────
+// ─── دالة مساعدة: تشغيل بلاي ليست من مصادر تحتاج search ─────
+async function playSearchBatch(voiceChannel, tracks, playOptions, guildId, sourceName) {
+  // شغّل الأول على طول
+  await playWithFallback(voiceChannel, tracks[0], playOptions, guildId);
+
+  // باقي الأغاني في الخلفية
+  ;(async () => {
+    const q = distube.getQueue(guildId);
+    if (q) q._batchLoading = true;
+    for (let i = 1; i < tracks.length; i++) {
+      try {
+        await distube.play(voiceChannel, `ytsearch:${tracks[i]}`, { ...playOptions });
+      } catch { /* تجاوز الأغنية اللي فشلت */ }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const qEnd = distube.getQueue(guildId);
+    if (qEnd) {
+      qEnd._batchLoading = false;
+      qEnd.textChannel?.send({
+        embeds: [new EmbedBuilder()
+          .setColor(0x66FCF1)
+          .setDescription(`✅ أُضيفت **${tracks.length} أغنية** من ${sourceName} للقائمة 🎵`)],
+      }).catch(() => {});
+    }
+  })();
+}
+
+// ─── handlePlay — يدعم 15+ مصدر ──────────────────────────────
 export async function handlePlay(interaction) {
   try {
     if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال! كلم الأونر.', ephemeral: true });
 
-    const query = interaction.options?.getString('اغنية') || interaction.options?.getString('query') || '';
+    const query = (interaction.options?.getString('اغنية') || interaction.options?.getString('query') || '').trim();
     const voiceChannel = interaction.member?.voice?.channel;
 
     if (!voiceChannel) return interaction.reply({ content: '❌ لازم تكون في قناة صوتية الأول!', ephemeral: true });
-    if (!query) return interaction.reply({ content: '❌ اكتب اسم الأغنية أو رابطها!', ephemeral: true });
+    if (!query)        return interaction.reply({ content: '❌ اكتب اسم الأغنية أو رابطها!', ephemeral: true });
 
     await interaction.deferReply();
 
-    const sourceType = detectSourceType(query);
+    const sourceType  = detectSourceType(query);
+    const label       = SOURCE_LABELS[sourceType] || '🔍 جاري التحميل...';
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
+    const guildId     = interaction.guildId;
 
+    await interaction.editReply({ content: label });
+    console.log(`🎵 [Music] مصدر: ${sourceType} | طلب: ${query.slice(0, 60)}`);
+
+    // ══════════════════════════════════════════════════════════
+    //  Spotify — نفس المنطق القديم (fetchSpotifyContent)
+    // ══════════════════════════════════════════════════════════
     if (sourceType.startsWith('spotify_')) {
-      const typeLabels = {
-        spotify_track:      '🎵 جاري جلب الأغنية من Spotify...',
-        spotify_collection: '📋 جاري تحميل المجموعة من Spotify...',
-        spotify_artist:     '🎤 جاري جلب أغاني الفنان من Spotify...',
-        spotify_short:      '🔗 جاري تحليل الرابط...',
-      };
-      await interaction.editReply({ content: typeLabels[sourceType] || '🎵 جاري جلب المحتوى من Spotify...' });
-
       let sp;
       try {
         sp = await fetchSpotifyContent(query);
       } catch (apiErr) {
-        console.error('❌ [Music] fetchSpotifyContent فشل:', apiErr.message);
         return interaction.editReply({ content: `❌ ${apiErr.message}` });
       }
 
-      await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
+      const icons = { track: '🎵', playlist: '📋', album: '💿', artist: '🎤' };
+      const icon  = icons[sp.type] || '🎵';
+      const desc  = sp.tracks.length === 1
+        ? `${icon} جاري تشغيل: **${sp.name}**`
+        : `${icon} جاري تشغيل **${sp.name}** — **${sp.tracks.length} أغنية** (Spotify)`;
+      await interaction.editReply({ embeds: [new EmbedBuilder().setColor(0x1DB954).setDescription(desc)] });
 
-      const scTrack = (name) => `ytsearch:${name}`;
+      await playSearchBatch(voiceChannel, sp.tracks, playOptions, guildId, 'Spotify');
+      return;
+    }
 
-      if (sp.tracks.length === 1) {
-        await distube.play(voiceChannel, scTrack(sp.tracks[0]), playOptions);
-      } else {
-        await distube.play(voiceChannel, scTrack(sp.tracks[0]), playOptions);
-        ;(async () => {
-          const q = distube.getQueue(interaction.guildId);
-          if (q) q._batchLoading = true;
-          for (let i = 1; i < sp.tracks.length; i++) {
-            try { await distube.play(voiceChannel, scTrack(sp.tracks[i]), { ...playOptions }); } catch {}
-            await new Promise(r => setTimeout(r, 350));
+    // ══════════════════════════════════════════════════════════
+    //  Apple Music — استخرج الاسم وابحث يوتيوب
+    // ══════════════════════════════════════════════════════════
+    if (sourceType === 'apple_music') {
+      const name = await fetchAppleMusicName(query);
+      if (!name) return interaction.editReply({ content: '❌ مش قادر أجيب معلومات الأغنية من Apple Music — جرّب اكتب الاسم مباشرة' });
+      await interaction.editReply({ content: `🍎 لاقيت: **${name}** — جاري البحث...` });
+      await playWithFallback(voiceChannel, name, playOptions, guildId);
+      await interaction.editReply({ content: `✅ شغّال: **${name}** (Apple Music)` }).catch(() => {});
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Deezer — API مفتوح بدون key
+    // ══════════════════════════════════════════════════════════
+    if (sourceType === 'deezer') {
+      const name = await fetchDeezerName(query);
+      if (!name) return interaction.editReply({ content: '❌ مش قادر أجيب معلومات من Deezer — جرّب اكتب الاسم مباشرة' });
+      await interaction.editReply({ content: `🎶 لاقيت: **${name}** — جاري البحث...` });
+      await playWithFallback(voiceChannel, name, playOptions, guildId);
+      await interaction.editReply({ content: `✅ شغّال: **${name}** (Deezer)` }).catch(() => {});
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  YouTube — مباشر لـ yt-dlp
+    // ══════════════════════════════════════════════════════════
+    if (sourceType === 'youtube') {
+      await distube.play(voiceChannel, query, playOptions);
+      await interaction.editReply({ content: '✅ تم!' }).catch(() => {});
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  SoundCloud — مباشر لـ SoundCloudPlugin
+    // ══════════════════════════════════════════════════════════
+    if (sourceType === 'soundcloud') {
+      await distube.play(voiceChannel, query, playOptions);
+      await interaction.editReply({ content: '✅ تم!' }).catch(() => {});
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  رابط صوت مباشر أو Stream — مباشر لـ yt-dlp (HTTP source)
+    // ══════════════════════════════════════════════════════════
+    if (sourceType === 'direct_audio' || sourceType === 'stream') {
+      await distube.play(voiceChannel, query, playOptions);
+      await interaction.editReply({ content: `✅ ${sourceType === 'stream' ? '📻 البث شغّال!' : '🔊 الملف شغّال!'}` }).catch(() => {});
+      return;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  مواقع yt-dlp بيدعمها مباشرة:
+    //  TikTok, Twitter/X, Instagram, Facebook,
+    //  Twitch, Bandcamp, Vimeo, NicoNico, Bilibili
+    // ══════════════════════════════════════════════════════════
+    if ([
+      'tiktok', 'twitter', 'instagram', 'facebook',
+      'twitch', 'bandcamp', 'vimeo', 'niconico', 'bilibili',
+    ].includes(sourceType)) {
+      try {
+        // yt-dlp يتعامل معاهم مباشرة
+        await distube.play(voiceChannel, query, playOptions);
+        await interaction.editReply({ content: '✅ تم!' }).catch(() => {});
+      } catch (directErr) {
+        // لو فشل — جرّب يسحب الاسم من الصفحة ويبحث
+        console.warn(`⚠️ [Music] ${sourceType} direct فشل، جاري الـ fallback:`, directErr.message);
+        await interaction.editReply({ content: `⚠️ مش شغّال مباشرة — جاري البحث بطريقة تانية...` });
+        // استخدم yt-dlp مباشرة عشان نجيب الاسم
+        try {
+          const { execSync: exec } = await import('child_process');
+          const raw = exec(
+            `yt-dlp --no-download --print "%(title)s %(uploader)s" --no-playlist "${query.replace(/"/g, '')}"`,
+            { timeout: 15000, encoding: 'utf8' }
+          ).trim();
+          if (raw) {
+            await playWithFallback(voiceChannel, raw, playOptions, guildId);
+            await interaction.editReply({ content: `✅ شغّال: **${raw.slice(0, 60)}**` }).catch(() => {});
+          } else {
+            throw new Error('مش لاقي بيانات');
           }
-          const qEnd = distube.getQueue(interaction.guildId);
-          if (qEnd) {
-            qEnd._batchLoading = false;
-            qEnd.textChannel?.send({
-              embeds: [new EmbedBuilder()
-                .setColor(0x1DB954)
-                .setDescription(`✅ أُضيفت **${sp.tracks.length} أغنية** من Spotify للقائمة 🎵`)],
-            }).catch(() => {});
-          }
-        })();
+        } catch {
+          return interaction.editReply({ content: `❌ مش قادر أشغّل الرابط ده من ${sourceType}` });
+        }
       }
       return;
     }
 
-    if (sourceType === 'soundcloud') {
-      await interaction.editReply({ content: '🔍 جاري التحميل من SoundCloud...' });
-      await distube.play(voiceChannel, query, playOptions);
-    } else if (sourceType === 'youtube') {
-      await interaction.editReply({ content: '🔍 جاري التحميل...' });
-      await distube.play(voiceChannel, query, playOptions);
-    } else {
-      await interaction.editReply({ content: '🔍 جاري البحث...' });
-      await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);
-    }
-
-    await interaction.editReply({ content: '✅ تم!' }).catch(() => {});
+    // ══════════════════════════════════════════════════════════
+    //  بحث نصي — يوتيوب أولاً، ساوند كلاود لو فشل
+    // ══════════════════════════════════════════════════════════
+    const result = await playWithFallback(voiceChannel, query, playOptions, guildId);
+    const sourceLabel = result.source === 'soundcloud' ? ' (SoundCloud)' : '';
+    await interaction.editReply({ content: `✅ تم!${sourceLabel}` }).catch(() => {});
 
   } catch (e) {
     const errMsg = e?.message || String(e);
@@ -582,17 +808,13 @@ export async function handlePlay(interaction) {
     if (/private or unavailable|SPOTIFY_API_ERROR|embed page/i.test(errMsg)) {
       msg = [
         '⚠️ **مش قادر أحمّل البلاي ليست من Spotify!**',
-        '',
-        'سبوتيفاي بيحتاج مفاتيح مجانية عشان يشتغل. اعمل الخطوات دي:',
-        '**١.** روح على: `developer.spotify.com/dashboard`',
-        '**٢.** سجّل دخول وانشئ App جديدة (اسمها أي حاجة)',
-        '**٣.** افتح الـ App وانسخ الـ Client ID والـ Client Secret',
-        '**٤.** حطّهم في السيكريتس: `SPOTIFY_CLIENT_ID` و `SPOTIFY_CLIENT_SECRET`',
+        'سبوتيفاي بيحتاج مفاتيح — روح `developer.spotify.com/dashboard`',
+        'انشئ App وحط `SPOTIFY_CLIENT_ID` و `SPOTIFY_CLIENT_SECRET` في السيكريتس',
       ].join('\n');
     } else if (/private|blocked|age.?restricted/i.test(errMsg)) {
       msg = `🔒 الأغنية/البلاي ليست دي مش متاحة (private أو blocked)`;
     } else if (/no result|not found|مش لاقي/i.test(errMsg)) {
-      msg = `❌ مش لاقي الأغنية دي! جرب اكتب اسم الأغنية مباشرة`;
+      msg = `❌ مش لاقيها! جرب اكتب اسم الأغنية مباشرة`;
     } else {
       msg = `❌ حصل خطأ: \`${errMsg.slice(0, 300)}\``;
     }
