@@ -9,4 +9,4 @@
 - [Speech Mode](speech-mode.md) — 3 modes: normal(no swearing)/free(mirror swear back)/toxic(swears freely); buildUserPrompt in index.js; /تغيير-طريقة-الكلام owner-only
 - [Latest Features Rule](latest-features-rule.md) — every new feature MUST be added to LATEST_FEATURES array in commands/games-hub.js (newest entry first)
 - [Codenames 5-Row Limit](codenames-5row.md) — Discord max 5 ActionRows: board alone takes all 5 rows; skip/cancel buttons go as separate control message in channel; spymaster gets "give clue" via DM (sendActiveSpymasterControl); modal submits must NOT use interaction.update() — edit message by fetching state.channelId+state.messageId directly
-- [Music System Lavalink](music-lavalink.md) — نقل من DisTube/yt-dlp إلى shoukaku v4 Lavalink; joinVoiceChannel/leaveVoiceChannel; fakeQueue getters لـ sendMusicCard; Spotify-Only مع text search مقبول; راجع LAVALINK_RAILWAY.md للإعداد
+- [Music System](music-system.md) — نظام جديد: @discordjs/voice + play-dl بدون Lavalink؛ GuildPlayer class في commands/music.js؛ players Map (guildId→GuildPlayer)؛ musicHandler object يعرض كل الدوال للـ index.js؛ music-handler.js اتحذف
