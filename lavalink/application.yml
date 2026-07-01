@@ -28,23 +28,23 @@ lavalink:
     password: "${LAVALINK_PASSWORD:-youshallnotpass}"
     sources:
       youtube: true
-      bandcamp: false
-      soundcloud: false
-      twitch: false
-      vimeo: false
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
       http: true
       local: false
     filters:
       volume: true
       equalizer: true
-      karaoke: false
-      timescale: false
-      tremolo: false
-      vibrato: false
-      distortion: false
-      rotation: false
-      channelMix: false
-      lowPass: false
+      karaoke: true
+      timescale: true
+      tremolo: true
+      vibrato: true
+      distortion: true
+      rotation: true
+      channelMix: true
+      lowPass: true
     bufferDurationMs: 400
     frameBufferDurationMs: 5000
     opusEncodingQuality: 10
@@ -54,7 +54,7 @@ lavalink:
     youtubePlaylistLoadLimit: 6
     playerUpdateInterval: 5
     youtubeSearchEnabled: true
-    soundcloudSearchEnabled: false
+    soundcloudSearchEnabled: true
     gc-warnings: true
 
 metrics:
