@@ -27,6 +27,7 @@ import {
 } from "./commands/quick-clean.js";
 import { handleOwnerAI, getProcessingCount, ROLE_PRESETS, smartRolePerms } from "./helpers/owner-ai.js";
 import { scanMessage as autoModScan, getDailyReport, resetDailyStats, getUserReputation } from "./helpers/auto-mod.js";
+import { buildPersonalContext, extractAndUpdateProfile, formatCompanionProfile, deleteProfile, forceSave as saveCompanions } from "./helpers/ai-companion.js";
 import { recordActivity, checkNewAchievements, formatProfileSummary, CLASSES, TITLES, ACHIEVEMENTS, ensureRpgData, getCurrentTitle, calculateStats } from "./helpers/rpg-system.js";
 import { registerRpgCommands, setRpgDatabase, handleClassSelect, handleTitleSelect, handleClass, handleProfile, handleAchievements, handleTitles } from "./commands/rpg.js";
 import { recordEvent, recordMessage, recordGameWin, generateSummary, resetDailyCounts } from "./helpers/server-memory.js";
@@ -423,6 +424,8 @@ const LEGACY_COMMANDS = [
     ),
   new SlashCommandBuilder().setName("مساعدة").setDescription("قائمة جميع الأوامر / Help"),
   new SlashCommandBuilder().setName("ملخص-السيرفر").setDescription("📊 اعرض ملخص نشاط السيرفر [أونر فقط]"),
+  new SlashCommandBuilder().setName("رفيقي").setDescription("🤝 اعرض ما يعرفه زنجي عنك"),
+  new SlashCommandBuilder().setName("امسح-ذاكرتك").setDescription("🗑️ امسح معلوماتك من ذاكرة زنجي"),
   new SlashCommandBuilder()
     .setName("ليدربورد")
     .setDescription("أفضل 10 أعضاء في السيرفر / Top 10 leaderboard")
@@ -1737,7 +1740,8 @@ function buildUserPrompt(senderName, question, userId) {
   const dialectNote = botDialect === "fus-ha"
     ? "\nاللهجة: تكلم بالعربي الفصيح / العربي الرسمي بشكل كامل — مش عامية مصرية."
     : "\nاللهجة: تكلم بالعامية المصرية الطبيعية بس.";
-  return `أنت زنجي — بوت ديسكورد.${dialectNote}${modeNote}
+  const personalCtx = buildPersonalContext(userId, senderName);
+  return `أنت زنجي — بوت ديسكورد.${dialectNote}${modeNote}${personalCtx}
 
 فهم الكلام:
 - افهم كل أنواع الكلام بدون استثناء: عامية، سلانج، ألفاظ، اختصارات، كلام مكسور، إنجليزي عربي (عربيزي)، وحتى لو فيه أخطاء إملائية — افهمه واتعامل معاه بشكل طبيعي.
@@ -1921,6 +1925,7 @@ client.on("messageCreate", async (msg) => {
       const reply      = result.response.text().trim();
       pushUserHistory(msg.author.id, "user", question);
       pushUserHistory(msg.author.id, "bot",  reply);
+      extractAndUpdateProfile(msg.author.id, senderName, question, reply, geminiModel()).catch(() => {});
       return msg.channel.send(reply).catch(() => {});
     } catch (err) {
       const isQuota = err?.isQuotaError || err?.message?.includes("429") || err?.message?.includes("EXHAUSTED");
@@ -2404,6 +2409,7 @@ client.on("messageCreate", async (msg) => {
 
     pushUserHistory(msg.author.id, "user", question);
     pushUserHistory(msg.author.id, "bot",  replyText);
+    extractAndUpdateProfile(msg.author.id, senderName, question, replyText, geminiModel()).catch(() => {});
 
     // ريأكشن على رسالة اليوزر
     if (reactionEmoji) msg.react(reactionEmoji).catch(() => {});
@@ -2863,6 +2869,23 @@ client.on("interactionCreate", async (interaction) => {
 
       // ── نظام الأنمي ────────────────────────────────────────────
       if (cmd === "أنمي") return await handleAnimeCommand(interaction);
+
+      // ── AI Companion ───────────────────────────────────────────
+      if (cmd === "رفيقي") {
+        await interaction.deferReply({ ephemeral: true });
+        const profile = formatCompanionProfile(interaction.user.id, interaction.user.globalName || interaction.user.username);
+        return interaction.editReply({
+          embeds: [new EmbedBuilder()
+            .setColor(0x9b59b6)
+            .setTitle("🤝 اللي زنجي بيعرفه عنك")
+            .setDescription(profile)
+            .setFooter({ text: "المعلومات دي بتتحدث تلقائياً كلما اتكلمتوا" })],
+        });
+      }
+      if (cmd === "امسح-ذاكرتك") {
+        deleteProfile(interaction.user.id);
+        return interaction.reply({ content: "✅ تم مسح كل معلوماتك من ذاكرتي — هبدأ من الصفر معاك!", ephemeral: true });
+      }
 
       if (cmd === "رفع-باند") {
         if (!config.isOwner(user.id) && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
