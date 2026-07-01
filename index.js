@@ -16,7 +16,7 @@ import config from "./config.js";
 import Database from "./database.js";
 import Logger from "./logger.js";
 import ModerationListener from "./helpers/moderation-listener.js";
-import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleVoteSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics, handlePrevious, handleQueueJump, handleSeek, handleFilter } from "./commands/music.js";
+import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleVoteSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics, handlePrevious, handleQueueJump, handleSeek, handleFilter, handleSearch, handleSearchButton, handleMove, handleClearQueue } from "./commands/music.js";
 import { registerCleanChapterCommand, handleCleanChapter } from "./commands/image-cleaner.js";
 import { registerTranslateChapterCommand, handleTranslateChapter } from "./commands/translator.js";
 import {
@@ -3199,6 +3199,10 @@ client.on("interactionCreate", async (interaction) => {
         if (cmd === "تصويت-تخطي")                 return await handleVoteSkip(musicInteraction);
         if (cmd === "انتقل")                       return await handleSeek(musicInteraction);
         if (cmd === "فلتر")                        return await handleFilter(musicInteraction);
+        if (cmd === "سابق")                        return await handlePrevious(musicInteraction);
+        if (cmd === "بحث")                         return await handleSearch(musicInteraction);
+        if (cmd === "نقل")                         return await handleMove(musicInteraction);
+        if (cmd === "مسح-القائمة")                 return await handleClearQueue(musicInteraction);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -4391,6 +4395,11 @@ client.on("interactionCreate", async (interaction) => {
       }
       if (interaction.customId.startsWith("ticket_claim|")) {
         return await handleTicketClaim(interaction);
+      }
+
+      // ─── أزرار بحث الموسيقى ──────────────────────────────────────
+      if (interaction.customId.startsWith("msearch_")) {
+        return await handleSearchButton(interaction);
       }
 
       // ─── أزرار التحكم في الموسيقى ────────────────────────────────
