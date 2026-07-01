@@ -13,6 +13,36 @@ import { SpotifyPlugin } from '@distube/spotify';
 import { YtDlpPlugin } from '@distube/yt-dlp';
 import { SoundCloudPlugin } from '@distube/soundcloud';
 import { sendMusicCard } from '../helpers/music-card.js';
+import { execSync, execFileSync } from 'child_process';
+import { existsSync, chmodSync } from 'fs';
+
+// ─── تأكد إن yt-dlp موجود (يحمّله من GitHub لو مش موجود) ────────
+const YT_DLP_BIN = '/tmp/yt-dlp';
+
+function ensureYtDlp() {
+  // لو موجود في PATH أصلاً
+  try { execSync('yt-dlp --version', { stdio: 'ignore', timeout: 5000 }); return; } catch {}
+  // لو موجود في /tmp
+  if (existsSync(YT_DLP_BIN)) {
+    process.env.PATH = `/tmp:${process.env.PATH}`;
+    return;
+  }
+  // حمّله من GitHub
+  console.log('📥 [Music] جاري تنزيل yt-dlp...');
+  try {
+    execSync(
+      `curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ${YT_DLP_BIN}`,
+      { timeout: 60_000, stdio: 'pipe' }
+    );
+    chmodSync(YT_DLP_BIN, '755');
+    process.env.PATH = `/tmp:${process.env.PATH}`;
+    console.log('✅ [Music] yt-dlp جاهز!');
+  } catch (e) {
+    console.warn('⚠️ [Music] فشل تنزيل yt-dlp — الموسيقى قد لا تشتغل:', e.message);
+  }
+}
+
+ensureYtDlp();
 
 // ─── كسر اتصال الصوت مباشرة بغض النظر عن الـ queue ─────────
 function destroyVoiceConnection(guildId) {
