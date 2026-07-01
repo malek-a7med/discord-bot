@@ -909,7 +909,7 @@ const client = new Client({
 });
 
 // ── تهيئة DisTube بعد إنشاء الكلاينت مباشرة ──────────────────
-initMusicSystem(client);
+initMusicSystem(client).catch(e => console.error('❌ [Music] init فشل:', e.message));
 
 const activeGames = new Collection();
 // إجراءات التأديب المعلقة — تنتظر تأكيد المشرف

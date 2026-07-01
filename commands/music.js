@@ -13,27 +13,30 @@ import { SpotifyPlugin } from '@distube/spotify';
 import { YtDlpPlugin } from '@distube/yt-dlp';
 import { SoundCloudPlugin } from '@distube/soundcloud';
 import { sendMusicCard } from '../helpers/music-card.js';
-import { execSync, execFileSync } from 'child_process';
-import { existsSync, chmodSync } from 'fs';
+import { execSync } from 'child_process';
+import { existsSync, chmodSync, writeFileSync } from 'fs';
 
 // ─── تأكد إن yt-dlp موجود (يحمّله من GitHub لو مش موجود) ────────
 const YT_DLP_BIN = '/tmp/yt-dlp';
 
-function ensureYtDlp() {
+async function ensureYtDlp() {
   // لو موجود في PATH أصلاً
   try { execSync('yt-dlp --version', { stdio: 'ignore', timeout: 5000 }); return; } catch {}
-  // لو موجود في /tmp
+  // لو موجود في /tmp من قبل
   if (existsSync(YT_DLP_BIN)) {
     process.env.PATH = `/tmp:${process.env.PATH}`;
     return;
   }
-  // حمّله من GitHub
+  // حمّله من GitHub باستخدام Node.js fetch (بدون curl/wget)
   console.log('📥 [Music] جاري تنزيل yt-dlp...');
   try {
-    execSync(
-      `curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o ${YT_DLP_BIN}`,
-      { timeout: 60_000, stdio: 'pipe' }
+    const res = await fetch(
+      'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp',
+      { redirect: 'follow' }
     );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buf = await res.arrayBuffer();
+    writeFileSync(YT_DLP_BIN, Buffer.from(buf));
     chmodSync(YT_DLP_BIN, '755');
     process.env.PATH = `/tmp:${process.env.PATH}`;
     console.log('✅ [Music] yt-dlp جاهز!');
@@ -41,8 +44,6 @@ function ensureYtDlp() {
     console.warn('⚠️ [Music] فشل تنزيل yt-dlp — الموسيقى قد لا تشتغل:', e.message);
   }
 }
-
-ensureYtDlp();
 
 // ─── كسر اتصال الصوت مباشرة بغض النظر عن الـ queue ─────────
 function destroyVoiceConnection(guildId) {
@@ -127,7 +128,8 @@ export const previousSongsMap = new Map(); // guildId → Song السابقة
 const _currentSongTracker    = new Map(); // guildId → Song الحالية (داخلي)
 
 // ─── تهيئة DisTube ────────────────────────────────────────────
-export function initMusicSystem(client) {
+export async function initMusicSystem(client) {
+  await ensureYtDlp();
   if (distube) return distube;
 
   distube = new DisTube(client, {
