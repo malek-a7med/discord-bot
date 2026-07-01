@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.yt-dlp
     pkgs.libuuid
     pkgs.pixman
     pkgs.librsvg
