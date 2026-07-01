@@ -1,12 +1,22 @@
 // ════════════════════════════════════════════════════════════════
-//  نظام الموسيقى — بوت زنجي
+//  نظام الموسيقى — بوت زنجي (نسخة محسّنة)
 //  DisTube v5 + SoundCloudPlugin + YtDlpPlugin
-//  الترتيب: رابط Spotify أي نوع → spotify-url-info (بدون API key)
-//                                 → أسماء الأغاني → بحث SoundCloud
-//           بحث نصي / YouTube / SoundCloud → مباشرة
+//  ✅ تحسينات:
+//     1. تصويت للتخطي (vote-skip)
+//     2. أمر انتقل (seek)
+//     3. فلاتر صوت (باس بوست، نايتكور، 8D، vaporwave)
+//     4. تخطي آخر أغنية بيوقف بدل إيرور
+//     5. قائمة بأزرار صفحات
+//     6. زر الخلط في لوحة التحكم
 // ════════════════════════════════════════════════════════════════
 
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} from 'discord.js';
 import { getVoiceConnection } from '@discordjs/voice';
 import { DisTube } from 'distube';
 import { SpotifyPlugin } from '@distube/spotify';
@@ -16,18 +26,15 @@ import { sendMusicCard } from '../helpers/music-card.js';
 import { execSync } from 'child_process';
 import { existsSync, chmodSync, writeFileSync } from 'fs';
 
-// ─── تأكد إن yt-dlp موجود (يحمّله من GitHub لو مش موجود) ────────
+// ─── تأكد إن yt-dlp موجود ────────────────────────────────────
 const YT_DLP_BIN = '/tmp/yt-dlp';
 
 async function ensureYtDlp() {
-  // لو موجود في PATH أصلاً
   try { execSync('yt-dlp --version', { stdio: 'ignore', timeout: 5000 }); return; } catch {}
-  // لو موجود في /tmp من قبل
   if (existsSync(YT_DLP_BIN)) {
     process.env.PATH = `/tmp:${process.env.PATH}`;
     return;
   }
-  // حمّله من GitHub باستخدام Node.js fetch (بدون curl/wget)
   console.log('📥 [Music] جاري تنزيل yt-dlp...');
   try {
     const res = await fetch(
@@ -41,15 +48,13 @@ async function ensureYtDlp() {
     process.env.PATH = `/tmp:${process.env.PATH}`;
     console.log('✅ [Music] yt-dlp جاهز!');
   } catch (e) {
-    console.warn('⚠️ [Music] فشل تنزيل yt-dlp — الموسيقى قد لا تشتغل:', e.message);
+    console.warn('⚠️ [Music] فشل تنزيل yt-dlp:', e.message);
   }
 }
 
-// ─── كسر اتصال الصوت مباشرة بغض النظر عن الـ queue ─────────
+// ─── كسر اتصال الصوت ─────────────────────────────────────────
 function destroyVoiceConnection(guildId) {
-  // DisTube voice manager أولاً (الأضمن)
   try { distube?.voices?.get(guildId)?.leave(); } catch {}
-  // fallback: @discordjs/voice مباشرة
   try {
     const conn = getVoiceConnection(guildId);
     if (conn) conn.destroy();
@@ -59,61 +64,46 @@ function destroyVoiceConnection(guildId) {
 // ─── كشف نوع الإدخال ──────────────────────────────────────────
 function detectSourceType(query) {
   const q = query.trim();
-  // Spotify URIs: spotify:track:xxx / spotify:playlist:xxx / spotify:album:xxx / spotify:artist:xxx
   if (/^spotify:(track|playlist|album|artist):[a-zA-Z0-9]+$/i.test(q)) {
     const kind = q.split(':')[1].toLowerCase();
     if (kind === 'track')  return 'spotify_track';
     if (kind === 'artist') return 'spotify_artist';
-    return 'spotify_collection'; // playlist / album
+    return 'spotify_collection';
   }
-  // Spotify short links
   if (/spotify\.link\//i.test(q))                      return 'spotify_short';
-  // Spotify web URLs
   if (/open\.spotify\.com\/(playlist|album)/i.test(q)) return 'spotify_collection';
   if (/open\.spotify\.com\/artist/i.test(q))            return 'spotify_artist';
   if (/open\.spotify\.com\/track/i.test(q))             return 'spotify_track';
   if (/open\.spotify\.com/i.test(q))                    return 'spotify_track';
-  // Other
   if (/youtube\.com|youtu\.be/i.test(q))               return 'youtube';
   if (/soundcloud\.com/i.test(q))                      return 'soundcloud';
   return 'text';
 }
 
-// ─── جيب كل أغاني Spotify بدون API key (spotify-url-info) ──────
-// بيرجع: { type, name, tracks: string[] }
+// ─── جيب أغاني Spotify بدون API key ──────────────────────────
 async function fetchSpotifyContent(rawQuery) {
   const q = rawQuery.trim();
-
-  // حوّل spotify: URI لـ URL عادي
   let url = q;
   if (/^spotify:/i.test(q)) {
     const parts = q.split(':');
     url = `https://open.spotify.com/${parts[1]}/${parts[2]}`;
   }
-
-  // spotify-url-info — بيجيب البيانات من صفحات Embed بدون API key
   const { default: spotifyUrlInfo } = await import('spotify-url-info');
   const { getDetails } = spotifyUrlInfo(fetch);
-
   let details;
   try {
     details = await getDetails(url);
   } catch (err) {
     throw new Error(`مش قادر أجيب بيانات الرابط ده — تأكد إن الرابط صح وإن البلاي ليست عامة (🔓 Public)\n${err.message}`);
   }
-
   const { preview, tracks: rawTracks } = details || {};
-
-  // حوّل الـ tracks لأسماء قابلة للبحث
   const tracks = [];
   for (const t of (rawTracks || [])) {
     const name   = t?.name;
     const artist = t?.artist || '';
     if (name) tracks.push(`${artist} ${name}`.trim());
   }
-
   if (!tracks.length) throw new Error('البلاي ليست/الألبوم ده فاضي أو private — جرب رابط عام (🔓 Public)');
-
   return {
     type:   preview?.type  || 'playlist',
     name:   preview?.title || 'مجموعة أغاني',
@@ -124,8 +114,21 @@ async function fetchSpotifyContent(rawQuery) {
 let distube = null;
 
 // ─── تتبع الأغنية السابقة لكل سيرفر ──────────────────────────
-export const previousSongsMap = new Map(); // guildId → Song السابقة
-const _currentSongTracker    = new Map(); // guildId → Song الحالية (داخلي)
+export const previousSongsMap = new Map();
+const _currentSongTracker    = new Map();
+
+// ─── تصويت التخطي لكل سيرفر ──────────────────────────────────
+const skipVotes = new Map(); // guildId → Set<userId>
+
+// ─── الفلاتر المتاحة ──────────────────────────────────────────
+export const AVAILABLE_FILTERS = {
+  'off':       { name: '❌ إيقاف الفلاتر',   filters: [] },
+  'bassboost': { name: '🔊 باس بوست',         filters: ['bassboost'] },
+  'nightcore': { name: '🌙 نايتكور',          filters: ['nightcore'] },
+  '8d':        { name: '🎧 8D صوت محيطي',     filters: ['8d'] },
+  'vaporwave': { name: '🌊 فيبورويف',         filters: ['vaporwave'] },
+  'karaoke':   { name: '🎤 كاريوكي',          filters: ['karaoke'] },
+};
 
 // ─── تهيئة DisTube ────────────────────────────────────────────
 export async function initMusicSystem(client) {
@@ -148,9 +151,8 @@ export async function initMusicSystem(client) {
   });
 
   // ─── خروج تلقائي لما القناة تفضى ────────────────────────────
-  const emptyLeaveTimers = new Map(); // guildId → timeoutHandle
+  const emptyLeaveTimers = new Map();
 
-  // دالة مساعدة للخروج الفعلي من القناة
   async function forceLeaveVoice(guild, textChannel) {
     try {
       const q = distube.getQueue(guild.id);
@@ -159,8 +161,8 @@ export async function initMusicSystem(client) {
         q.currentMessage = null;
       }
       if (q) await distube.stop(guild.id).catch(() => {});
-      // كسر اتصال الصوت مباشرة من @discordjs/voice
       destroyVoiceConnection(guild.id);
+      skipVotes.delete(guild.id);
       textChannel?.send({
         embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription('👋 القناة فاضية — خرجت تلقائياً!')],
       }).catch(() => {});
@@ -171,23 +173,18 @@ export async function initMusicSystem(client) {
     try {
       const guild = newState.guild || oldState.guild;
       const guildId = guild.id;
-
-      // جيب القناة الصوتية للبوت مباشرة (مش محتاج queue)
       const botVC = guild.members.me?.voice?.channel;
       if (!botVC) {
-        // البوت مش في قناة — امسح أي تايمر معلّق
         if (emptyLeaveTimers.has(guildId)) {
           clearTimeout(emptyLeaveTimers.get(guildId));
           emptyLeaveTimers.delete(guildId);
         }
         return;
       }
-
       const humans = botVC.members.filter(m => !m.user.bot).size;
       const q = distube.getQueue(guildId);
 
       if (humans === 0) {
-        // فاضية — ابدأ عداد 30 ثانية للخروج
         if (!emptyLeaveTimers.has(guildId)) {
           const textCh = q?.textChannel || null;
           textCh?.send({
@@ -196,16 +193,13 @@ export async function initMusicSystem(client) {
 
           const timer = setTimeout(async () => {
             emptyLeaveTimers.delete(guildId);
-            // تأكد إن لسه فاضية
             const stillEmpty = guild.members.me?.voice?.channel?.members.filter(m => !m.user.bot).size === 0;
             if (!stillEmpty) return;
             await forceLeaveVoice(guild, q?.textChannel || null);
           }, 30_000);
-
           emptyLeaveTimers.set(guildId, timer);
         }
       } else {
-        // حد رجع — إلغي العداد وكمّل
         if (emptyLeaveTimers.has(guildId)) {
           clearTimeout(emptyLeaveTimers.get(guildId));
           emptyLeaveTimers.delete(guildId);
@@ -220,10 +214,10 @@ export async function initMusicSystem(client) {
 
   distube.on('playSong', async (queue, song) => {
     try {
-      // حفظ الأغنية الحالية كـ "سابقة" قبل ما نبدأ الجديدة
       const prevSong = _currentSongTracker.get(queue.id);
       if (prevSong) previousSongsMap.set(queue.id, prevSong);
       _currentSongTracker.set(queue.id, song);
+      skipVotes.delete(queue.id); // إعادة تعيين التصويت عند أغنية جديدة
 
       if (queue.currentMessage) {
         await queue.currentMessage.delete().catch(() => {});
@@ -237,7 +231,7 @@ export async function initMusicSystem(client) {
 
   distube.on('addSong', (queue, song) => {
     try {
-      if (queue._batchLoading) return; // كتم الرسايل أثناء تحميل البلاي ليست
+      if (queue._batchLoading) return;
       if (!queue.textChannel?.send) return;
       const min = Math.floor(song.duration / 60);
       const sec = (song.duration % 60).toString().padStart(2, '0');
@@ -256,17 +250,28 @@ export async function initMusicSystem(client) {
   });
 
   distube.on('finish', (queue) => {
-    try { queue.textChannel?.send('🏁 خلصت القائمة!').catch(() => {}); } catch {}
+    try {
+      _currentSongTracker.delete(queue.id);
+      skipVotes.delete(queue.id);
+      queue.textChannel?.send({
+        embeds: [new EmbedBuilder().setColor(0x66FCF1).setDescription('🏁 خلصت القائمة!')],
+      }).catch(() => {});
+    } catch {}
+  });
+
+  distube.on('disconnect', (queue) => {
+    try {
+      _currentSongTracker.delete(queue.id);
+      skipVotes.delete(queue.id);
+    } catch {}
   });
 
   distube.on('error', (error, queue) => {
     const msg = error?.message || String(error);
     console.error('❌ [DisTube]', msg);
     try {
-      // FFMPEG_EXITED أو مش لاقي الأغنية → تخطى تلقائي بدون رسالة
       const isSkippable = /FFMPEG_EXITED|ffmpeg exited|no result|not found|Cannot find/i.test(msg);
       if (isSkippable) {
-        // تخطى للأغنية الجاية لو في قائمة
         if (queue && queue.songs.length > 1) {
           distube.skip(queue.id).catch(() => {});
         }
@@ -282,7 +287,7 @@ export async function initMusicSystem(client) {
   return distube;
 }
 
-// ─── musicHandler — للتوافق مع index.js ──────────────────────
+// ─── musicHandler ─────────────────────────────────────────────
 export const musicHandler = {
   _pending: {},
 
@@ -320,7 +325,10 @@ export const musicHandler = {
     if (!distube) throw new Error('نظام الموسيقى مش شغال!');
     const q = distube.getQueue(guildId);
     if (!q) throw new Error('مفيش موسيقى شغالة!');
-    if (q.songs.length <= 1) throw new Error('مفيش أغنية تانية في القائمة!');
+    if (q.songs.length <= 1) {
+      await distube.stop(guildId);
+      return null;
+    }
     return await distube.skip(guildId);
   },
 
@@ -380,19 +388,103 @@ export const musicHandler = {
 // ─── تسجيل أوامر الموسيقى ─────────────────────────────────────
 export async function registerMusicCommands() {
   return [
-    { data: new SlashCommandBuilder().setName('شغل').setDescription('🎵 شغّل أغنية من Spotify أو ابحث بالاسم').addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها من Spotify').setRequired(true)), execute: handlePlay },
-    { data: new SlashCommandBuilder().setName('تخطي').setDescription('⏭️ تخطي الأغنية الحالية'), execute: handleSkip },
-    { data: new SlashCommandBuilder().setName('خروج').setDescription('⏹️ إيقاف الموسيقى والخروج من القناة'), execute: handleStop },
-    { data: new SlashCommandBuilder().setName('قائمة').setDescription('📋 عرض قائمة التشغيل').addIntegerOption(o => o.setName('صفحة').setDescription('رقم الصفحة').setRequired(false).setMinValue(1)), execute: handleQueue },
-    { data: new SlashCommandBuilder().setName('بوز').setDescription('⏸️ إيقاف مؤقت للأغنية'), execute: handlePause },
-    { data: new SlashCommandBuilder().setName('كمل').setDescription('▶️ استئناف التشغيل'), execute: handleResume },
-    { data: new SlashCommandBuilder().setName('شغال-ايه').setDescription('🎶 اعرض الأغنية الشغالة دلوقتي'), execute: handleNowPlaying },
-    { data: new SlashCommandBuilder().setName('صوت').setDescription('🔊 اضبط مستوى الصوت').addIntegerOption(o => o.setName('مستوى').setDescription('من 0 لـ 100').setRequired(true).setMinValue(0).setMaxValue(100)), execute: handleVolume },
-    { data: new SlashCommandBuilder().setName('تكرار').setDescription('🔁 بدّل وضع التكرار'), execute: handleRepeat },
-    { data: new SlashCommandBuilder().setName('خلط').setDescription('🔀 خلط ترتيب القائمة عشوائياً'), execute: handleShuffle },
-    { data: new SlashCommandBuilder().setName('تخطى-لـ').setDescription('⏩ تخطى لأغنية معينة في القائمة').addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية في القائمة').setRequired(true).setMinValue(1)), execute: handleJump },
-    { data: new SlashCommandBuilder().setName('احذف').setDescription('🗑️ احذف أغنية من القائمة').addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية (مش الشغالة دلوقتي)').setRequired(true).setMinValue(2)), execute: handleRemove },
-    { data: new SlashCommandBuilder().setName('كلمات').setDescription('📝 اعرض كلمات الأغنية الشغالة دلوقتي'), execute: handleLyrics },
+    {
+      data: new SlashCommandBuilder()
+        .setName('شغل')
+        .setDescription('🎵 شغّل أغنية من Spotify أو ابحث بالاسم')
+        .addStringOption(o => o.setName('اغنية').setDescription('اسم الأغنية أو رابطها').setRequired(true)),
+      execute: handlePlay,
+    },
+    {
+      data: new SlashCommandBuilder().setName('تخطي').setDescription('⏭️ تخطي الأغنية الحالية'),
+      execute: handleSkip,
+    },
+    {
+      data: new SlashCommandBuilder().setName('تصويت-تخطي').setDescription('🗳️ صوّت لتخطي الأغنية الحالية'),
+      execute: handleVoteSkip,
+    },
+    {
+      data: new SlashCommandBuilder().setName('خروج').setDescription('⏹️ إيقاف الموسيقى والخروج من القناة'),
+      execute: handleStop,
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('قائمة')
+        .setDescription('📋 عرض قائمة التشغيل')
+        .addIntegerOption(o => o.setName('صفحة').setDescription('رقم الصفحة').setRequired(false).setMinValue(1)),
+      execute: handleQueue,
+    },
+    {
+      data: new SlashCommandBuilder().setName('بوز').setDescription('⏸️ إيقاف مؤقت للأغنية'),
+      execute: handlePause,
+    },
+    {
+      data: new SlashCommandBuilder().setName('كمل').setDescription('▶️ استئناف التشغيل'),
+      execute: handleResume,
+    },
+    {
+      data: new SlashCommandBuilder().setName('شغال-ايه').setDescription('🎶 اعرض الأغنية الشغالة دلوقتي'),
+      execute: handleNowPlaying,
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('صوت')
+        .setDescription('🔊 اضبط مستوى الصوت')
+        .addIntegerOption(o => o.setName('مستوى').setDescription('من 0 لـ 100').setRequired(true).setMinValue(0).setMaxValue(100)),
+      execute: handleVolume,
+    },
+    {
+      data: new SlashCommandBuilder().setName('تكرار').setDescription('🔁 بدّل وضع التكرار'),
+      execute: handleRepeat,
+    },
+    {
+      data: new SlashCommandBuilder().setName('خلط').setDescription('🔀 خلط ترتيب القائمة عشوائياً'),
+      execute: handleShuffle,
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('تخطى-لـ')
+        .setDescription('⏩ تخطى لأغنية معينة في القائمة')
+        .addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية في القائمة').setRequired(true).setMinValue(1)),
+      execute: handleJump,
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('احذف')
+        .setDescription('🗑️ احذف أغنية من القائمة')
+        .addIntegerOption(o => o.setName('رقم').setDescription('رقم الأغنية (مش الشغالة دلوقتي)').setRequired(true).setMinValue(2)),
+      execute: handleRemove,
+    },
+    {
+      data: new SlashCommandBuilder().setName('كلمات').setDescription('📝 اعرض كلمات الأغنية الشغالة دلوقتي'),
+      execute: handleLyrics,
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('انتقل')
+        .setDescription('⏱️ انتقل لوقت معين في الأغنية')
+        .addStringOption(o => o.setName('وقت').setDescription('الوقت — مثال: 1:30 أو 90 (ثانية)').setRequired(true)),
+      execute: handleSeek,
+    },
+    {
+      data: new SlashCommandBuilder()
+        .setName('فلتر')
+        .setDescription('🎛️ تطبيق فلتر صوتي على الموسيقى')
+        .addStringOption(o =>
+          o.setName('نوع')
+            .setDescription('نوع الفلتر')
+            .setRequired(true)
+            .addChoices(
+              { name: '❌ إيقاف الفلاتر',   value: 'off' },
+              { name: '🔊 باس بوست',         value: 'bassboost' },
+              { name: '🌙 نايتكور',          value: 'nightcore' },
+              { name: '🎧 8D صوت محيطي',     value: '8d' },
+              { name: '🌊 فيبورويف',         value: 'vaporwave' },
+              { name: '🎤 كاريوكي',          value: 'karaoke' },
+            )
+        ),
+      execute: handleFilter,
+    },
   ];
 }
 
@@ -423,7 +515,6 @@ export async function handlePlay(interaction) {
     const sourceType = detectSourceType(query);
     const playOptions = { textChannel: interaction.channel, member: interaction.member };
 
-    // ── Spotify — كل الأنواع عن طريق fetchSpotifyContent مباشرة ──
     if (sourceType.startsWith('spotify_')) {
       const typeLabels = {
         spotify_track:      '🎵 جاري جلب الأغنية من Spotify...',
@@ -443,7 +534,6 @@ export async function handlePlay(interaction) {
 
       await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
 
-      // Spotify → بحث YouTube
       const scTrack = (name) => `ytsearch:${name}`;
 
       if (sp.tracks.length === 1) {
@@ -468,22 +558,16 @@ export async function handlePlay(interaction) {
           }
         })();
       }
-
       return;
     }
 
     if (sourceType === 'soundcloud') {
-      // ── رابط SoundCloud مباشرة ──
       await interaction.editReply({ content: '🔍 جاري التحميل من SoundCloud...' });
       await distube.play(voiceChannel, query, playOptions);
-
     } else if (sourceType === 'youtube') {
-      // ── رابط YouTube مباشرة لـ yt-dlp ──
       await interaction.editReply({ content: '🔍 جاري التحميل...' });
       await distube.play(voiceChannel, query, playOptions);
-
     } else {
-      // ── بحث نصي → YouTube ──
       await interaction.editReply({ content: '🔍 جاري البحث...' });
       await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);
     }
@@ -495,7 +579,6 @@ export async function handlePlay(interaction) {
     console.error('❌ [Music] handlePlay:', errMsg);
 
     let msg;
-    // إيرور سبوتيفاي بسبب مفيش كريدنشيالز
     if (/private or unavailable|SPOTIFY_API_ERROR|embed page/i.test(errMsg)) {
       msg = [
         '⚠️ **مش قادر أحمّل البلاي ليست من Spotify!**',
@@ -504,7 +587,7 @@ export async function handlePlay(interaction) {
         '**١.** روح على: `developer.spotify.com/dashboard`',
         '**٢.** سجّل دخول وانشئ App جديدة (اسمها أي حاجة)',
         '**٣.** افتح الـ App وانسخ الـ Client ID والـ Client Secret',
-        '**٤.** حطّهم في ريل واي: `SPOTIFY_CLIENT_ID` و `SPOTIFY_CLIENT_SECRET`',
+        '**٤.** حطّهم في السيكريتس: `SPOTIFY_CLIENT_ID` و `SPOTIFY_CLIENT_SECRET`',
       ].join('\n');
     } else if (/private|blocked|age.?restricted/i.test(errMsg)) {
       msg = `🔒 الأغنية/البلاي ليست دي مش متاحة (private أو blocked)`;
@@ -525,9 +608,75 @@ export async function handleSkip(interaction) {
     if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
     const q = distube.getQueue(interaction.guildId);
     if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
-    if (q.songs.length <= 1) return interaction.reply({ content: '❌ مفيش أغنية تانية في القائمة!', ephemeral: true });
+
+    skipVotes.delete(interaction.guildId);
+
+    if (q.songs.length <= 1) {
+      // آخر أغنية — وقّف بدل إيرور
+      if (q.currentMessage) {
+        await q.currentMessage.delete().catch(() => {});
+        q.currentMessage = null;
+      }
+      await distube.stop(interaction.guildId).catch(() => {});
+      destroyVoiceConnection(interaction.guildId);
+      return interaction.reply({ content: '⏹️ دي آخر أغنية — اتوقفت الموسيقى!', ephemeral: true });
+    }
+
     await distube.skip(interaction.guildId);
     await interaction.reply({ content: '⏭️ اتخطت الأغنية!', ephemeral: true });
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
+// ─── handleVoteSkip — تصويت لتخطي الأغنية ────────────────────
+export async function handleVoteSkip(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+
+    const voiceChannel = interaction.member?.voice?.channel;
+    if (!voiceChannel) return interaction.reply({ content: '❌ لازم تكون في القناة الصوتية عشان تصوّت!', ephemeral: true });
+
+    const humanCount = voiceChannel.members.filter(m => !m.user.bot).size;
+    const needed = Math.ceil(humanCount / 2); // الأغلبية
+
+    if (!skipVotes.has(interaction.guildId)) skipVotes.set(interaction.guildId, new Set());
+    const votes = skipVotes.get(interaction.guildId);
+
+    if (votes.has(interaction.user.id)) {
+      return interaction.reply({
+        embeds: [new EmbedBuilder().setColor(0xf39c12).setDescription(`🗳️ صوّتت بالفعل! (${votes.size}/${needed} صوت)`)],
+        ephemeral: true,
+      });
+    }
+
+    votes.add(interaction.user.id);
+
+    if (votes.size >= needed) {
+      skipVotes.delete(interaction.guildId);
+      if (q.songs.length <= 1) {
+        if (q.currentMessage) { await q.currentMessage.delete().catch(() => {}); q.currentMessage = null; }
+        await distube.stop(interaction.guildId).catch(() => {});
+        destroyVoiceConnection(interaction.guildId);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription(`✅ وصلت الأصوات لـ ${needed}/${humanCount} — اتوقفت الموسيقى!`)],
+        });
+      }
+      await distube.skip(interaction.guildId);
+      return interaction.reply({
+        embeds: [new EmbedBuilder().setColor(0x2ecc71).setDescription(`✅ وصلت الأصوات لـ ${needed}/${humanCount} — اتخطت الأغنية! ⏭️`)],
+      });
+    }
+
+    await interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x66FCF1)
+        .setTitle('🗳️ تصويت تخطي')
+        .setDescription(`صوّت **${interaction.user.displayName}** للتخطي!\n\n**${votes.size}/${needed}** صوت مطلوب من **${humanCount}** مستخدم`)
+        .setFooter({ text: 'استخدم /تصويت-تخطي للمشاركة' })],
+    });
   } catch (e) {
     await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
   }
@@ -541,7 +690,6 @@ export async function handleStop(interaction) {
 
     const q = distube.getQueue(interaction.guildId);
 
-    // امسح رسالة الداش بورد
     const dashMsg = isButton ? interaction.message : q?.currentMessage;
     if (dashMsg) await dashMsg.delete().catch(() => {});
     if (q?.currentMessage && q.currentMessage.id !== dashMsg?.id) {
@@ -549,10 +697,9 @@ export async function handleStop(interaction) {
     }
     if (q) q.currentMessage = null;
 
-    // وقّف الموسيقى
-    if (q) await distube.stop(interaction.guildId).catch(() => {});
+    skipVotes.delete(interaction.guildId);
 
-    // كسر اتصال الصوت مباشرة — يشتغل حتى لو مفيش queue
+    if (q) await distube.stop(interaction.guildId).catch(() => {});
     destroyVoiceConnection(interaction.guildId);
 
     if (!isButton) {
@@ -566,31 +713,80 @@ export async function handleStop(interaction) {
   }
 }
 
-// ─── handleQueue ───────────────────────────────────────────────
+// ─── handleQueue — مع أزرار صفحات ─────────────────────────────
 export async function handleQueue(interaction) {
   try {
     if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
-    const q = distube.getQueue(interaction.guildId);
-    if (!q || !q.songs.length) return interaction.reply({ content: '❌ القائمة فاضية!', ephemeral: true });
 
-    const page = interaction.options?.getInteger('صفحة') || 1;
+    // لو جه من زرار (صفحات)
+    const isButton = interaction.isButton?.();
+    if (isButton) await interaction.deferUpdate().catch(() => {});
+
+    const q = distube.getQueue(interaction.guildId);
+    if (!q || !q.songs.length) {
+      const content = '❌ القائمة فاضية!';
+      return isButton
+        ? interaction.editReply({ content, components: [] }).catch(() => {})
+        : interaction.reply({ content, ephemeral: true });
+    }
+
     const perPage = 10;
+    const totalPages = Math.max(1, Math.ceil(q.songs.length / perPage));
+
+    let page = 1;
+    if (isButton) {
+      const match = interaction.customId.match(/music_queue_page_(\d+)/);
+      if (match) page = parseInt(match[1], 10);
+    } else {
+      page = interaction.options?.getInteger('صفحة') || 1;
+    }
+    page = Math.max(1, Math.min(page, totalPages));
+
     const start = (page - 1) * perPage;
+    const totalDuration = q.songs.reduce((acc, s) => acc + (s.duration || 0), 0);
+    const fmtTotal = `${Math.floor(totalDuration / 3600)}:${Math.floor((totalDuration % 3600) / 60).toString().padStart(2, '0')}:${(totalDuration % 60).toString().padStart(2, '0')}`;
+
     const lines = q.songs.slice(start, start + perPage).map((s, i) => {
       const idx = start + i;
       const min = Math.floor(s.duration / 60);
       const sec = (s.duration % 60).toString().padStart(2, '0');
-      return `${idx === 0 ? '🔊 **شغّال:**' : `**${idx}.**`} ${s.name} \`${min}:${sec}\``;
+      const requester = s.user ? ` • <@${s.user.id}>` : '';
+      return `${idx === 0 ? '🔊 **شغّال:**' : `**${idx}.**`} ${s.name} \`${min}:${sec}\`${requester}`;
     });
 
-    await interaction.reply({
-      embeds: [new EmbedBuilder()
-        .setTitle('🎵 قائمة التشغيل')
-        .setDescription(lines.join('\n'))
-        .setColor(0x66FCF1)
-        .setFooter({ text: `🔊 ${q.volume}% | ${q.songs.length} أغنية | صفحة ${page}` })
-        .setTimestamp()],
-    });
+    const embed = new EmbedBuilder()
+      .setTitle('🎵 قائمة التشغيل')
+      .setDescription(lines.join('\n'))
+      .setColor(0x66FCF1)
+      .addFields(
+        { name: '🎵 الإجمالي', value: `${q.songs.length} أغنية`, inline: true },
+        { name: '⏱️ المدة الكلية', value: fmtTotal, inline: true },
+        { name: '🔊 الصوت', value: `${q.volume}%`, inline: true },
+      )
+      .setFooter({ text: `صفحة ${page}/${totalPages}` })
+      .setTimestamp();
+
+    // أزرار التنقل
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`music_queue_page_${Math.max(1, page - 1)}`)
+        .setLabel('◀️ السابقة')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page <= 1),
+      new ButtonBuilder()
+        .setCustomId(`music_queue_page_${Math.min(totalPages, page + 1)}`)
+        .setLabel('▶️ التالية')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= totalPages),
+    );
+
+    const payload = { embeds: [embed], components: totalPages > 1 ? [row] : [] };
+
+    if (isButton) {
+      await interaction.editReply(payload).catch(() => {});
+    } else {
+      await interaction.reply(payload);
+    }
   } catch (e) {
     await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
   }
@@ -638,10 +834,18 @@ export async function handleNowPlaying(interaction) {
     const fmt = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
     const repeatLabel = q.repeatMode === 0 ? '❌ إيقاف' : q.repeatMode === 1 ? '🔂 أغنية' : '🔁 قائمة';
 
+    // شريط التقدم
+    const barLen = 20;
+    const filled = Math.round((pct / 100) * barLen);
+    const progressBar = '▬'.repeat(filled) + '🔘' + '▬'.repeat(barLen - filled);
+
+    // الفلاتر الشغالة
+    const activeFilters = q.filters?.names?.join(', ') || 'لا يوجد';
+
     await interaction.reply({
       embeds: [new EmbedBuilder()
         .setTitle('🎵 شغّال دلوقتي')
-        .setDescription(`**${song.name}**`)
+        .setDescription(`**${song.name}**\n\n${progressBar}`)
         .setThumbnail(song.thumbnail)
         .addFields(
           { name: '⏱️ الوقت', value: `\`${fmt(cur)} / ${fmt(tot)}\``, inline: true },
@@ -649,6 +853,7 @@ export async function handleNowPlaying(interaction) {
           { name: '🔁 التكرار', value: `\`${repeatLabel}\``, inline: true },
           { name: '📊 التقدم', value: `\`${pct}%\``, inline: true },
           { name: '👤 طلبها', value: song.user ? `<@${song.user.id}>` : 'مجهول', inline: true },
+          { name: '🎛️ الفلتر', value: `\`${activeFilters}\``, inline: true },
         )
         .setColor(0x66FCF1)
         .setTimestamp()],
@@ -691,10 +896,23 @@ export async function handleRepeat(interaction) {
 // ─── handleShuffle ─────────────────────────────────────────────
 export async function handleShuffle(interaction) {
   try {
-    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const isButton = interaction.isButton?.();
+    if (isButton) await interaction.deferUpdate().catch(() => {});
+
+    if (!distube) {
+      const msg = '❌ نظام الموسيقى مش شغال!';
+      return isButton ? interaction.followUp({ content: msg, ephemeral: true }) : interaction.reply({ content: msg, ephemeral: true });
+    }
     const q = distube.getQueue(interaction.guildId);
-    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
-    if (q.songs.length <= 1) return interaction.reply({ content: '❌ مفيش أغاني كفاية في القائمة عشان تتخلط!', ephemeral: true });
+    if (!q) {
+      const msg = '❌ مفيش موسيقى شغالة!';
+      return isButton ? interaction.followUp({ content: msg, ephemeral: true }) : interaction.reply({ content: msg, ephemeral: true });
+    }
+    if (q.songs.length <= 1) {
+      const msg = '❌ مفيش أغاني كفاية في القائمة عشان تتخلط!';
+      return isButton ? interaction.followUp({ content: msg, ephemeral: true }) : interaction.reply({ content: msg, ephemeral: true });
+    }
+
     const current = q.songs[0];
     const rest = q.songs.slice(1);
     for (let i = rest.length - 1; i > 0; i--) {
@@ -702,9 +920,11 @@ export async function handleShuffle(interaction) {
       [rest[i], rest[j]] = [rest[j], rest[i]];
     }
     q.songs = [current, ...rest];
-    await interaction.reply({
+
+    const msg = {
       embeds: [new EmbedBuilder().setColor(0x9b59b6).setDescription(`🔀 اتخلطت القائمة! (${rest.length} أغنية)`)],
-    });
+    };
+    return isButton ? interaction.followUp({ ...msg, ephemeral: true }) : interaction.reply(msg);
   } catch (e) {
     await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
   }
@@ -814,6 +1034,88 @@ export async function handleLyrics(interaction) {
   }
 }
 
+// ─── handleSeek — انتقل لوقت معين في الأغنية ────────────────────
+export async function handleSeek(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q || !q.songs[0]) return interaction.reply({ content: '❌ مفيش أغنية شغالة دلوقتي!', ephemeral: true });
+
+    const timeStr = interaction.options.getString('وقت');
+    let seconds = 0;
+
+    if (timeStr.includes(':')) {
+      const parts = timeStr.split(':').map(Number);
+      if (parts.length === 2) {
+        seconds = parts[0] * 60 + parts[1];
+      } else if (parts.length === 3) {
+        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+    } else {
+      seconds = parseInt(timeStr, 10);
+    }
+
+    if (isNaN(seconds) || seconds < 0) {
+      return interaction.reply({ content: '❌ الوقت مش صح! مثال: `1:30` أو `90`', ephemeral: true });
+    }
+
+    const total = q.songs[0].duration;
+    if (seconds >= total) {
+      return interaction.reply({ content: `❌ الوقت أكبر من مدة الأغنية (${Math.floor(total/60)}:${(total%60).toString().padStart(2,'0')})!`, ephemeral: true });
+    }
+
+    await distube.seek(interaction.guildId, seconds);
+
+    const min = Math.floor(seconds / 60);
+    const sec = (seconds % 60).toString().padStart(2, '0');
+    await interaction.reply({
+      embeds: [new EmbedBuilder()
+        .setColor(0x66FCF1)
+        .setDescription(`⏱️ انتقلت للثانية **${min}:${sec}** في **${q.songs[0].name}**`)],
+    });
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
+// ─── handleFilter — فلاتر الصوت ──────────────────────────────
+export async function handleFilter(interaction) {
+  try {
+    if (!distube) return interaction.reply({ content: '❌ نظام الموسيقى مش شغال!', ephemeral: true });
+    const q = distube.getQueue(interaction.guildId);
+    if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
+
+    const filterKey = interaction.options.getString('نوع');
+    const filterInfo = AVAILABLE_FILTERS[filterKey];
+    if (!filterInfo) return interaction.reply({ content: '❌ الفلتر ده مش موجود!', ephemeral: true });
+
+    await interaction.deferReply({ ephemeral: true });
+
+    try {
+      if (filterKey === 'off') {
+        await q.filters.clear();
+      } else {
+        await q.filters.clear();
+        await q.filters.add(filterInfo.filters);
+      }
+
+      await interaction.editReply({
+        embeds: [new EmbedBuilder()
+          .setColor(0x9b59b6)
+          .setDescription(`🎛️ تم تطبيق الفلتر: **${filterInfo.name}**`)],
+      });
+    } catch (filterErr) {
+      // لو DisTube مش بيدعم filters API، نبعت رسالة توضيحية
+      console.warn('⚠️ [Music] فشل تطبيق الفلتر:', filterErr.message);
+      await interaction.editReply({
+        content: '⚠️ الفلاتر مش متاحة دلوقتي — محتاج إعداد إضافي من الأونر',
+      });
+    }
+  } catch (e) {
+    await interaction.reply({ content: `❌ ${e.message}`, ephemeral: true }).catch(() => {});
+  }
+}
+
 // ─── handlePrevious ────────────────────────────────────────────
 export async function handlePrevious(interaction) {
   try {
@@ -824,7 +1126,6 @@ export async function handlePrevious(interaction) {
     const prev = previousSongsMap.get(interaction.guildId);
     if (!prev) return interaction.reply({ content: '⏮️ مفيش أغنية سابقة!', ephemeral: true });
 
-    // أدخّل الأغنية السابقة مباشرة في الـ index 1 بدون ما يتبعت event addSong
     q.songs.splice(1, 0, prev);
     await distube.skip(interaction.guildId);
     await interaction.reply({ content: `⏮️ بيرجع لـ **${prev.name}**`, ephemeral: true });
@@ -840,7 +1141,7 @@ export async function handleQueueJump(interaction) {
     const q = distube.getQueue(interaction.guildId);
     if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
 
-    const idx = parseInt(interaction.values[0], 10); // 0-based index in q.songs
+    const idx = parseInt(interaction.values[0], 10);
     if (isNaN(idx) || idx < 1 || idx >= q.songs.length) {
       return interaction.reply({ content: '❌ الأغنية دي مش موجودة في القائمة!', ephemeral: true });
     }

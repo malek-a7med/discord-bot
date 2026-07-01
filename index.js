@@ -16,7 +16,7 @@ import config from "./config.js";
 import Database from "./database.js";
 import Logger from "./logger.js";
 import ModerationListener from "./helpers/moderation-listener.js";
-import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics, handlePrevious, handleQueueJump } from "./commands/music.js";
+import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleVoteSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics, handlePrevious, handleQueueJump, handleSeek, handleFilter } from "./commands/music.js";
 import { registerCleanChapterCommand, handleCleanChapter } from "./commands/image-cleaner.js";
 import { registerTranslateChapterCommand, handleTranslateChapter } from "./commands/translator.js";
 import {
@@ -3196,6 +3196,9 @@ client.on("interactionCreate", async (interaction) => {
         if (cmd === "تخطى-لـ")                     return await handleJump(musicInteraction);
         if (cmd === "احذف")                        return await handleRemove(musicInteraction);
         if (cmd === "كلمات")                       return await handleLyrics(musicInteraction);
+        if (cmd === "تصويت-تخطي")                 return await handleVoteSkip(musicInteraction);
+        if (cmd === "انتقل")                       return await handleSeek(musicInteraction);
+        if (cmd === "فلتر")                        return await handleFilter(musicInteraction);
       }
 
       // ═══════════════════════════════════════════════════════════════
@@ -4401,6 +4404,8 @@ client.on("interactionCreate", async (interaction) => {
         if (id === "music_nowplaying") return await handleNowPlaying(interaction);
         if (id === "music_repeat")     return await handleRepeat(interaction);
         if (id === "music_lyrics")     return await handleLyrics(interaction);
+        if (id === "music_shuffle")    return await handleShuffle(interaction);
+        if (id.startsWith("music_queue_page_")) return await handleQueue(interaction);
         if (id === "music_vol_up" || id === "music_vol_down") {
           const q = musicHandler.getQueue(interaction.guildId);
           if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });

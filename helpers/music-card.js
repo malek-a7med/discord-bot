@@ -255,6 +255,7 @@ function buildMusicRows(song, queue = null) {
     new ButtonBuilder().setCustomId('music_vol_up').setLabel('🔊+').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_vol_down').setLabel('🔉-').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('music_repeat').setLabel('🔁 تكرار').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('music_shuffle').setLabel('🔀 خلط').setStyle(ButtonStyle.Secondary),
   );
 
   const rows = [row1, row2];
