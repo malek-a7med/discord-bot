@@ -2229,13 +2229,15 @@ client.on("messageCreate", async (msg) => {
     userData._lastXpMsg = msg.id;
     db.updateUser(msg.author.id, userData);
 
-    // إنجازات جديدة → إشعار
+    // إنجازات جديدة → إشعار كل 10 ليفلات بس
     if (newAchievements && newAchievements.length > 0) {
       newAchievements.forEach(a => recordEvent("achievement", { userId: msg.author.id, achievementName: a.name }));
-      const achText = newAchievements.map(a => `${a.name} — ${a.desc} (+${a.xpReward} XP)`).join("\n");
-      msg.channel.send({
-        embeds: [new EmbedBuilder().setColor(0x9b59b6).setTitle("🏅 إنجاز جديد!").setDescription(`${msg.author} فتح إنجاز جديد!\n${achText}`).setTimestamp()],
-      }).catch(() => {});
+      if (userData.level % 10 === 0) {
+        const achText = newAchievements.map(a => `${a.name} — ${a.desc} (+${a.xpReward} XP)`).join("\n");
+        msg.channel.send({
+          embeds: [new EmbedBuilder().setColor(0x9b59b6).setTitle("🏅 إنجاز جديد!").setDescription(`${msg.author} فتح إنجاز جديد!\n${achText}`).setTimestamp()],
+        }).catch(() => {});
+      }
     }
 
     if (userData.level > oldLevel) {
