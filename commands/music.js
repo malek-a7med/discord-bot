@@ -617,21 +617,23 @@ export async function registerMusicCommands() {
 
 
 // ─── دالة مساعدة: تشغيل بـ fallback (يوتيوب ← ساوند كلاود) ───
+// DisTube v5: النص المباشر = بحث يوتيوب تلقائياً (لا ytsearch: prefix)
 async function playWithFallback(voiceChannel, searchQuery, playOptions, guildId) {
-  // جرّب يوتيوب أولاً
+  // جرّب يوتيوب (بحث نصي مباشر — DisTube بيتعامل معاه تلقائياً)
   try {
-    await distube.play(voiceChannel, `ytsearch:${searchQuery}`, playOptions);
+    await distube.play(voiceChannel, searchQuery, playOptions);
     return { ok: true, source: 'youtube' };
   } catch (ytErr) {
     console.warn(`⚠️ [Music] يوتيوب فشل (${searchQuery.slice(0, 40)}): ${ytErr.message}`);
   }
-  // fallback: ساوند كلاود
+  // fallback: ساوند كلاود (URL بحث مباشر)
   try {
-    await distube.play(voiceChannel, `scsearch:${searchQuery}`, playOptions);
+    const scSearchUrl = `https://soundcloud.com/search?q=${encodeURIComponent(searchQuery)}`;
+    await distube.play(voiceChannel, scSearchUrl, playOptions);
     return { ok: true, source: 'soundcloud' };
   } catch (scErr) {
     console.warn(`⚠️ [Music] ساوند كلاود فشل: ${scErr.message}`);
-    throw new Error(`مش لاقي "${searchQuery}" — جرّب اسم تاني أو رابط مباشر`);
+    throw new Error(`مش لاقي "${searchQuery.slice(0, 60)}" — جرّب اسم تاني أو رابط مباشر`);
   }
 }
 
@@ -646,7 +648,7 @@ async function playSearchBatch(voiceChannel, tracks, playOptions, guildId, sourc
     if (q) q._batchLoading = true;
     for (let i = 1; i < tracks.length; i++) {
       try {
-        await distube.play(voiceChannel, `ytsearch:${tracks[i]}`, { ...playOptions });
+        await distube.play(voiceChannel, tracks[i], { ...playOptions });
       } catch { /* تجاوز الأغنية اللي فشلت */ }
       await new Promise(r => setTimeout(r, 300));
     }
