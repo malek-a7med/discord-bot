@@ -2235,12 +2235,6 @@ client.on("messageCreate", async (msg) => {
 
     if (userData.level > oldLevel) {
       recordEvent("level_up", { userId: msg.author.id, level: userData.level });
-      const embed = new EmbedBuilder()
-        .setColor(0xffd700)
-        .setTitle("🎉 مبروك! ارتقيت مستوى!")
-        .setDescription(`${msg.author} وصل للمستوى **${userData.level}** 🚀`)
-        .setTimestamp();
-      msg.channel.send({ embeds: [embed] }).catch(() => {});
 
       // ── Rank Roles تلقائي (ديناميكي) ─────────────────────────
       const currentRanks = getRanks(); // مرتبين من الأعلى للأدنى

@@ -411,8 +411,8 @@ export async function handlePlay(interaction) {
 
       await interaction.editReply({ embeds: [buildPlayEmbed(sp)] });
 
-      // Spotify → بحث SoundCloud عشان YouTube مابيشتغلش
-      const scTrack = (name) => `scsearch:${name}`;
+      // Spotify → بحث YouTube
+      const scTrack = (name) => `ytsearch:${name}`;
 
       if (sp.tracks.length === 1) {
         await distube.play(voiceChannel, scTrack(sp.tracks[0]), playOptions);
@@ -451,9 +451,9 @@ export async function handlePlay(interaction) {
       await distube.play(voiceChannel, query, playOptions);
 
     } else {
-      // ── بحث نصي → SoundCloud ──
-      await interaction.editReply({ content: '🔍 جاري البحث على SoundCloud...' });
-      await distube.play(voiceChannel, `scsearch:${query}`, playOptions);
+      // ── بحث نصي → YouTube ──
+      await interaction.editReply({ content: '🔍 جاري البحث...' });
+      await distube.play(voiceChannel, `ytsearch:${query}`, playOptions);
     }
 
     await interaction.editReply({ content: '✅ تم!' }).catch(() => {});

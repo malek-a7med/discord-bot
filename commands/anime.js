@@ -1171,8 +1171,7 @@ export function scheduleAnimeNews(client, db) {
   const CHECK_INTERVAL_MS = 60 * 60 * 1000; // كل ساعة
 
   async function checkAndPostNews() {
-    const threadId = db.getConfig("animeNewsThreadId");
-    if (!threadId) return; // لو الثريد ملوش ID معناها لسه ما اتنشأش
+    const threadId = db.getConfig("animeNewsThreadId") || "1520827228425031785";
 
     // جيب الثريد
     let thread;
@@ -1270,11 +1269,14 @@ export function scheduleAnimeNews(client, db) {
     }
   }
 
-  // تشغيل فوري بعد دقيقتين من بدء البوت، ثم كل ساعة
+  // مسح القائمة القديمة عشان الأخبار تنزل فوراً (مرة واحدة بعد الريستارت)
+  db.setConfig("animeNewsPosted", []);
+
+  // تشغيل فوري بعد 10 ثواني، ثم كل ساعة
   setTimeout(() => {
     checkAndPostNews().catch(() => {});
     setInterval(() => checkAndPostNews().catch(() => {}), CHECK_INTERVAL_MS);
-  }, 2 * 60 * 1000);
+  }, 10_000);
 
   console.log("✅ [AnimeNews] نظام أخبار الأنمي جاهز — بيتحقق كل ساعة");
 }

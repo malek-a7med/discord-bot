@@ -257,17 +257,6 @@ function checkSpam(msg) {
   }
 
 
-  if (content.length >= SPAM_CONFIG.MIN_CAPS_LENGTH) {
-    const letters = content.replace(/[^a-zA-Zا-ي]/g, "");
-    if (letters.length > 0) {
-      const capsRatio = content.replace(/[^A-Z]/g, "").length / letters.length;
-      if (capsRatio >= SPAM_CONFIG.MIN_CAPS_RATIO) {
-        changeRep(userId, -3);
-        return { type: "caps_flood", reason: "كابس فلود", level: DANGER.LOW };
-      }
-    }
-  }
-
   let tracker = _spamTracker.get(userId) || { messages: [], lastReset: now };
   if (now - tracker.lastReset > SPAM_CONFIG.WINDOW_MS) {
     tracker = { messages: [], lastReset: now };
@@ -275,17 +264,6 @@ function checkSpam(msg) {
   tracker.messages.push({ content, time: now });
   tracker.messages = tracker.messages.filter(m => now - m.time < SPAM_CONFIG.WINDOW_MS);
   _spamTracker.set(userId, tracker);
-
-  if (tracker.messages.length > SPAM_CONFIG.MAX_MESSAGES) {
-    changeRep(userId, -15);
-    return { type: "flood", reason: `فيضان (${tracker.messages.length} رسائل/5ث)`, level: DANGER.HIGH };
-  }
-
-  const last = tracker.messages.slice(-SPAM_CONFIG.MAX_DUPLICATES).map(m => m.content);
-  if (last.length >= SPAM_CONFIG.MAX_DUPLICATES && last.every(c => c === last[0]) && last[0].length > 3) {
-    changeRep(userId, -10);
-    return { type: "duplicate", reason: "تكرار رسائل متطابقة", level: DANGER.MEDIUM };
-  }
 
   return null;
 }
