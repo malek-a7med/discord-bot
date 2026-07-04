@@ -483,6 +483,9 @@ const LEGACY_COMMANDS = [
       sub.setName("حالة").setDescription("إظهار حالة البوت والـ AI في الوقت الفعلي [أونر فقط]")
     )
     .addSubcommand(sub =>
+      sub.setName("تحديث-الأوامر").setDescription("🔄 إعادة تسجيل كل أوامر السلاش عند ديسكورد يدوياً [أونر فقط]")
+    )
+    .addSubcommand(sub =>
       sub.setName("اختبار").setDescription("اختبار رسالة الترحيب أو الوداع [إدارة]")
         .addStringOption((o) =>
           o.setName("نوع").setDescription("اختار نوع الرسالة").setRequired(true)
@@ -2611,6 +2614,28 @@ client.on("interactionCreate", async (interaction) => {
         }
 
         return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
+      }
+
+      if (cmd === "بوت" && interaction.options.getSubcommand() === "تحديث-الأوامر") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          await deployCommands(process.env.DISCORD_TOKEN, client.user.id);
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم تحديث الأوامر")
+                .setDescription("كل الأوامر اتسجلت عند ديسكورد من جديد، أي أوامر قديمة اتشالت وأي أوامر جديدة ظهرت.\n⏳ ممكن ياخد شوية وقت (لحد ساعة) عشان يظهر عند كل اليوزرز — ده حد من ديسكورد نفسه.")
+                .setTimestamp()
+            ]
+          });
+        } catch (err) {
+          logger.error("خطأ في تحديث الأوامر:", err);
+          return interaction.editReply({ content: `❌ حصل خطأ أثناء تحديث الأوامر: ${err.message}` });
+        }
       }
 
       if (cmd === "بوت" && interaction.options.getSubcommand() === "قناة-لوجز") {
