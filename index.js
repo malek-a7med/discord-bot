@@ -3403,19 +3403,21 @@ client.on("interactionCreate", async (interaction) => {
           .setTitle("سيرفر ماين كرافت")
           .setDescription("اختار العملية اللي عايز تعملها من الأزرار تحت 👇")
           .addFields(
-            { name: "▶️ تشغيل",          value: "يشغّل السيرفر",              inline: true },
-            { name: "⏹️ إيقاف",          value: "يوقف السيرفر",               inline: true },
-            { name: "🔄 إعادة تشغيل",    value: "يعيد تشغيل السيرفر",         inline: true },
-            { name: "✅ وايت ليست",       value: "تضيف لاعب للوايت ليست",     inline: true }
+            { name: "▶️ تشغيل",            value: "يشغّل السيرفر",                          inline: true },
+            { name: "⏹️ إيقاف",            value: "يوقف السيرفر",                           inline: true },
+            { name: "🔄 إعادة تشغيل",      value: "يعيد تشغيل السيرفر",                     inline: true },
+            { name: "✅ وايت ليست",         value: "تضيف لاعب للوايت ليست",                 inline: true },
+            { name: "🟢 تصحيح السيرفر",    value: "يصحّي السيرفر لو نايم (Limbo)",          inline: true }
           )
           .setFooter({ text: `طلب بواسطة: ${interaction.user.tag}` })
           .setTimestamp();
 
         const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("mc_start")   .setLabel("تشغيل")          .setEmoji("▶️") .setStyle(ButtonStyle.Success),
-          new ButtonBuilder().setCustomId("mc_stop")    .setLabel("إيقاف")          .setEmoji("⏹️") .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("mc_restart") .setLabel("إعادة تشغيل")   .setEmoji("🔄") .setStyle(ButtonStyle.Primary),
-          new ButtonBuilder().setCustomId("mc_whitelist").setLabel("وايت ليست")    .setEmoji("✅") .setStyle(ButtonStyle.Secondary)
+          new ButtonBuilder().setCustomId("mc_start")   .setLabel("تشغيل")           .setEmoji("▶️") .setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId("mc_stop")    .setLabel("إيقاف")           .setEmoji("⏹️") .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("mc_restart") .setLabel("إعادة تشغيل")    .setEmoji("🔄") .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("mc_whitelist").setLabel("وايت ليست")     .setEmoji("✅") .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder().setCustomId("mc_fix")     .setLabel("تصحيح السيرفر")  .setEmoji("🟢") .setStyle(ButtonStyle.Success)
         );
 
         return interaction.reply({ embeds: [controlEmbed], components: [row] });
@@ -4530,7 +4532,7 @@ client.on("interactionCreate", async (interaction) => {
     try {
 
       // ─── أزرار ماين كرافت ─────────────────────────────────────────
-      if (["mc_start", "mc_stop", "mc_restart", "mc_whitelist"].includes(interaction.customId)) {
+      if (["mc_start", "mc_stop", "mc_restart", "mc_whitelist", "mc_fix"].includes(interaction.customId)) {
         // التحقق من الصلاحية
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
           return interaction.reply({ content: "❌ الأزرار دي للأدمنز بس!", ephemeral: true });
@@ -4552,30 +4554,82 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.showModal(modal);
         }
 
-        // باقي الأزرار — تشغيل / إيقاف / إعادة تشغيل
         await interaction.deferReply({ ephemeral: true });
 
         const panelUrl = process.env.PTERODACTYL_URL?.replace(/\/$/, "");
         const apiKey   = process.env.PTERODACTYL_KEY;
         const serverId = process.env.PTERODACTYL_SERVER_ID;
+        const mcHeaders = {
+          "Authorization": `Bearer ${apiKey}`,
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        };
 
+        // ─── زرار تصحيح السيرفر (Limbo / Hibernation) ──────────────
+        if (interaction.customId === "mc_fix") {
+          try {
+            const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/settings/reinstall`, {
+              method: "POST",
+              headers: mcHeaders
+            });
+            if (!res.ok) throw new Error(`كود الاستجابة من السيرفر: ${res.status}`);
+            return interaction.editReply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0x2ecc71)
+                  .setTitle("🟢 تم إرسال طلب تصحيح السيرفر")
+                  .setDescription("اتبعت طلب تنشيط السيرفر من وضع النوم.\nاستنى شوية وبعدين اضغط **▶️ تشغيل**.")
+                  .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
+                  .setTimestamp()
+              ]
+            });
+          } catch (err) {
+            return interaction.editReply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0xe74c3c)
+                  .setTitle("❌ فشل طلب التصحيح")
+                  .setDescription(`حصل خطأ أثناء التواصل مع السيرفر:\n\`${err.message}\``)
+                  .setTimestamp()
+              ]
+            });
+          }
+        }
+
+        // ─── أزرار تشغيل / إيقاف / إعادة تشغيل ─────────────────────
         const actionMap = {
           mc_start:   { signal: "start",   emoji: "▶️", label: "تشغيل السيرفر",        color: 0x2ecc71 },
           mc_stop:    { signal: "stop",    emoji: "⏹️", label: "إيقاف السيرفر",         color: 0xe74c3c },
           mc_restart: { signal: "restart", emoji: "🔄", label: "إعادة تشغيل السيرفر",   color: 0xf39c12 },
         };
         const action = actionMap[interaction.customId];
+        if (!action) return;
 
         try {
           const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/power`, {
             method: "POST",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-              "Accept": "application/json",
-              "Content-Type": "application/json"
-            },
+            headers: mcHeaders,
             body: JSON.stringify({ signal: action.signal })
           });
+
+          // لو رد بـ 403 معناه السيرفر نايم (Limbo)
+          if (res.status === 403) {
+            return interaction.editReply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0xe67e22)
+                  .setTitle("😴 السيرفر نايم حالياً (In Limbo)")
+                  .setDescription(
+                    "الاستضافة قفلت الـ API لأن السيرفر دخل وضع النوم.\n\n" +
+                    "**اضغط على زرار 🟢 تصحيح السيرفر الأول عشان تصحيه،** " +
+                    "وبعدين استنى شوية وارجع اضغط **▶️ تشغيل**."
+                  )
+                  .addFields({ name: "⚡ طلب بواسطة", value: `${interaction.user}`, inline: true })
+                  .setTimestamp()
+              ]
+            });
+          }
+
           if (!res.ok) throw new Error(`كود الاستجابة من السيرفر: ${res.status}`);
 
           return interaction.editReply({
