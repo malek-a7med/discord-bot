@@ -884,6 +884,39 @@ function canSendError(key) {
   return false;
 }
 
+// ── إشعار الأونرز أوتوماتيك لو أمر حصله خطأ وهو شغال ─────────────
+async function notifyOwnersOfError(cmdName, err, interaction) {
+  if (!canSendError(`cmd_fail_${cmdName}`)) return;
+
+  const embed = new EmbedBuilder()
+    .setColor(0xe74c3c)
+    .setTitle("🚨 خطأ في تنفيذ أمر")
+    .addFields(
+      { name: "📌 الأمر", value: `\`/${cmdName}\``, inline: true },
+      { name: "👤 نفّذه", value: `${interaction.user?.tag || interaction.user?.id || "غير معروف"}`, inline: true },
+      { name: "🏛️ السيرفر", value: `${interaction.guild?.name || "DM"}`, inline: true },
+      { name: "🧾 نص الخطأ", value: `\`\`\`${String(err?.message || err).slice(0, 1000)}\`\`\`` }
+    )
+    .setTimestamp();
+
+  try {
+    const logChannelId = db?.data?.settings?.ownerLogsChannelId;
+    if (logChannelId) {
+      const logChannel = await client.channels.fetch(logChannelId).catch(() => null);
+      if (logChannel) {
+        await logChannel.send({ embeds: [embed] }).catch(() => {});
+        return;
+      }
+    }
+  } catch {}
+
+  // مفيش قناة لوجز متعينة (أو فشل الإرسال فيها) — ابعت DM لأول أونر
+  try {
+    const owner = await client.users.fetch(config.OWNER_ID).catch(() => null);
+    if (owner) await owner.send({ embeds: [embed] }).catch(() => {});
+  } catch {}
+}
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -4378,6 +4411,7 @@ client.on("interactionCreate", async (interaction) => {
 
     } catch (err) {
       logger.error("خطأ في تنفيذ الأمر:", err);
+      notifyOwnersOfError(cmd, err, interaction).catch(() => {});
       return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
     }
   }
