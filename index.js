@@ -2530,6 +2530,76 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.editReply({ embeds: [embed] });
       }
 
+      if (cmd === "بوت" && interaction.options.getSubcommand() === "اختبار") {
+        const type = interaction.options.getString("نوع");
+        const WELCOME_CHANNEL_ID = "1486100560494203183";
+        const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
+        if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+
+        if (type === "welcome") {
+          const imagePath = path.join(__dirname, 'welcome.png');
+          const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
+          const embed = new EmbedBuilder()
+            .setColor('#A020F0')
+            .setTitle('⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️')
+            .setDescription(
+              `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
+              `👤 **الـعـضـو الـجـديـد:** ${user}\n` +
+              `🆔 **الـمـعـرّف الـخـاص:** \`${user.id}\`\n` +
+              `📊 **أنـت الـفـرعـون رقـم:** \`${guild.memberCount}\` في مملكتنا!\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+              `🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`
+            )
+            .setImage('attachment://welcome.png')
+            .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️ [اختبار]' })
+            .setTimestamp();
+          await testChannel.send({ embeds: [embed], files: [attachment] });
+        } else {
+          const embed = new EmbedBuilder()
+            .setColor('#A020F0')
+            .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
+            .setDescription(
+              `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+              `👤 **الفرعون اللي ودعنا:** ${user}\n` +
+              `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
+              `📊 **بقينا** \`${guild.memberCount}\` **فرعون في المملكة.**\n` +
+              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+              `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
+            )
+            .setThumbnail(user.displayAvatarURL({ size: 256 }))
+            .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️ [اختبار]' })
+            .setTimestamp();
+          await testChannel.send({ embeds: [embed] });
+        }
+
+        return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
+      }
+
+      if (cmd === "بوت" && interaction.options.getSubcommand() === "قناة-لوجز") {
+        if (!config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
+        }
+        const ch = interaction.options.getChannel("قناة");
+        if (!db.data.settings) db.data.settings = {};
+        db.data.settings.ownerLogsChannelId = ch.id;
+        db.save();
+        return interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(0xe67e22)
+              .setTitle("📋 تم تعيين قناة اللوجز")
+              .setDescription(`كل أوامر الأونر هتتسجل في ${ch} من دلوقتي ✅`)
+              .setTimestamp()
+          ],
+          ephemeral: true
+        });
+      }
+
       // ── مفاتيح-جيميني ──────────────────────────────────────────────
       if (cmd === "مفاتيح-جيميني") {
         if (!config.isOwner(user.id)) {
@@ -4151,70 +4221,23 @@ client.on("interactionCreate", async (interaction) => {
         }
       }
 
-      if (cmd === "بوت" && interaction.options.getSubcommand() === "اختبار") {
-        const type = interaction.options.getString("نوع");
-        const WELCOME_CHANNEL_ID = "1486100560494203183";
-        const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
-        if (!testChannel) return interaction.reply({ content: "❌ مش لاقي قناة الترحيب!", ephemeral: true });
-
-        await interaction.deferReply({ ephemeral: true });
-
-        if (type === "welcome") {
-          const imagePath = path.join(__dirname, 'welcome.png');
-          const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
-          const embed = new EmbedBuilder()
-            .setColor('#A020F0')
-            .setTitle('⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️')
-            .setDescription(
-              `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
-              `👤 **الـعـضـو الـجـديـد:** ${user}\n` +
-              `🆔 **الـمـعـرّف الـخـاص:** \`${user.id}\`\n` +
-              `📊 **أنـت الـفـرعـون رقـم:** \`${guild.memberCount}\` في مملكتنا!\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-              `🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`
-            )
-            .setImage('attachment://welcome.png')
-            .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️ [اختبار]' })
-            .setTimestamp();
-          await testChannel.send({ embeds: [embed], files: [attachment] });
-        } else {
-          const embed = new EmbedBuilder()
-            .setColor('#A020F0')
-            .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
-            .setDescription(
-              `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-              `👤 **الفرعون اللي ودعنا:** ${user}\n` +
-              `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
-              `📊 **بقينا** \`${guild.memberCount}\` **فرعون في المملكة.**\n` +
-              `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-              `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
-            )
-            .setThumbnail(user.displayAvatarURL({ size: 256 }))
-            .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️ [اختبار]' })
-            .setTimestamp();
-          await testChannel.send({ embeds: [embed] });
+      if (cmd === "نسخ-احتياطي" && interaction.options.getSubcommand() === "تحديد-قناة") {
+        const channelId = interaction.options.getString("id").trim();
+        const ch = await guild.channels.fetch(channelId).catch(() => null);
+        if (!ch) {
+          return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, ephemeral: true });
         }
-
-        return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
-      }
-
-      if (cmd === "بوت" && interaction.options.getSubcommand() === "قناة-لوجز") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const ch = interaction.options.getChannel("قناة");
         if (!db.data.settings) db.data.settings = {};
-        db.data.settings.ownerLogsChannelId = ch.id;
+        db.data.settings.backupChannelId = ch.id;
         db.save();
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
-              .setColor(0xe67e22)
-              .setTitle("📋 تم تعيين قناة اللوجز")
-              .setDescription(`كل أوامر الأونر هتتسجل في ${ch} من دلوقتي ✅`)
+              .setColor(0x3498db)
+              .setTitle("✅ تم تعيين قناة النسخ الاحتياطية")
+              .setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ <#${ch.id}> كل 24 ساعة 🔄`)
+              .addFields({ name: "📋 الـ ID المحفوظ", value: `\`${ch.id}\``, inline: true })
+              .setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" })
               .setTimestamp()
           ],
           ephemeral: true
@@ -4321,29 +4344,6 @@ client.on("interactionCreate", async (interaction) => {
 
           return;
         }
-      }
-
-      if (cmd === "نسخ-احتياطي" && interaction.options.getSubcommand() === "تحديد-قناة") {
-        const channelId = interaction.options.getString("id").trim();
-        const ch = await guild.channels.fetch(channelId).catch(() => null);
-        if (!ch) {
-          return interaction.reply({ content: `❌ مش لاقي قناة بالـ ID ده: \`${channelId}\`\nتأكد من الـ ID وإن البوت عنده صلاحية يشوف القناة دي.`, ephemeral: true });
-        }
-        if (!db.data.settings) db.data.settings = {};
-        db.data.settings.backupChannelId = ch.id;
-        db.save();
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0x3498db)
-              .setTitle("✅ تم تعيين قناة النسخ الاحتياطية")
-              .setDescription(`البوت هيبعت نسخة احتياطية يومية تلقائية لـ <#${ch.id}> كل 24 ساعة 🔄`)
-              .addFields({ name: "📋 الـ ID المحفوظ", value: `\`${ch.id}\``, inline: true })
-              .setFooter({ text: "يمكنك تغيير القناة في أي وقت بتكرار الأمر" })
-              .setTimestamp()
-          ],
-          ephemeral: true
-        });
       }
 
       if (cmd === "لوحة-dm") {
