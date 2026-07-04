@@ -4539,33 +4539,36 @@ client.on("interactionCreate", async (interaction) => {
 
         // ─── زرار تصحيح السيرفر (Limbo / Hibernation) ──────────────
         if (interaction.customId === "mc_fix") {
-          try {
-            const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/settings/reinstall`, {
-              method: "POST",
-              headers: mcHeaders
-            });
-            if (!res.ok) throw new Error(`كود الاستجابة من السيرفر: ${res.status}`);
-            return interaction.editReply({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(0x2ecc71)
-                  .setTitle("🟢 تم إرسال طلب تصحيح السيرفر")
-                  .setDescription("اتبعت طلب تنشيط السيرفر من وضع النوم.\nاستنى شوية وبعدين اضغط **▶️ تشغيل**.")
-                  .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
-                  .setTimestamp()
-              ]
-            });
-          } catch (err) {
-            return interaction.editReply({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(0xe74c3c)
-                  .setTitle("❌ فشل طلب التصحيح")
-                  .setDescription(`حصل خطأ أثناء التواصل مع السيرفر:\n\`${err.message}\``)
-                  .setTimestamp()
-              ]
-            });
+          const notifyIds = ["1385979606829629470", "954816748140503090"];
+          const notifyEmbed = new EmbedBuilder()
+            .setColor(0x2ecc71)
+            .setTitle("🟢 حد عايز يدخل السيرفر!")
+            .setDescription(`العضو ${interaction.user} ضغط زرار **تصحيح السيرفر** وعايز يدخل ماين كرافت.\nصحّي السيرفر بسرعة! 🎮`)
+            .addFields(
+              { name: "👤 العضو", value: `${interaction.user} (${interaction.user.tag})`, inline: true },
+              { name: "🖥️ السيرفر", value: interaction.guild?.name ?? "غير معروف", inline: true }
+            )
+            .setTimestamp();
+
+          let sent = 0;
+          for (const uid of notifyIds) {
+            try {
+              const u = await client.users.fetch(uid);
+              await u.send({ embeds: [notifyEmbed] });
+              sent++;
+            } catch {}
           }
+
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم إرسال الطلب")
+                .setDescription("اتبعت رسالة للمسؤولين عشان يصحّوا السيرفر.\nاستنى شوية وهيتشغل قريباً! 🎮")
+                .addFields({ name: "📨 الرسائل اللي اتبعتت", value: `${sent} من ${notifyIds.length}`, inline: true })
+                .setTimestamp()
+            ]
+          });
         }
 
         // ─── أزرار تشغيل / إيقاف / إعادة تشغيل ─────────────────────
