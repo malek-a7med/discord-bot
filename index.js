@@ -717,6 +717,24 @@ const LEGACY_COMMANDS = [
     .addStringOption(o => o.setName("فوتر-صورة").setDescription("رابط صورة الفوتر الجديدة"))
     .addStringOption(o => o.setName("لينك-عنوان").setDescription("لينك العنوان الجديد (اكتب 'مسح' عشان تشيله)"))
     .addBooleanOption(o => o.setName("تاريخ").setDescription("إظهار أو إخفاء التاريخ")),
+  // ─── ماين كرافت ───────────────────────────────────────────────
+  new SlashCommandBuilder()
+    .setName("ماين-كرافت")
+    .setDescription("🎮 التحكم في سيرفر ماين كرافت [إدارة]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addSubcommand(sub =>
+      sub.setName("تشغيل").setDescription("▶️ تشغيل سيرفر ماين كرافت")
+    )
+    .addSubcommand(sub =>
+      sub.setName("إيقاف").setDescription("⏹️ إيقاف سيرفر ماين كرافت")
+    )
+    .addSubcommand(sub =>
+      sub.setName("إعادة-تشغيل").setDescription("🔄 إعادة تشغيل سيرفر ماين كرافت")
+    )
+    .addSubcommand(sub =>
+      sub.setName("وايت-ليست").setDescription("✅ إضافة لاعب للوايت ليست")
+        .addStringOption(o => o.setName("لاعب").setDescription("اسم اللاعب في ماين كرافت").setRequired(true))
+    ),
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -3364,6 +3382,106 @@ client.on("interactionCreate", async (interaction) => {
       // ═══════════════════════════════════════════════════════════════
       //  Legacy Commands
       // ═══════════════════════════════════════════════════════════════
+
+      // ─── ماين كرافت ───────────────────────────────────────────────
+      if (cmd === "ماين-كرافت") {
+        const panelUrl  = process.env.PTERODACTYL_URL?.replace(/\/$/, "");
+        const apiKey    = process.env.PTERODACTYL_KEY;
+        const serverId  = process.env.PTERODACTYL_SERVER_ID;
+
+        if (!panelUrl || !apiKey || !serverId) {
+          return interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0xe74c3c)
+                .setTitle("❌ إعدادات ناقصة")
+                .setDescription("المتغيرات `PTERODACTYL_URL` و`PTERODACTYL_KEY` و`PTERODACTYL_SERVER_ID` مش موجودين في الإعدادات.")
+                .setTimestamp()
+            ],
+            ephemeral: true
+          });
+        }
+
+        const sub = interaction.options.getSubcommand();
+        await interaction.deferReply();
+
+        const headers = {
+          "Authorization": `Bearer ${apiKey}`,
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        };
+
+        // وايت ليست
+        if (sub === "وايت-ليست") {
+          const playerName = interaction.options.getString("لاعب");
+          try {
+            const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/command`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ command: `whitelist add ${playerName}` })
+            });
+            if (!res.ok) throw new Error(`كود الاستجابة: ${res.status}`);
+            return interaction.editReply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0x2ecc71)
+                  .setTitle("✅ تم الإضافة للوايت ليست")
+                  .setDescription(`اللاعب **${playerName}** اتضاف للوايت ليست بنجاح.`)
+                  .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
+                  .setTimestamp()
+              ]
+            });
+          } catch (err) {
+            return interaction.editReply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0xe74c3c)
+                  .setTitle("❌ فشل تنفيذ الأمر")
+                  .setDescription(`حصل خطأ أثناء إضافة اللاعب: \`${err.message}\``)
+                  .setTimestamp()
+              ]
+            });
+          }
+        }
+
+        // تشغيل / إيقاف / إعادة تشغيل
+        const signalMap = {
+          "تشغيل":         { signal: "start",   emoji: "▶️", label: "تشغيل السيرفر",         color: 0x2ecc71 },
+          "إيقاف":         { signal: "stop",    emoji: "⏹️", label: "إيقاف السيرفر",          color: 0xe74c3c },
+          "إعادة-تشغيل":  { signal: "restart", emoji: "🔄", label: "إعادة تشغيل السيرفر",    color: 0xf39c12 },
+        };
+        const action = signalMap[sub];
+        if (action) {
+          try {
+            const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/power`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify({ signal: action.signal })
+            });
+            if (!res.ok) throw new Error(`كود الاستجابة: ${res.status}`);
+            return interaction.editReply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(action.color)
+                  .setTitle(`${action.emoji} تم — ${action.label}`)
+                  .setDescription(`الأمر اتبعت للسيرفر بنجاح.`)
+                  .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
+                  .setTimestamp()
+              ]
+            });
+          } catch (err) {
+            return interaction.editReply({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(0xe74c3c)
+                  .setTitle("❌ فشل تنفيذ الأمر")
+                  .setDescription(`حصل خطأ: \`${err.message}\``)
+                  .setTimestamp()
+              ]
+            });
+          }
+        }
+      }
 
       if (cmd === "ping") {
         return interaction.reply({ content: `🏓 سرعة البوت الحالية: **${client.ws.ping}ms**` });
