@@ -3389,7 +3389,7 @@ client.on("interactionCreate", async (interaction) => {
           new ButtonBuilder().setCustomId("mc_stop")    .setLabel("إيقاف")           .setEmoji("⏹️") .setStyle(ButtonStyle.Danger),
           new ButtonBuilder().setCustomId("mc_restart") .setLabel("إعادة تشغيل")    .setEmoji("🔄") .setStyle(ButtonStyle.Primary),
           new ButtonBuilder().setCustomId("mc_whitelist").setLabel("وايت ليست")     .setEmoji("✅") .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId("mc_fix")     .setLabel("تصحيح السيرفر")  .setEmoji("🟢") .setStyle(ButtonStyle.Success)
+          new ButtonBuilder().setCustomId("mc_fix")     .setLabel("تشغيل السيرفر")  .setEmoji("🟢") .setStyle(ButtonStyle.Success)
         );
 
         return interaction.reply({ embeds: [controlEmbed], components: [row] });
