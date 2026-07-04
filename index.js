@@ -875,37 +875,9 @@ async function deployCommands(token, clientId) {
   const allCommands = [...LEGACY_COMMANDS, ...advancedCommands];
 
   try {
-    let oldNames = [];
-    try {
-      const existing = await rest.get(Routes.applicationCommands(clientId));
-      oldNames = existing.map((c) => c.name);
-    } catch {}
-
     logger.info(`🔄 رفع ${allCommands.length} أمر على ديسكورد...`);
     await rest.put(Routes.applicationCommands(clientId), { body: allCommands.map((c) => c.toJSON()) });
     logger.success(`تم رفع ${allCommands.length} أمر بنجاح!`);
-
-    const newNames = allCommands.map((c) => c.name);
-    const added   = newNames.filter((n) => !oldNames.includes(n));
-    const removed = oldNames.filter((n) => !newNames.includes(n));
-
-    if (added.length > 0 || removed.length > 0) {
-      try {
-        const logChannel = await client.channels.fetch(COMMANDS_UPDATE_LOG_CHANNEL_ID).catch(() => null);
-        if (logChannel) {
-          const embed = new EmbedBuilder()
-            .setColor(0x2ecc71)
-            .setTitle("🔄 تم تحديث أوامر السلاش")
-            .setDescription(`إجمالي الأوامر المسجلة دلوقتي: **${allCommands.length}**`)
-            .addFields(
-              { name: "✅ أوامر جديدة اتضافت", value: added.length ? added.map(n => `\`/${n}\``).join(", ") : "لا يوجد", inline: false },
-              { name: "🗑️ أوامر اتشالت",       value: removed.length ? removed.map(n => `\`/${n}\``).join(", ") : "لا يوجد", inline: false },
-            )
-            .setTimestamp();
-          await logChannel.send({ embeds: [embed] }).catch(() => {});
-        }
-      } catch {}
-    }
   } catch (e) {
     logger.error("خطأ في رفع الأوامر:", e);
   }
