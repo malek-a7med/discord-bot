@@ -6042,6 +6042,14 @@ async function checkAntiRaid(member) {
   }
 }
 
+// ── لوج انضمام/خروج/تغيير رتب الأعضاء في روم واحدة (نفس روم تحديثات الأوامر) ──
+async function sendServerActivityLog(embed) {
+  try {
+    const logChannel = await client.channels.fetch(COMMANDS_UPDATE_LOG_CHANNEL_ID).catch(() => null);
+    if (logChannel) await logChannel.send({ embeds: [embed] }).catch(() => {});
+  } catch {}
+}
+
 client.on('guildMemberAdd', async (member) => {
   // ✅ FIX: تفعيل anti-raid من moderation-listener.js (كانت معمولة new بس مش مربوطة بأي event)
   //   بنستدعيها هنا بشكل مستقل عن منطق الترحيب عشان تشتغل دايمًا حتى لو الترحيب اتعمله dedupe
@@ -6050,6 +6058,15 @@ client.on('guildMemberAdd', async (member) => {
   });
 
   checkAntiRaid(member).catch(e => console.error("[Anti-Raid] خطأ:", e.message));
+
+  sendServerActivityLog(
+    new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle("📥 عضو جديد انضم")
+      .setDescription(`👤 **${member.user.tag}**\n🆔 \`${member.id}\`\n📊 إجمالي الأعضاء: **${member.guild.memberCount}**`)
+      .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+      .setTimestamp()
+  );
 
   if (!_dedupeWelcome(`${member.guild.id}-${member.id}`)) return;
 
@@ -6088,6 +6105,15 @@ client.on('guildMemberAdd', async (member) => {
 
 // ================= نظام الوداع للفراعنة =================
 client.on('guildMemberRemove', async (member) => {
+  sendServerActivityLog(
+    new EmbedBuilder()
+      .setColor(0xe74c3c)
+      .setTitle("📤 عضو غادر السيرفر")
+      .setDescription(`👤 **${member.user?.tag ?? member.id}**\n🆔 \`${member.id}\`\n📊 إجمالي الأعضاء: **${member.guild.memberCount}**`)
+      .setThumbnail(member.user?.displayAvatarURL({ size: 256 }) ?? null)
+      .setTimestamp()
+  );
+
   if (!_dedupeLeave(`${member.guild.id}-${member.id}`)) return;
 
   const WELCOME_CHANNEL_ID = "1486100560494203183";
@@ -6117,6 +6143,30 @@ client.on('guildMemberRemove', async (member) => {
   } catch (error) {
     console.error("خطأ في نظام الوداع:", error);
   }
+});
+
+// ================= لوج تغيير رتب الأعضاء =================
+client.on('guildMemberUpdate', (oldMember, newMember) => {
+  const oldRoles = oldMember.roles.cache;
+  const newRoles = newMember.roles.cache;
+
+  const addedRoles   = newRoles.filter((r) => !oldRoles.has(r.id));
+  const removedRoles = oldRoles.filter((r) => !newRoles.has(r.id));
+
+  if (addedRoles.size === 0 && removedRoles.size === 0) return;
+
+  const fields = [];
+  if (addedRoles.size)   fields.push({ name: "✅ رتب اتضافت", value: addedRoles.map((r) => `<@&${r.id}>`).join(", "), inline: false });
+  if (removedRoles.size) fields.push({ name: "❌ رتب اتشالت", value: removedRoles.map((r) => `<@&${r.id}>`).join(", "), inline: false });
+
+  sendServerActivityLog(
+    new EmbedBuilder()
+      .setColor(0x3498db)
+      .setTitle("🏷️ تغيير رتب عضو")
+      .setDescription(`👤 **${newMember.user.tag}**\n🆔 \`${newMember.id}\``)
+      .addFields(fields)
+      .setTimestamp()
+  );
 });
 
 // ================= نظام إبقاء البوت حياً 24 ساعة =================
