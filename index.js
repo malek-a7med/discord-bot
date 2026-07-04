@@ -717,24 +717,12 @@ const LEGACY_COMMANDS = [
     .addStringOption(o => o.setName("فوتر-صورة").setDescription("رابط صورة الفوتر الجديدة"))
     .addStringOption(o => o.setName("لينك-عنوان").setDescription("لينك العنوان الجديد (اكتب 'مسح' عشان تشيله)"))
     .addBooleanOption(o => o.setName("تاريخ").setDescription("إظهار أو إخفاء التاريخ")),
-  // ─── ماين كرافت ───────────────────────────────────────────────
+
+  // ─── ماين كرافت ────────────────────────────────────────────────
   new SlashCommandBuilder()
     .setName("ماين-كرافت")
-    .setDescription("🎮 التحكم في سيرفر ماين كرافت [إدارة]")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addSubcommand(sub =>
-      sub.setName("تشغيل").setDescription("▶️ تشغيل سيرفر ماين كرافت")
-    )
-    .addSubcommand(sub =>
-      sub.setName("إيقاف").setDescription("⏹️ إيقاف سيرفر ماين كرافت")
-    )
-    .addSubcommand(sub =>
-      sub.setName("إعادة-تشغيل").setDescription("🔄 إعادة تشغيل سيرفر ماين كرافت")
-    )
-    .addSubcommand(sub =>
-      sub.setName("وايت-ليست").setDescription("✅ إضافة لاعب للوايت ليست")
-        .addStringOption(o => o.setName("لاعب").setDescription("اسم اللاعب في ماين كرافت").setRequired(true))
-    ),
+    .setDescription("🎮 لوحة التحكم في سيرفر ماين كرافت [أدمن]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -3383,104 +3371,52 @@ client.on("interactionCreate", async (interaction) => {
       //  Legacy Commands
       // ═══════════════════════════════════════════════════════════════
 
-      // ─── ماين كرافت ───────────────────────────────────────────────
+      // ─── ماين كرافت — لوحة التحكم ──────────────────────────────
       if (cmd === "ماين-كرافت") {
-        const panelUrl  = process.env.PTERODACTYL_URL?.replace(/\/$/, "");
-        const apiKey    = process.env.PTERODACTYL_KEY;
-        const serverId  = process.env.PTERODACTYL_SERVER_ID;
+        const panelUrl = process.env.PTERODACTYL_URL?.replace(/\/$/, "");
+        const apiKey   = process.env.PTERODACTYL_KEY;
+        const serverId = process.env.PTERODACTYL_SERVER_ID;
 
         if (!panelUrl || !apiKey || !serverId) {
           return interaction.reply({
             embeds: [
               new EmbedBuilder()
                 .setColor(0xe74c3c)
-                .setTitle("❌ إعدادات ناقصة")
-                .setDescription("المتغيرات `PTERODACTYL_URL` و`PTERODACTYL_KEY` و`PTERODACTYL_SERVER_ID` مش موجودين في الإعدادات.")
+                .setTitle("❌ الإعدادات ناقصة")
+                .setDescription(
+                  "محتاج تضيف المتغيرات دي في الـ Secrets:\n" +
+                  "`PTERODACTYL_URL` — رابط البانيل\n" +
+                  "`PTERODACTYL_KEY` — مفتاح الـ API\n" +
+                  "`PTERODACTYL_SERVER_ID` — رقم السيرفر"
+                )
                 .setTimestamp()
             ],
             ephemeral: true
           });
         }
 
-        const sub = interaction.options.getSubcommand();
-        await interaction.deferReply();
+        const controlEmbed = new EmbedBuilder()
+          .setColor(0x2d7d46)
+          .setAuthor({ name: "🎮 لوحة تحكم ماين كرافت", iconURL: "https://i.imgur.com/cGM7aMH.png" })
+          .setTitle("سيرفر ماين كرافت")
+          .setDescription("اختار العملية اللي عايز تعملها من الأزرار تحت 👇")
+          .addFields(
+            { name: "▶️ تشغيل",          value: "يشغّل السيرفر",              inline: true },
+            { name: "⏹️ إيقاف",          value: "يوقف السيرفر",               inline: true },
+            { name: "🔄 إعادة تشغيل",    value: "يعيد تشغيل السيرفر",         inline: true },
+            { name: "✅ وايت ليست",       value: "تضيف لاعب للوايت ليست",     inline: true }
+          )
+          .setFooter({ text: `طلب بواسطة: ${interaction.user.tag}` })
+          .setTimestamp();
 
-        const headers = {
-          "Authorization": `Bearer ${apiKey}`,
-          "Accept": "application/json",
-          "Content-Type": "application/json"
-        };
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId("mc_start")   .setLabel("تشغيل")          .setEmoji("▶️") .setStyle(ButtonStyle.Success),
+          new ButtonBuilder().setCustomId("mc_stop")    .setLabel("إيقاف")          .setEmoji("⏹️") .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId("mc_restart") .setLabel("إعادة تشغيل")   .setEmoji("🔄") .setStyle(ButtonStyle.Primary),
+          new ButtonBuilder().setCustomId("mc_whitelist").setLabel("وايت ليست")    .setEmoji("✅") .setStyle(ButtonStyle.Secondary)
+        );
 
-        // وايت ليست
-        if (sub === "وايت-ليست") {
-          const playerName = interaction.options.getString("لاعب");
-          try {
-            const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/command`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ command: `whitelist add ${playerName}` })
-            });
-            if (!res.ok) throw new Error(`كود الاستجابة: ${res.status}`);
-            return interaction.editReply({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(0x2ecc71)
-                  .setTitle("✅ تم الإضافة للوايت ليست")
-                  .setDescription(`اللاعب **${playerName}** اتضاف للوايت ليست بنجاح.`)
-                  .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
-                  .setTimestamp()
-              ]
-            });
-          } catch (err) {
-            return interaction.editReply({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(0xe74c3c)
-                  .setTitle("❌ فشل تنفيذ الأمر")
-                  .setDescription(`حصل خطأ أثناء إضافة اللاعب: \`${err.message}\``)
-                  .setTimestamp()
-              ]
-            });
-          }
-        }
-
-        // تشغيل / إيقاف / إعادة تشغيل
-        const signalMap = {
-          "تشغيل":         { signal: "start",   emoji: "▶️", label: "تشغيل السيرفر",         color: 0x2ecc71 },
-          "إيقاف":         { signal: "stop",    emoji: "⏹️", label: "إيقاف السيرفر",          color: 0xe74c3c },
-          "إعادة-تشغيل":  { signal: "restart", emoji: "🔄", label: "إعادة تشغيل السيرفر",    color: 0xf39c12 },
-        };
-        const action = signalMap[sub];
-        if (action) {
-          try {
-            const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/power`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify({ signal: action.signal })
-            });
-            if (!res.ok) throw new Error(`كود الاستجابة: ${res.status}`);
-            return interaction.editReply({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(action.color)
-                  .setTitle(`${action.emoji} تم — ${action.label}`)
-                  .setDescription(`الأمر اتبعت للسيرفر بنجاح.`)
-                  .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
-                  .setTimestamp()
-              ]
-            });
-          } catch (err) {
-            return interaction.editReply({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(0xe74c3c)
-                  .setTitle("❌ فشل تنفيذ الأمر")
-                  .setDescription(`حصل خطأ: \`${err.message}\``)
-                  .setTimestamp()
-              ]
-            });
-          }
-        }
+        return interaction.reply({ embeds: [controlEmbed], components: [row] });
       }
 
       if (cmd === "ping") {
@@ -4591,6 +4527,78 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     try {
 
+      // ─── أزرار ماين كرافت ─────────────────────────────────────────
+      if (["mc_start", "mc_stop", "mc_restart", "mc_whitelist"].includes(interaction.customId)) {
+        // التحقق من الصلاحية
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+          return interaction.reply({ content: "❌ الأزرار دي للأدمنز بس!", ephemeral: true });
+        }
+
+        // لو الزرار وايت ليست — افتح مودال
+        if (interaction.customId === "mc_whitelist") {
+          const modal = new ModalBuilder()
+            .setCustomId("mc_whitelist_modal")
+            .setTitle("إضافة لاعب للوايت ليست");
+          const input = new TextInputBuilder()
+            .setCustomId("mc_player_name")
+            .setLabel("اسم اللاعب في ماين كرافت")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("مثلاً: Steve123")
+            .setRequired(true)
+            .setMaxLength(36);
+          modal.addComponents(new ActionRowBuilder().addComponents(input));
+          return interaction.showModal(modal);
+        }
+
+        // باقي الأزرار — تشغيل / إيقاف / إعادة تشغيل
+        await interaction.deferReply({ ephemeral: true });
+
+        const panelUrl = process.env.PTERODACTYL_URL?.replace(/\/$/, "");
+        const apiKey   = process.env.PTERODACTYL_KEY;
+        const serverId = process.env.PTERODACTYL_SERVER_ID;
+
+        const actionMap = {
+          mc_start:   { signal: "start",   emoji: "▶️", label: "تشغيل السيرفر",        color: 0x2ecc71 },
+          mc_stop:    { signal: "stop",    emoji: "⏹️", label: "إيقاف السيرفر",         color: 0xe74c3c },
+          mc_restart: { signal: "restart", emoji: "🔄", label: "إعادة تشغيل السيرفر",   color: 0xf39c12 },
+        };
+        const action = actionMap[interaction.customId];
+
+        try {
+          const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/power`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Accept": "application/json",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ signal: action.signal })
+          });
+          if (!res.ok) throw new Error(`كود الاستجابة من السيرفر: ${res.status}`);
+
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(action.color)
+                .setTitle(`${action.emoji} تم — ${action.label}`)
+                .setDescription("الأمر اتبعت للسيرفر بنجاح ✅")
+                .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
+                .setTimestamp()
+            ]
+          });
+        } catch (err) {
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0xe74c3c)
+                .setTitle("❌ فشل تنفيذ الأمر")
+                .setDescription(`حصل خطأ أثناء التواصل مع السيرفر:\n\`${err.message}\``)
+                .setTimestamp()
+            ]
+          });
+        }
+      }
+
       // ─── أزرار نظام التذاكر ────────────────────────────────────────
       if (interaction.customId === "open_ticket") {
         return await handleTicketButton(interaction, db);
@@ -5481,6 +5489,47 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      // ─── مودال وايت ليست ماين كرافت ──────────────────────────────
+      if (interaction.customId === "mc_whitelist_modal") {
+        await interaction.deferReply({ ephemeral: true });
+        const panelUrl   = process.env.PTERODACTYL_URL?.replace(/\/$/, "");
+        const apiKey     = process.env.PTERODACTYL_KEY;
+        const serverId   = process.env.PTERODACTYL_SERVER_ID;
+        const playerName = interaction.fields.getTextInputValue("mc_player_name").trim();
+        try {
+          const res = await fetch(`${panelUrl}/api/client/servers/${serverId}/command`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Accept": "application/json",
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ command: `whitelist add ${playerName}` })
+          });
+          if (!res.ok) throw new Error(`كود الاستجابة من السيرفر: ${res.status}`);
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0x2ecc71)
+                .setTitle("✅ تم الإضافة للوايت ليست")
+                .setDescription(`اللاعب **${playerName}** اتضاف للوايت ليست بنجاح.`)
+                .addFields({ name: "⚡ نُفِّذ بواسطة", value: `${interaction.user}`, inline: true })
+                .setTimestamp()
+            ]
+          });
+        } catch (err) {
+          return interaction.editReply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0xe74c3c)
+                .setTitle("❌ فشل إضافة اللاعب")
+                .setDescription(`حصل خطأ أثناء تنفيذ الأمر:\n\`${err.message}\``)
+                .setTimestamp()
+            ]
+          });
+        }
+      }
+
       // ─── مودال نظام التذاكر ────────────────────────────────────────
       if (interaction.customId === "ticket_modal") {
         return await handleTicketModalSubmit(interaction, db);
