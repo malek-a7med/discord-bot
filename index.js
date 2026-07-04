@@ -4079,7 +4079,7 @@ client.on("interactionCreate", async (interaction) => {
         return handleServerStats(interaction, db);
       }
 
-      if (cmd === "نسخة-احتياطية") {
+      if (cmd === "نسخ-احتياطي" && interaction.options.getSubcommand() === "انشاء") {
         await interaction.deferReply({ ephemeral: true });
         try {
           const allData = db.getAllData();
@@ -4108,7 +4108,7 @@ client.on("interactionCreate", async (interaction) => {
         }
       }
 
-      if (cmd === "استرجاع") {
+      if (cmd === "نسخ-احتياطي" && interaction.options.getSubcommand() === "استرجاع") {
         await interaction.deferReply({ ephemeral: true });
         try {
           const attachment = interaction.options.getAttachment("ملف");
@@ -4151,7 +4151,7 @@ client.on("interactionCreate", async (interaction) => {
         }
       }
 
-      if (cmd === "تشغيل-اختبار") {
+      if (cmd === "بوت" && interaction.options.getSubcommand() === "اختبار") {
         const type = interaction.options.getString("نوع");
         const WELCOME_CHANNEL_ID = "1486100560494203183";
         const testChannel = guild.channels.cache.get(WELCOME_CHANNEL_ID);
@@ -4201,7 +4201,7 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.editReply({ content: `✅ تم إرسال رسالة الاختبار في ${testChannel} بنجاح!` });
       }
 
-      if (cmd === "قناة-اللوجز") {
+      if (cmd === "بوت" && interaction.options.getSubcommand() === "قناة-لوجز") {
         if (!config.isOwner(user.id)) {
           return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         }
@@ -4323,7 +4323,7 @@ client.on("interactionCreate", async (interaction) => {
         }
       }
 
-      if (cmd === "قناة-النسخ") {
+      if (cmd === "نسخ-احتياطي" && interaction.options.getSubcommand() === "تحديد-قناة") {
         const channelId = interaction.options.getString("id").trim();
         const ch = await guild.channels.fetch(channelId).catch(() => null);
         if (!ch) {
