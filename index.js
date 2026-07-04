@@ -6145,28 +6145,128 @@ client.on('guildMemberRemove', async (member) => {
   }
 });
 
-// ================= لوج تغيير رتب الأعضاء =================
+// ================= لوج تغيير رتب/اسم الأعضاء =================
 client.on('guildMemberUpdate', (oldMember, newMember) => {
   const oldRoles = oldMember.roles.cache;
   const newRoles = newMember.roles.cache;
 
   const addedRoles   = newRoles.filter((r) => !oldRoles.has(r.id));
   const removedRoles = oldRoles.filter((r) => !newRoles.has(r.id));
+  const nickChanged  = oldMember.nickname !== newMember.nickname;
 
-  if (addedRoles.size === 0 && removedRoles.size === 0) return;
+  if (addedRoles.size === 0 && removedRoles.size === 0 && !nickChanged) return;
 
   const fields = [];
   if (addedRoles.size)   fields.push({ name: "✅ رتب اتضافت", value: addedRoles.map((r) => `<@&${r.id}>`).join(", "), inline: false });
   if (removedRoles.size) fields.push({ name: "❌ رتب اتشالت", value: removedRoles.map((r) => `<@&${r.id}>`).join(", "), inline: false });
+  if (nickChanged) fields.push({ name: "✏️ الاسم", value: `${oldMember.nickname ?? "بدون"} → ${newMember.nickname ?? "بدون"}`, inline: false });
 
   sendServerActivityLog(
     new EmbedBuilder()
       .setColor(0x3498db)
-      .setTitle("🏷️ تغيير رتب عضو")
+      .setTitle(nickChanged && addedRoles.size === 0 && removedRoles.size === 0 ? "✏️ تغيير اسم عضو" : "🏷️ تغيير رتب عضو")
       .setDescription(`👤 **${newMember.user.tag}**\n🆔 \`${newMember.id}\``)
       .addFields(fields)
       .setTimestamp()
   );
+});
+
+// ================= لوج حذف/تعديل الرسايل =================
+client.on('messageDelete', (msg) => {
+  if (!msg.guild || msg.author?.bot) return;
+  sendServerActivityLog(
+    new EmbedBuilder()
+      .setColor(0xe74c3c)
+      .setTitle("🗑️ رسالة اتمسحت")
+      .setDescription(`👤 **${msg.author?.tag ?? "غير معروف"}**\n📍 الروم: <#${msg.channelId}>`)
+      .addFields({ name: "📝 المحتوى", value: (msg.content || "*(بدون نص — صورة/ملف)*").slice(0, 1000) })
+      .setTimestamp()
+  );
+});
+
+client.on('messageUpdate', (oldMsg, newMsg) => {
+  if (!newMsg.guild || newMsg.author?.bot) return;
+  if (oldMsg.content === newMsg.content) return;
+  sendServerActivityLog(
+    new EmbedBuilder()
+      .setColor(0xf39c12)
+      .setTitle("✏️ رسالة اتعدلت")
+      .setDescription(`👤 **${newMsg.author?.tag ?? "غير معروف"}**\n📍 الروم: <#${newMsg.channelId}>`)
+      .addFields(
+        { name: "📝 قبل", value: (oldMsg.content || "*(فاضي)*").slice(0, 500) },
+        { name: "📝 بعد", value: (newMsg.content || "*(فاضي)*").slice(0, 500) },
+      )
+      .setTimestamp()
+  );
+});
+
+// ================= لوج الرومات والرتب (إنشاء/حذف) =================
+client.on('channelCreate', (channel) => {
+  if (!channel.guild) return;
+  sendServerActivityLog(
+    new EmbedBuilder().setColor(0x2ecc71).setTitle("📁 روم جديدة اتعملت")
+      .setDescription(`📌 **${channel.name}**\n🆔 \`${channel.id}\``).setTimestamp()
+  );
+});
+
+client.on('channelDelete', (channel) => {
+  if (!channel.guild) return;
+  sendServerActivityLog(
+    new EmbedBuilder().setColor(0xe74c3c).setTitle("📁 روم اتمسحت")
+      .setDescription(`📌 **${channel.name}**\n🆔 \`${channel.id}\``).setTimestamp()
+  );
+});
+
+client.on('roleCreate', (role) => {
+  sendServerActivityLog(
+    new EmbedBuilder().setColor(0x2ecc71).setTitle("🏷️ رتبة جديدة اتعملت")
+      .setDescription(`📌 <@&${role.id}>\n🆔 \`${role.id}\``).setTimestamp()
+  );
+});
+
+client.on('roleDelete', (role) => {
+  sendServerActivityLog(
+    new EmbedBuilder().setColor(0xe74c3c).setTitle("🏷️ رتبة اتمسحت")
+      .setDescription(`📌 **${role.name}**\n🆔 \`${role.id}\``).setTimestamp()
+  );
+});
+
+// ================= لوج الباند/الأنباند =================
+client.on('guildBanAdd', (ban) => {
+  sendServerActivityLog(
+    new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 عضو اتبند")
+      .setDescription(`👤 **${ban.user?.tag ?? ban.user?.id}**\n🆔 \`${ban.user?.id}\``).setTimestamp()
+  );
+});
+
+client.on('guildBanRemove', (ban) => {
+  sendServerActivityLog(
+    new EmbedBuilder().setColor(0x2ecc71).setTitle("🔓 عضو اتشال منه الباند")
+      .setDescription(`👤 **${ban.user?.tag ?? ban.user?.id}**\n🆔 \`${ban.user?.id}\``).setTimestamp()
+  );
+});
+
+// ================= لوج دخول/خروج الفويس =================
+client.on('voiceStateUpdate', (oldState, newState) => {
+  const member = newState.member ?? oldState.member;
+  if (!member || member.user.bot) return;
+
+  if (!oldState.channelId && newState.channelId) {
+    sendServerActivityLog(
+      new EmbedBuilder().setColor(0x3498db).setTitle("🔊 عضو دخل فويس")
+        .setDescription(`👤 **${member.user.tag}**\n📍 <#${newState.channelId}>`).setTimestamp()
+    );
+  } else if (oldState.channelId && !newState.channelId) {
+    sendServerActivityLog(
+      new EmbedBuilder().setColor(0x95a5a6).setTitle("🔇 عضو خرج من الفويس")
+        .setDescription(`👤 **${member.user.tag}**\n📍 <#${oldState.channelId}>`).setTimestamp()
+    );
+  } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
+    sendServerActivityLog(
+      new EmbedBuilder().setColor(0x9b59b6).setTitle("🔀 عضو نقل فويس")
+        .setDescription(`👤 **${member.user.tag}**\n📍 من <#${oldState.channelId}> لـ <#${newState.channelId}>`).setTimestamp()
+    );
+  }
 });
 
 // ================= نظام إبقاء البوت حياً 24 ساعة =================
