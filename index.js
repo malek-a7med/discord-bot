@@ -1325,7 +1325,8 @@ function buildSuggestionsPanelRow() {
     new ButtonBuilder()
       .setCustomId("suggest_other")
       .setLabel("💬 تعليق")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Secondary),
+    buildTicketButton()
   );
 }
 
@@ -1883,8 +1884,7 @@ async function sendModLog(type, modUser, targetId, reason, extra = {}) {
 
   try {
     const logCh = await client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID);
-    const ticketRow = new ActionRowBuilder().addComponents(buildTicketButton());
-    await logCh.send({ embeds: [embed], components: [ticketRow] });
+    await logCh.send({ embeds: [embed] });
   } catch { /* فشل اللوج — تجاهل */ }
 }
 
