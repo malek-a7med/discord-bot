@@ -6246,28 +6246,6 @@ client.on('guildBanRemove', (ban) => {
   );
 });
 
-// ================= لوج دخول/خروج الفويس =================
-client.on('voiceStateUpdate', (oldState, newState) => {
-  const member = newState.member ?? oldState.member;
-  if (!member || member.user.bot) return;
-
-  if (!oldState.channelId && newState.channelId) {
-    sendServerActivityLog(
-      new EmbedBuilder().setColor(0x3498db).setTitle("🔊 عضو دخل فويس")
-        .setDescription(`👤 **${member.user.tag}**\n📍 <#${newState.channelId}>`).setTimestamp()
-    );
-  } else if (oldState.channelId && !newState.channelId) {
-    sendServerActivityLog(
-      new EmbedBuilder().setColor(0x95a5a6).setTitle("🔇 عضو خرج من الفويس")
-        .setDescription(`👤 **${member.user.tag}**\n📍 <#${oldState.channelId}>`).setTimestamp()
-    );
-  } else if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-    sendServerActivityLog(
-      new EmbedBuilder().setColor(0x9b59b6).setTitle("🔀 عضو نقل فويس")
-        .setDescription(`👤 **${member.user.tag}**\n📍 من <#${oldState.channelId}> لـ <#${newState.channelId}>`).setTimestamp()
-    );
-  }
-});
 
 // ================= نظام إبقاء البوت حياً 24 ساعة =================
 // ✅ [تعديل 7] Express بطريقة ES Module الصحيحة + PORT من البيئة
