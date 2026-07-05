@@ -66,30 +66,74 @@ export const COLOR_LIST = [
 const PER_PAGE    = 10;
 const TOTAL_PAGES = Math.ceil(COLOR_LIST.length / PER_PAGE);
 
+// ── ماب الإيموجيز — اسم الإيموجي → ID ───────────────
+const EMOJI_MAP = {
+  "clr_black":            "1523392119153098812",
+  "clr_grey":             "1523392121938247770",
+  "clr_white":            "1523392124379336755",
+  "clr_dark_red":         "1523392126728147144",
+  "clr_rose":             "1523392128724631614",
+  "clr_mona":             "1523392131975348255",
+  "clr_red":              "1523392134571495534",
+  "clr_vermilion":        "1523392137071296642",
+  "clr_tangerine":        "1523392139499802704",
+  "clr_orange":           "1523392141945212999",
+  "clr_mango_tango":      "1523392144461660270",
+  "clr_koromiko":         "1523392146902745359",
+  "clr_yellow":           "1523392149385908334",
+  "clr_lemon_yellow":     "1523392151956754483",
+  "clr_pale_canary":      "1523392154376994908",
+  "clr_lime":             "1523392156947972176",
+  "clr_green_yellow":     "1523392159368351885",
+  "clr_reef":             "1523392161876541443",
+  "clr_green":            "1523392164015505479",
+  "clr_screamin_green":   "1523392166825558026",
+  "clr_mint_green":       "1523392169283420210",
+  "clr_spring_green":     "1523392171699601519",
+  "clr_aquamarine":       "1523392174031507538",
+  "clr_aero":             "1523392176413741056",
+  "clr_bright_turquoise": "1523392179303743582",
+  "clr_aqua":             "1523392181849554954",
+  "clr_fresh_air":        "1523392184806805636",
+  "clr_cyan":             "1523392187633500481",
+  "clr_malibu":           "1523392190364123298",
+  "clr_baby_blue":        "1523392193379696650",
+  "clr_azure_radiance":   "1523392195883700414",
+  "clr_blueberry":        "1523392198333300847",
+  "clr_anakiwa":          "1523392201428697160",
+  "clr_blue_ribbon":      "1523392203978838149",
+  "clr_indigo":           "1523392206226849864",
+  "clr_melrose":          "1523392208995221534",
+  "clr_blue":             "1523392211440500826",
+  "clr_royal_blue":       "1523392214137311436",
+  "clr_ship_cove":        "1523392216951951421",
+  "clr_electric_violet":  "1523392219443237105",
+  "clr_heliotrope":       "1523392222005956658",
+  "clr_mauve":            "1523392224660951151",
+  "clr_violet":           "1523392227517137057",
+  "clr_amethyst":         "1523392230012747917",
+  "clr_east_side":        "1523392232365887590",
+  "clr_magenta":          "1523392234563698901",
+  "clr_pink_flamingo":    "1523392237260636220",
+  "clr_lavender_rose":    "1523392240016298175",
+  "clr_hollywood_cerise": "1523392242738397416",
+  "clr_hot_pink":         "1523392244839874668",
+  "clr_cotton_candy":     "1523392248178278530",
+};
+
+// ── جيب إيموجي اللون ─────────────────────────────────
+function colorEmoji(color) {
+  const key = "clr_" + color.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+  const id  = EMOJI_MAP[key];
+  return id ? `<:${key}:${id}>` : "🎨";
+}
+
 // ── جيب ألوان الصفحة ─────────────────────────────────
 function pageColors(page) {
   return COLOR_LIST.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
 }
 
-// ── اختار أقرب ANSI color من الـ hex ─────────────────
-function ansiForHex(hex) {
-  const r = (hex >> 16) & 0xff;
-  const g = (hex >> 8)  & 0xff;
-  const b =  hex        & 0xff;
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  if (r > 200 && g < 100 && b < 100) return 91;  // أحمر
-  if (r > 200 && g > 100 && b < 80)  return 93;  // أصفر/برتقالي
-  if (r < 100 && g > 150 && b < 100) return 92;  // أخضر
-  if (r < 100 && g > 150 && b > 150) return 96;  // سماوي
-  if (r < 100 && g < 100 && b > 200) return 94;  // أزرق
-  if (r > 150 && g < 100 && b > 150) return 95;  // بنفسجي/وردي
-  if (r > 200 && g > 200 && b > 200) return 97;  // أبيض
-  if (r < 50  && g < 50  && b < 50)  return 90;  // رمادي داكن
-  if (brightness < 80)                return 90;  // داكن عموماً
-  return 37; // رمادي فاتح
-}
-
-// ── بناء إيمبد الصفحة مع ANSI ────────────────────────
+// ── بناء إيمبد الصفحة بالإيموجيز الحقيقية ────────────
 function buildPageEmbed(page) {
   const colors = pageColors(page);
 
@@ -98,22 +142,17 @@ function buildPageEmbed(page) {
   const right = colors.slice(half);
 
   const lines = left.map((lc, i) => {
-    const rc    = right[i];
-    const lAnsi = ansiForHex(lc.hex);
-    const lNum  = String(lc.id).padStart(2, " ");
-    const lTxt  = `\u001b[${lAnsi}m${lNum}. ${lc.name}\u001b[0m`;
+    const rc   = right[i];
+    const lTxt = `${colorEmoji(lc)} \`${String(lc.id).padStart(2)}\` ${lc.name}`;
     if (!rc) return lTxt;
-    const rAnsi = ansiForHex(rc.hex);
-    const rNum  = String(rc.id).padStart(2, " ");
-    const pad   = " ".repeat(Math.max(1, 24 - (lNum.length + 2 + lc.name.length)));
-    const rTxt  = `\u001b[${rAnsi}m${rNum}. ${rc.name}\u001b[0m`;
-    return `${lTxt}${pad}${rTxt}`;
+    const rTxt = `${colorEmoji(rc)} \`${String(rc.id).padStart(2)}\` ${rc.name}`;
+    return `${lTxt}\u2003\u2003${rTxt}`;
   });
 
   return new EmbedBuilder()
     .setColor(colors[Math.floor(colors.length / 2)].hex)
     .setTitle("🎨 اختار لون اسمك")
-    .setDescription("```ansi\n" + lines.join("\n") + "\n```")
+    .setDescription(lines.join("\n"))
     .setFooter({ text: `📄 صفحة ${page + 1} من ${TOTAL_PAGES}  •  اضغط رقم اللون عشان تاخده ✨` });
 }
 
