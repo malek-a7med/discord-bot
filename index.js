@@ -58,6 +58,7 @@ import {
   scheduleAnimeNews,
 } from "./commands/anime.js";
 import { coinsShopCommand, handleCoinsShop, SHOP_ITEMS } from "./commands/coins-shop-extended.js";
+import { colorsCommand, handleColorsCommand, handleColorButton } from "./commands/colors.js";
 import { fullProfileCommand, handleFullProfile } from "./commands/full-profile.js";
 import { serverStatsCommand, handleServerStats } from "./commands/server-stats-live.js";
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
@@ -723,6 +724,9 @@ const LEGACY_COMMANDS = [
     .setName("ماين-كرافت")
     .setDescription("🎮 لوحة التحكم في سيرفر ماين كرافت [أدمن]")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  // ─── الألوان ────────────────────────────────────────────────────
+  colorsCommand,
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -1909,8 +1913,36 @@ async function checkAndReplyOwnerInsult(msg) {
 }
 
 // ─── DM من الأونر ───────────────────────────────────────────────
+// ─── مصيدة الهاكرات — اي حد يكتب في القناة دي يتطرد فوراً ──────
+const TRAP_CHANNEL_ID = "1523348823798321242";
+
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
+
+  // ── مصيدة الهاكرات ───────────────────────────────────────────
+  if (msg.channel?.id === TRAP_CHANNEL_ID && msg.guild) {
+    const trapMember = msg.member;
+    try { await msg.delete().catch(() => {}); } catch {}
+    try {
+      await msg.channel.send({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xe74c3c)
+            .setTitle("⛔ لا ترسل أي رسالة هنا!")
+            .setDescription(
+              "**القناة دي بتُستخدم للكشف عن الحسابات الآلية.**\n" +
+              "أي رسالة بتتبعت هنا بتودي إلى **طرد تلقائي فوري**. ⚠️"
+            )
+            .setThumbnail("https://i.imgur.com/p5dDDAf.png")
+            .setTimestamp()
+        ]
+      });
+    } catch {}
+    try {
+      await trapMember?.kick("مصيدة هاكرات — أرسل رسالة في القناة المحظورة").catch(() => {});
+    } catch {}
+    return;
+  }
 
   // ── منع تكرار الردود لو في نسختين شغالين ────────────────────
   if (processedMessages.has(msg.id)) return;
@@ -4265,6 +4297,10 @@ client.on("interactionCreate", async (interaction) => {
         return handleServerStats(interaction, db);
       }
 
+      if (cmd === "الوان") {
+        return handleColorsCommand(interaction);
+      }
+
       if (cmd === "نسخ-احتياطي" && interaction.options.getSubcommand() === "انشاء") {
         await interaction.deferReply({ ephemeral: true });
         try {
@@ -4502,6 +4538,12 @@ client.on("interactionCreate", async (interaction) => {
   // التعامل مع الأزرار والمودال التفاعلية
   if (interaction.isButton()) {
     try {
+
+      // ─── أزرار الألوان ────────────────────────────────────────────
+      if (interaction.customId.startsWith("clr_")) {
+        const colorId = parseInt(interaction.customId.replace("clr_", ""), 10);
+        return handleColorButton(interaction, colorId);
+      }
 
       // ─── أزرار ماين كرافت ─────────────────────────────────────────
       if (["mc_start", "mc_stop", "mc_restart", "mc_whitelist", "mc_fix"].includes(interaction.customId)) {
