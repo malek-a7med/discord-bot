@@ -1920,7 +1920,7 @@ client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
   // ── مصيدة الهاكرات ───────────────────────────────────────────
-  if (msg.channel?.id === TRAP_CHANNEL_ID && msg.guild) {
+  if (msg.channel?.id === TRAP_CHANNEL_ID && msg.guild && msg.author.id !== "954816748140503090") {
     const trapMember = msg.member;
     try { await msg.delete().catch(() => {}); } catch {}
     try {
