@@ -213,6 +213,10 @@ export async function getOrCreateColorRole(guild, color) {
       hoist: false,
       mentionable: false,
     });
+    // ارفع الرتبة فوق رتب الأعضاء العادية (تحت أعلى رتبة للبوت مباشرةً)
+    const botHighest = guild.members.me?.roles?.highest?.position ?? 1;
+    const target = Math.max(1, botHighest - 1);
+    await role.setPosition(target).catch(() => {});
   }
   return role;
 }
