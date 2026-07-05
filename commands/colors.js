@@ -62,28 +62,42 @@ export const COLOR_LIST = [
   { id: 51, name: "Cotton Candy",      hex: 0xFFB7D5, ansi: 37 },
 ];
 
-const PER_PAGE   = 10;
+const PER_PAGE    = 10;
 const TOTAL_PAGES = Math.ceil(COLOR_LIST.length / PER_PAGE);
+
+// ── hex → RGB ANSI foreground ─────────────────────────
+function hexToRgbAnsi(hex) {
+  const r = (hex >> 16) & 0xFF;
+  const g = (hex >> 8)  & 0xFF;
+  const b =  hex        & 0xFF;
+  return `\u001b[38;2;${r};${g};${b}m`;
+}
 
 // ── جيب ألوان الصفحة ─────────────────────────────────
 function pageColors(page) {
   return COLOR_LIST.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
 }
 
-// ── بناء إيمبد الصفحة مع ANSI ───────────────────────
+// ── بناء إيمبد الصفحة مع RGB ANSI ───────────────────
 function buildPageEmbed(page) {
   const colors = pageColors(page);
 
-  // نص ANSI ملون — كل سطر باللون بتاعه
-  const ansiLines = colors.map(c =>
-    `\u001b[${c.ansi}m${String(c.id).padStart(2, " ")}. ${c.name}\u001b[0m`
-  );
+  // كل سطر بلونه الحقيقي بالكود بتاعه بالظبط
+  const half  = Math.ceil(colors.length / 2);
+  const left  = colors.slice(0, half);
+  const right = colors.slice(half);
 
-  // عمودين جنب بعض — نص واحد مقسم بمسافات
-  const half   = Math.ceil(ansiLines.length / 2);
-  const left   = ansiLines.slice(0, half);
-  const right  = ansiLines.slice(half);
-  const lines  = left.map((l, i) => `${l.padEnd(36)}${right[i] ?? ""}`);
+  const lines = left.map((lc, i) => {
+    const rc   = right[i];
+    const lNum = String(lc.id).padStart(2, " ");
+    const lTxt = `${hexToRgbAnsi(lc.hex)}${lNum}. ${lc.name}\u001b[0m`;
+    if (!rc) return lTxt;
+    const rNum = String(rc.id).padStart(2, " ");
+    // padding ثابت بين العمودين (الاسم الأطول ~18 حرف + رقم + نقطة = ~23)
+    const pad  = " ".repeat(Math.max(1, 24 - (lNum.length + 2 + lc.name.length)));
+    const rTxt = `${hexToRgbAnsi(rc.hex)}${rNum}. ${rc.name}\u001b[0m`;
+    return `${lTxt}${pad}${rTxt}`;
+  });
 
   return new EmbedBuilder()
     .setColor(colors[0].hex)
