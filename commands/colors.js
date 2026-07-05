@@ -14,7 +14,7 @@ export const COLOR_LIST = [
   { id: 3,  name: "White",             hex: 0xFFFFFF, ansi: 97 },
   { id: 4,  name: "Dark Red",          hex: 0x8B0000, ansi: 31 },
   { id: 5,  name: "Rose",              hex: 0xFF007F, ansi: 95 },
-  { id: 6,  name: "Mona",              hex: 0xF5728C, ansi: 35 },
+  { id: 6,  name: "Mona",              hex: 0xF5728C, ansi: 95 },
   { id: 7,  name: "Red",               hex: 0xFF0000, ansi: 91 },
   { id: 8,  name: "Vermilion",         hex: 0xE34234, ansi: 91 },
   { id: 9,  name: "Tangerine",         hex: 0xF28500, ansi: 33 },
@@ -36,7 +36,7 @@ export const COLOR_LIST = [
   { id: 25, name: "Bright Turquoise",  hex: 0x08E8DE, ansi: 96 },
   { id: 26, name: "Aqua",              hex: 0x00FFFF, ansi: 96 },
   { id: 27, name: "Fresh Air",         hex: 0xA6E7FF, ansi: 97 },
-  { id: 28, name: "Cyan",              hex: 0x00B7EB, ansi: 36 },
+  { id: 28, name: "Cyan",              hex: 0x00B7EB, ansi: 96 },
   { id: 29, name: "Malibu",            hex: 0x51B0EF, ansi: 94 },
   { id: 30, name: "Baby Blue",         hex: 0x89CFF0, ansi: 94 },
   { id: 31, name: "Azure Radiance",    hex: 0x007FFF, ansi: 34 },
@@ -59,7 +59,7 @@ export const COLOR_LIST = [
   { id: 48, name: "Lavender Rose",     hex: 0xFBA0E3, ansi: 95 },
   { id: 49, name: "Hollywood Cerise",  hex: 0xF400A1, ansi: 35 },
   { id: 50, name: "Hot Pink",          hex: 0xFF69B4, ansi: 95 },
-  { id: 51, name: "Cotton Candy",      hex: 0xFFB7D5, ansi: 37 },
+  { id: 51, name: "Cotton Candy",      hex: 0xFFB7D5, ansi: 95 },
 ];
 
 const PER_PAGE    = 10;
