@@ -201,6 +201,24 @@ export function colorRoleName(color) {
   return `🎨 ${color.name}`;
 }
 
+// ── ارفع رتبة اللون لتحت أعلى رتبة للبوت مباشرة (أقرب حاجة لرتبة الأونر) ──
+async function raiseColorRole(guild, role) {
+  try {
+    // نتأكد إن بيانات البوت في الجيلد محدّثة (لو مش متكاشية بتطلع غلط)
+    const me = guild.members.me ?? await guild.members.fetchMe();
+    const botHighest = me?.roles?.highest?.position ?? 0;
+
+    // أعلى بوزيشن ممكن نحطه فيها هي تحت رتبة البوت مباشرة (حد الديسكورد)
+    const target = Math.max(1, botHighest - 1);
+
+    if (target > role.position) {
+      await role.setPosition(target);
+    }
+  } catch (err) {
+    console.warn("⚠️ مقدرتش أرفع رتبة اللون:", err?.message || err);
+  }
+}
+
 // ── جيب أو إنشئ رتبة اللون ──────────────────────────
 export async function getOrCreateColorRole(guild, color) {
   const name = colorRoleName(color);
@@ -213,11 +231,9 @@ export async function getOrCreateColorRole(guild, color) {
       hoist: false,
       mentionable: false,
     });
-    // ارفع الرتبة فوق رتب الأعضاء العادية (تحت أعلى رتبة للبوت مباشرةً)
-    const botHighest = guild.members.me?.roles?.highest?.position ?? 1;
-    const target = Math.max(1, botHighest - 1);
-    await role.setPosition(target).catch(() => {});
   }
+  // كل مرة (سواء اتعملت جديدة أو موجودة قبل كده) نتأكد إنها فوق ومش نازلة تحت
+  await raiseColorRole(guild, role);
   return role;
 }
 
