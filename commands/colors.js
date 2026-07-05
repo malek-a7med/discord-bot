@@ -157,7 +157,7 @@ export async function getOrCreateColorRole(guild, color) {
 export const colorsCommand = new SlashCommandBuilder()
   .setName("الوان")
   .setDescription("🎨 عرض لوحة اختيار لون الاسم")
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+  ;
 
 // ── هاندلر الأمر — بيبعت صفحة 0 ────────────────────
 export async function handleColorsCommand(interaction) {
@@ -175,7 +175,7 @@ export async function handleColorNav(interaction, page) {
 
 // ── هاندلر زرار اختيار اللون ─────────────────────────
 export async function handleColorButton(interaction, colorId) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ ephemeral: false });
 
   const color = COLOR_LIST.find(c => c.id === colorId);
   if (!color) return interaction.editReply({ content: "❌ اللون ده مش موجود!" });
@@ -199,13 +199,5 @@ export async function handleColorButton(interaction, colorId) {
 
   await member.roles.add(role, "اختيار لون الاسم").catch(() => {});
 
-  return interaction.editReply({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(color.hex)
-        .setTitle("🎨 تم تغيير لون اسمك!")
-        .setDescription(`لونك دلوقتي: **${color.name}**`)
-        .setTimestamp()
-    ]
-  });
+  return interaction.editReply({ content: `🎨 ${interaction.user} لونك دلوقتي **${color.name}**!` });
 }
