@@ -58,7 +58,7 @@ import {
   scheduleAnimeNews,
 } from "./commands/anime.js";
 import { coinsShopCommand, handleCoinsShop, SHOP_ITEMS } from "./commands/coins-shop-extended.js";
-import { colorsCommand, handleColorsCommand, handleColorButton, handleColorNav } from "./commands/colors.js";
+import { colorsCommand, handleColorsCommand, handleColorButton, handleColorNav, handleColorCustomButton, handleColorCustomModal } from "./commands/colors.js";
 import { fullProfileCommand, handleFullProfile } from "./commands/full-profile.js";
 import { serverStatsCommand, handleServerStats } from "./commands/server-stats-live.js";
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
@@ -4544,6 +4544,9 @@ client.on("interactionCreate", async (interaction) => {
         const page = parseInt(interaction.customId.replace("clr_nav_", ""), 10);
         return handleColorNav(interaction, page);
       }
+      if (interaction.customId === "clr_custom") {
+        return handleColorCustomButton(interaction);
+      }
       if (interaction.customId.startsWith("clr_")) {
         const colorId = parseInt(interaction.customId.replace("clr_", ""), 10);
         return handleColorButton(interaction, colorId);
@@ -5566,6 +5569,11 @@ client.on("interactionCreate", async (interaction) => {
 
   if (interaction.isModalSubmit()) {
     try {
+      // ─── مودال لون مخصص ───────────────────────────────────────────
+      if (interaction.customId === "clr_custom_modal") {
+        return handleColorCustomModal(interaction);
+      }
+
       // ─── مودال وايت ليست ماين كرافت ──────────────────────────────
       if (interaction.customId === "mc_whitelist_modal") {
         await interaction.deferReply({ ephemeral: true });

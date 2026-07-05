@@ -4,6 +4,7 @@
 import {
   SlashCommandBuilder, EmbedBuilder,
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  ModalBuilder, TextInputBuilder, TextInputStyle,
   PermissionFlagsBits
 } from "discord.js";
 
@@ -135,7 +136,7 @@ function buildPageComponents(page) {
     ));
   }
 
-  // صف التنقل
+  // صف التنقل + لون مخصص
   rows.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`clr_nav_${page - 1}`)
@@ -147,6 +148,10 @@ function buildPageComponents(page) {
       .setLabel("التالي ▶️")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(page === TOTAL_PAGES - 1),
+    new ButtonBuilder()
+      .setCustomId("clr_custom")
+      .setLabel("🎨 لون مخصص")
+      .setStyle(ButtonStyle.Success),
   ));
 
   return rows;
@@ -220,5 +225,55 @@ export async function handleColorButton(interaction, colorId) {
 
   await member.roles.add(role, "اختيار لون الاسم").catch(() => {});
 
+  return interaction.editReply({ content: `🎨 ${interaction.user} لونك دلوقتي **${color.name}**!` });
+}
+
+// ── هاندلر زرار "لون مخصص" — بيفتح مودال ────────────
+export async function handleColorCustomButton(interaction) {
+  const modal = new ModalBuilder()
+    .setCustomId("clr_custom_modal")
+    .setTitle("🎨 لون مخصص");
+
+  const input = new TextInputBuilder()
+    .setCustomId("clr_custom_input")
+    .setLabel("اكتب رقم اللون (1 – 51)")
+    .setStyle(TextInputStyle.Short)
+    .setMinLength(1)
+    .setMaxLength(2)
+    .setPlaceholder("مثلاً: 5")
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(input));
+  return interaction.showModal(modal);
+}
+
+// ── هاندلر submit المودال ────────────────────────────
+export async function handleColorCustomModal(interaction) {
+  const raw = interaction.fields.getTextInputValue("clr_custom_input").trim();
+  const id  = parseInt(raw, 10);
+
+  if (isNaN(id) || id < 1 || id > COLOR_LIST.length) {
+    return interaction.reply({ content: `❌ الرقم لازم يكون بين 1 و ${COLOR_LIST.length}!`, ephemeral: true });
+  }
+
+  await interaction.deferReply({ ephemeral: false });
+
+  const color  = COLOR_LIST.find(c => c.id === id);
+  const member = interaction.member;
+  const guild  = interaction.guild;
+
+  const oldColorRoles = member.roles.cache.filter(r => r.name.startsWith("🎨 "));
+  if (oldColorRoles.size > 0) {
+    await member.roles.remove(oldColorRoles, "تغيير لون الاسم").catch(() => {});
+  }
+
+  let role;
+  try {
+    role = await getOrCreateColorRole(guild, color);
+  } catch {
+    return interaction.editReply({ content: "❌ مقدرتش أعمل رتبة اللون، تأكد إن البوت عنده صلاحية إدارة الرتب!" });
+  }
+
+  await member.roles.add(role, "اختيار لون الاسم").catch(() => {});
   return interaction.editReply({ content: `🎨 ${interaction.user} لونك دلوقتي **${color.name}**!` });
 }

@@ -1,0 +1,102 @@
+cd discord-bot-main && node --input-type=module << 'EOF'
+import { createCanvas } from 'canvas';
+import { REST, Routes } from 'discord.js';
+
+const TOKEN = process.env.DISCORD_TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID; // محتاج تضيفه في Secrets
+
+const COLOR_LIST = [
+  { id:1,  name:"Black",            hex:"#010101" },
+  { id:2,  name:"Grey",             hex:"#808080" },
+  { id:3,  name:"White",            hex:"#FFFFFF" },
+  { id:4,  name:"Dark_Red",         hex:"#8B0000" },
+  { id:5,  name:"Rose",             hex:"#FF007F" },
+  { id:6,  name:"Mona",             hex:"#F5728C" },
+  { id:7,  name:"Red",              hex:"#FF0000" },
+  { id:8,  name:"Vermilion",        hex:"#E34234" },
+  { id:9,  name:"Tangerine",        hex:"#F28500" },
+  { id:10, name:"Orange",           hex:"#FFA500" },
+  { id:11, name:"Mango_Tango",      hex:"#FF8243" },
+  { id:12, name:"Koromiko",         hex:"#FFBD5F" },
+  { id:13, name:"Yellow",           hex:"#FFFF00" },
+  { id:14, name:"Lemon_Yellow",     hex:"#FFF44F" },
+  { id:15, name:"Pale_Canary",      hex:"#FFFF99" },
+  { id:16, name:"Lime",             hex:"#00FF00" },
+  { id:17, name:"Green_Yellow",     hex:"#ADFF2F" },
+  { id:18, name:"Reef",             hex:"#D2FF4A" },
+  { id:19, name:"Green",            hex:"#008000" },
+  { id:20, name:"Screamin_Green",   hex:"#66FF66" },
+  { id:21, name:"Mint_Green",       hex:"#98FF98" },
+  { id:22, name:"Spring_Green",     hex:"#00FF7F" },
+  { id:23, name:"Aquamarine",       hex:"#7FFFD4" },
+  { id:24, name:"Aero",             hex:"#7CB9E8" },
+  { id:25, name:"Bright_Turquoise", hex:"#08E8DE" },
+  { id:26, name:"Aqua",             hex:"#00FFFF" },
+  { id:27, name:"Fresh_Air",        hex:"#A6E7FF" },
+  { id:28, name:"Cyan",             hex:"#00B7EB" },
+  { id:29, name:"Malibu",           hex:"#51B0EF" },
+  { id:30, name:"Baby_Blue",        hex:"#89CFF0" },
+  { id:31, name:"Azure_Radiance",   hex:"#007FFF" },
+  { id:32, name:"Blueberry",        hex:"#4F86F7" },
+  { id:33, name:"Anakiwa",          hex:"#9BC4E2" },
+  { id:34, name:"Blue_Ribbon",      hex:"#0047AB" },
+  { id:35, name:"Indigo",           hex:"#4B0082" },
+  { id:36, name:"Melrose",          hex:"#C4B7F8" },
+  { id:37, name:"Blue",             hex:"#0000FF" },
+  { id:38, name:"Royal_Blue",       hex:"#4169E1" },
+  { id:39, name:"Ship_Cove",        hex:"#788BBA" },
+  { id:40, name:"Electric_Violet",  hex:"#8B00FF" },
+  { id:41, name:"Heliotrope",       hex:"#DF73FF" },
+  { id:42, name:"Mauve",            hex:"#E0B0FF" },
+  { id:43, name:"Violet",           hex:"#EE82EE" },
+  { id:44, name:"Amethyst",         hex:"#9966CC" },
+  { id:45, name:"East_Side",        hex:"#AC91C8" },
+  { id:46, name:"Magenta",          hex:"#FF00FF" },
+  { id:47, name:"Pink_Flamingo",    hex:"#FC74FD" },
+  { id:48, name:"Lavender_Rose",    hex:"#FBA0E3" },
+  { id:49, name:"Hollywood_Cerise", hex:"#F400A1" },
+  { id:50, name:"Hot_Pink",         hex:"#FF69B4" },
+  { id:51, name:"Cotton_Candy",     hex:"#FFB7D5" },
+];
+
+function makeColorSquare(hex) {
+  const canvas = createCanvas(64, 64);
+  const ctx = canvas.getContext('2d');
+  // خلفية رمادي داكن عشان الألوان الفاتحة تبان
+  ctx.fillStyle = '#2b2d31';
+  ctx.fillRect(0, 0, 64, 64);
+  // مربع اللون مع border radius
+  ctx.fillStyle = hex;
+  ctx.beginPath();
+  ctx.roundRect(4, 4, 56, 56, 10);
+  ctx.fill();
+  return canvas.toBuffer('image/png');
+}
+
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
+console.log('🎨 بيرفع الإيموجي...');
+let success = 0;
+
+for (const color of COLOR_LIST) {
+  try {
+    const buf = makeColorSquare(color.hex);
+    const base64 = `data:image/png;base64,${buf.toString('base64')}`;
+    const emojiName = `clr_${color.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+    
+    await rest.post(Routes.applicationEmojis(CLIENT_ID), {
+      body: { name: emojiName, image: base64 },
+    });
+    
+    success++;
+    console.log(`✅ (${success}/51) ${emojiName}`);
+    
+    // ديلاي بسيط عشان مانضربش rate limit
+    await new Promise(r => setTimeout(r, 300));
+  } catch (e) {
+    console.error(`❌ ${color.name}: ${e.message}`);
+  }
+}
+
+console.log(`\n🎉 خلص! ${success}/51 إيموجي اترفعوا`);
+EOF
