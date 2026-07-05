@@ -219,22 +219,44 @@ async function raiseColorRole(guild, role) {
   }
 }
 
+// ── قفل بسيط بيمنع إنشاء نفس رتبة اللون مرتين في نفس اللحظة ─
+//   (لو أكتر من عضو ضغط على نفس اللون في نفس الثانية)
+const pendingRoleCreations = new Map();
+
 // ── جيب أو إنشئ رتبة اللون ──────────────────────────
 export async function getOrCreateColorRole(guild, color) {
   const name = colorRoleName(color);
-  let role = guild.roles.cache.find(r => r.name === name);
-  if (!role) {
-    role = await guild.roles.create({
-      name,
-      color: color.hex,
-      reason: "نظام تلوين الأسماء",
-      hoist: false,
-      mentionable: false,
-    });
+  const lockKey = `${guild.id}_${name}`;
+
+  // لو فيه عملية إنشاء شغالة بالفعل لنفس اللون، ننتظرها بدل ما نعمل رتبة تانية
+  if (pendingRoleCreations.has(lockKey)) {
+    return pendingRoleCreations.get(lockKey);
   }
-  // كل مرة (سواء اتعملت جديدة أو موجودة قبل كده) نتأكد إنها فوق ومش نازلة تحت
-  await raiseColorRole(guild, role);
-  return role;
+
+  const creationPromise = (async () => {
+    // نجيب الرتب بشكل محدث من الديسكورد عشان نتجنب أي كاش قديم
+    await guild.roles.fetch().catch(() => {});
+    let role = guild.roles.cache.find(r => r.name === name);
+    if (!role) {
+      role = await guild.roles.create({
+        name,
+        color: color.hex,
+        reason: "نظام تلوين الأسماء",
+        hoist: false,
+        mentionable: false,
+      });
+    }
+    // كل مرة (سواء اتعملت جديدة أو موجودة قبل كده) نتأكد إنها فوق ومش نازلة تحت
+    await raiseColorRole(guild, role);
+    return role;
+  })();
+
+  pendingRoleCreations.set(lockKey, creationPromise);
+  try {
+    return await creationPromise;
+  } finally {
+    pendingRoleCreations.delete(lockKey);
+  }
 }
 
 // ── الأمر الرئيسي ────────────────────────────────────
@@ -260,10 +282,13 @@ export async function handleColorNav(interaction, page) {
 
 // ── هاندلر زرار اختيار اللون ─────────────────────────
 export async function handleColorButton(interaction, colorId) {
-  await interaction.deferReply({ ephemeral: false });
+  // نأكد الضغطة من غير ما نبعت أي رسالة تأكيد
+  await interaction.deferUpdate();
 
   const color = COLOR_LIST.find(c => c.id === colorId);
-  if (!color) return interaction.editReply({ content: "❌ اللون ده مش موجود!" });
+  if (!color) {
+    return interaction.followUp({ content: "❌ اللون ده مش موجود!", ephemeral: true });
+  }
 
   const member = interaction.member;
   const guild  = interaction.guild;
@@ -279,12 +304,10 @@ export async function handleColorButton(interaction, colorId) {
   try {
     role = await getOrCreateColorRole(guild, color);
   } catch {
-    return interaction.editReply({ content: "❌ مقدرتش أعمل رتبة اللون، تأكد إن البوت عنده صلاحية إدارة الرتب!" });
+    return interaction.followUp({ content: "❌ مقدرتش أعمل رتبة اللون، تأكد إن البوت عنده صلاحية إدارة الرتب!", ephemeral: true });
   }
 
   await member.roles.add(role, "اختيار لون الاسم").catch(() => {});
-
-  return interaction.editReply({ content: `🎨 ${interaction.user} لونك دلوقتي **${color.name}**!` });
 }
 
 // ── هاندلر زرار "لون مخصص" — بيفتح مودال ────────────
@@ -315,7 +338,8 @@ export async function handleColorCustomModal(interaction) {
     return interaction.reply({ content: `❌ الرقم لازم يكون بين 1 و ${COLOR_LIST.length}!`, ephemeral: true });
   }
 
-  await interaction.deferReply({ ephemeral: false });
+  // نأكد الأمر من غير ما نبعت أي رسالة تأكيد
+  await interaction.deferUpdate();
 
   const color  = COLOR_LIST.find(c => c.id === id);
   const member = interaction.member;
@@ -330,9 +354,8 @@ export async function handleColorCustomModal(interaction) {
   try {
     role = await getOrCreateColorRole(guild, color);
   } catch {
-    return interaction.editReply({ content: "❌ مقدرتش أعمل رتبة اللون، تأكد إن البوت عنده صلاحية إدارة الرتب!" });
+    return interaction.followUp({ content: "❌ مقدرتش أعمل رتبة اللون، تأكد إن البوت عنده صلاحية إدارة الرتب!", ephemeral: true });
   }
 
   await member.roles.add(role, "اختيار لون الاسم").catch(() => {});
-  return interaction.editReply({ content: `🎨 ${interaction.user} لونك دلوقتي **${color.name}**!` });
 }
