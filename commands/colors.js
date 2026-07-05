@@ -65,24 +65,15 @@ export const COLOR_LIST = [
 const PER_PAGE    = 10;
 const TOTAL_PAGES = Math.ceil(COLOR_LIST.length / PER_PAGE);
 
-// ── hex → RGB ANSI foreground ─────────────────────────
-function hexToRgbAnsi(hex) {
-  const r = (hex >> 16) & 0xFF;
-  const g = (hex >> 8)  & 0xFF;
-  const b =  hex        & 0xFF;
-  return `\u001b[38;2;${r};${g};${b}m`;
-}
-
 // ── جيب ألوان الصفحة ─────────────────────────────────
 function pageColors(page) {
   return COLOR_LIST.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
 }
 
-// ── بناء إيمبد الصفحة مع RGB ANSI ───────────────────
+// ── بناء إيمبد الصفحة مع ANSI ────────────────────────
 function buildPageEmbed(page) {
   const colors = pageColors(page);
 
-  // كل سطر بلونه الحقيقي بالكود بتاعه بالظبط
   const half  = Math.ceil(colors.length / 2);
   const left  = colors.slice(0, half);
   const right = colors.slice(half);
@@ -90,12 +81,11 @@ function buildPageEmbed(page) {
   const lines = left.map((lc, i) => {
     const rc   = right[i];
     const lNum = String(lc.id).padStart(2, " ");
-    const lTxt = `${hexToRgbAnsi(lc.hex)}${lNum}. ${lc.name}\u001b[0m`;
+    const lTxt = `\u001b[${lc.ansi}m${lNum}. ${lc.name}\u001b[0m`;
     if (!rc) return lTxt;
     const rNum = String(rc.id).padStart(2, " ");
-    // padding ثابت بين العمودين (الاسم الأطول ~18 حرف + رقم + نقطة = ~23)
     const pad  = " ".repeat(Math.max(1, 24 - (lNum.length + 2 + lc.name.length)));
-    const rTxt = `${hexToRgbAnsi(rc.hex)}${rNum}. ${rc.name}\u001b[0m`;
+    const rTxt = `\u001b[${rc.ansi}m${rNum}. ${rc.name}\u001b[0m`;
     return `${lTxt}${pad}${rTxt}`;
   });
 
