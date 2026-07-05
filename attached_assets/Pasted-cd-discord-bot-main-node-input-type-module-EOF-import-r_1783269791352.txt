@@ -1,0 +1,82 @@
+cd discord-bot-main && node --input-type=module << 'EOF'
+import { readFileSync, writeFileSync } from 'fs';
+let code = readFileSync('commands/colors.js', 'utf8');
+
+const oldBuild = `function buildPageEmbed(page) {
+  const colors = pageColors(page);
+
+  const half  = Math.ceil(colors.length / 2);
+  const left  = colors.slice(0, half);
+  const right = colors.slice(half);
+
+  const lines = left.map((lc, i) => {
+    const rc   = right[i];
+    const lNum = String(lc.id).padStart(2, " ");
+    const lTxt = \`\\u001b[\${lc.ansi}m\${lNum}. \${lc.name}\\u001b[0m\`;
+    if (!rc) return lTxt;
+    const rNum = String(rc.id).padStart(2, " ");
+    const pad  = " ".repeat(Math.max(1, 24 - (lNum.length + 2 + lc.name.length)));
+    const rTxt = \`\\u001b[\${rc.ansi}m\${rNum}. \${rc.name}\\u001b[0m\`;
+    return \`\${lTxt}\${pad}\${rTxt}\`;
+  });
+
+  return new EmbedBuilder()
+    .setColor(colors[0].hex)
+    .setTitle("🎨 اختار لون اسمك")
+    .setDescription("\`\`\`ansi\\n" + lines.join("\\n") + "\\n\`\`\`")
+    .setFooter({ text: \`📄 صفحة \${page + 1} من \${TOTAL_PAGES}  •  اضغط رقم اللون عشان تاخده ✨\` });
+}`;
+
+const newBuild = `function hexToRgb(hex) {
+  const r = (hex >> 16) & 0xff;
+  const g = (hex >> 8)  & 0xff;
+  const b =  hex        & 0xff;
+  return { r, g, b };
+}
+
+// ألوان ANSI محسّنة بناءً على الـ hex
+function ansiForHex(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  // بنختار أقرب ANSI color بناءً على قيم RGB
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  if (r > 200 && g < 100 && b < 100) return 91;  // أحمر
+  if (r > 200 && g > 100 && b < 80)  return 93;  // أصفر/برتقالي
+  if (r < 100 && g > 150 && b < 100) return 92;  // أخضر
+  if (r < 100 && g > 150 && b > 150) return 96;  // سماوي
+  if (r < 100 && g < 100 && b > 200) return 94;  // أزرق
+  if (r > 150 && g < 100 && b > 150) return 95;  // بنفسجي/وردي
+  if (r > 200 && g > 200 && b > 200) return 97;  // أبيض
+  if (r < 50  && g < 50  && b < 50)  return 90;  // رمادي داكن
+  if (brightness < 80)                return 90;  // داكن عموماً
+  return 37; // رمادي فاتح
+}
+
+function buildPageEmbed(page) {
+  const colors = pageColors(page);
+
+  const half  = Math.ceil(colors.length / 2);
+  const left  = colors.slice(0, half);
+  const right = colors.slice(half);
+
+  const lines = left.map((lc, i) => {
+    const rc   = right[i];
+    const lAnsi = ansiForHex(lc.hex);
+    const lNum = String(lc.id).padStart(2, " ");
+    const lTxt = \`\\u001b[\${lAnsi}m\${lNum}. \${lc.name}\\u001b[0m\`;
+    if (!rc) return lTxt;
+    const rAnsi = ansiForHex(rc.hex);
+    const rNum = String(rc.id).padStart(2, " ");
+    const pad  = " ".repeat(Math.max(1, 24 - (lNum.length + 2 + lc.name.length)));
+    const rTxt = \`\\u001b[\${rAnsi}m\${rNum}. \${rc.name}\\u001b[0m\`;
+    return \`\${lTxt}\${pad}\${rTxt}\`;
+  });
+
+  return new EmbedBuilder()
+    .setColor(colors[Math.floor(colors.length / 2)].hex)
+    .setTitle("🎨 اختار لون اسمك")
+    .setDescription("\`\`\`ansi\\n" + lines.join("\\n") + "\\n\`\`\`")
+    .setFooter({ text: \`📄 صفحة \${page + 1} من \${TOTAL_PAGES}  •  اضغط رقم اللون عشان تاخده ✨\` });
+}`;
+
+code = code.replace(oldBuild, newBuild);
+writeFileSync('commands/color
