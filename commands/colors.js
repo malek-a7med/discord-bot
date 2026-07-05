@@ -157,6 +157,7 @@ export async function getOrCreateColorRole(guild, color) {
 export const colorsCommand = new SlashCommandBuilder()
   .setName("الوان")
   .setDescription("🎨 عرض لوحة اختيار لون الاسم")
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   ;
 
 // ── هاندلر الأمر — بيبعت صفحة 0 ────────────────────
