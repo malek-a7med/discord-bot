@@ -417,10 +417,38 @@ class Database {
 
   setCentralBankChannel(guildId, channelId) {
     if (!this.data.centralBank) this.data.centralBank = {};
-    if (!this.data.centralBank[guildId]) this.data.centralBank[guildId] = { profiles: {}, channelId: null };
+    if (!this.data.centralBank[guildId]) this.data.centralBank[guildId] = { profiles: {}, channelId: null, channelIds: [] };
     this.data.centralBank[guildId].channelId = channelId;
     this.save();
     return channelId;
+  }
+
+  getCentralBankChannels(guildId) {
+    if (!this.data.centralBank || !this.data.centralBank[guildId]) return [];
+    const g = this.data.centralBank[guildId];
+    if (Array.isArray(g.channelIds) && g.channelIds.length) return g.channelIds;
+    return g.channelId ? [g.channelId] : [];
+  }
+
+  addCentralBankChannel(guildId, channelId) {
+    if (!this.data.centralBank) this.data.centralBank = {};
+    if (!this.data.centralBank[guildId]) this.data.centralBank[guildId] = { profiles: {}, channelId: null, channelIds: [] };
+    const g = this.data.centralBank[guildId];
+    if (!Array.isArray(g.channelIds)) g.channelIds = g.channelId ? [g.channelId] : [];
+    if (!g.channelIds.includes(channelId)) g.channelIds.push(channelId);
+    if (!g.channelId) g.channelId = channelId;
+    this.save();
+    return g.channelIds;
+  }
+
+  removeCentralBankChannel(guildId, channelId) {
+    if (!this.data.centralBank || !this.data.centralBank[guildId]) return [];
+    const g = this.data.centralBank[guildId];
+    if (!Array.isArray(g.channelIds)) g.channelIds = g.channelId ? [g.channelId] : [];
+    g.channelIds = g.channelIds.filter(id => id !== channelId);
+    if (g.channelId === channelId) g.channelId = g.channelIds[0] || null;
+    this.save();
+    return g.channelIds;
   }
 
   // ═══════════════════════════════════════════════════════════════

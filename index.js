@@ -2515,6 +2515,56 @@ client.on("messageCreate", async (msg) => {
 
 
 // ───────────────────────────────────────────────────────────────
+//  توجيه اختيار من هب الألعاب (زرار أو قايمة اختيار)
+// ───────────────────────────────────────────────────────────────
+async function dispatchGamesHubChoice(interaction, db, gid) {
+  if (gid === "ghub_rlt" || gid === "ftr_rlt")   return await handleRouletteCommand(interaction, db);
+  if (gid === "ghub_maf" || gid === "ftr_maf")   return await handleMafiaCommand(interaction, db);
+  if (gid === "ghub_ttt")                         return await handleTTTCommand(interaction, db);
+  if (gid === "ghub_cdn" || gid === "ftr_cdn")   return await handleCodenamesCommand(interaction);
+  if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
+  if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
+  if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
+  if (gid === "ghub_rps_easy")                    return await handleRPSBasicCommand(interaction);
+  if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
+  if (gid === "ghub_banklife")                    return await handleBankLifeButton(interaction, db);
+  if (gid === "ghub_bankluck")                    return await bankLuckEgCommand.execute(interaction, db);
+  if (gid === "ghub_cancel") {
+    const cid = interaction.channel.id;
+    if (channelGames.has(cid))       { channelGames.delete(cid); }
+    if (garticChannelMap.has(cid))   { const gId = garticChannelMap.get(cid); garticGames.delete(gId); garticChannelMap.delete(cid); }
+    if (memeChannelMap.has(cid))     { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
+    if (rpsChannelMap.has(cid))      { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
+    if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
+    // ✅ FIX: lifeChannelMap/lifeGames اتشالوا — لعبة الحياة الجديدة نظام
+    //   مستمر مالوش "جلسة في روم" تتلغى أصلاً
+    if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
+    if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
+    if (interaction.message) await interaction.message.delete().catch(() => {});
+    return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", flags: 64 });
+  }
+
+  // ✅ إضافة: إقفال كل الألعاب الشغالة في كل الرومات دفعة واحدة [إدارة]
+  //   مفيد لو فيه ألعاب عالقة من قبل أو محتاج تنضيف شامل
+  if (gid === "ghub_closeall") {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !config.isOwner(interaction.user.id))
+      return interaction.reply({ content: "❌ الزرار ده للإدارة بس!", ephemeral: true });
+    let count = 0;
+    channelGames.forEach((_, cid)    => { channelGames.delete(cid); count++; });
+    rouletteGames.forEach((_, gid2)  => { rouletteGames.delete(gid2); });
+    mafiaGames.forEach((_, gid2)     => { mafiaGames.delete(gid2); });
+    tttGames.forEach((_, gid2)       => { tttGames.delete(gid2); });
+    rpsChannelMap.forEach((rId, cid) => { rpsGames.delete(rId); rpsChannelMap.delete(cid); count++; });
+    rpsBasicChannelMap.forEach((rId, cid) => { rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); count++; });
+    garticChannelMap.forEach((gId, cid)   => { garticGames.delete(gId); garticChannelMap.delete(cid); count++; });
+    memeChannelMap.forEach((mId, cid)     => { memeGames.delete(mId);   memeChannelMap.delete(cid); count++; });
+    luckChannelMap.forEach((lId, cid)     => { luckGames.delete(lId);   luckChannelMap.delete(cid); count++; });
+    quizChannelMap.clear();
+    return interaction.reply({ content: `🛑 تم إقفال **${count}** لعبة من كل الرومات!`, ephemeral: true });
+  }
+}
+
+// ───────────────────────────────────────────────────────────────
 //  تنفيذ Slash Commands و الأزرار و المودال بالكامل
 // ───────────────────────────────────────────────────────────────
 client.on("interactionCreate", async (interaction) => {
@@ -4899,52 +4949,8 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── أزرار هب الألعاب + احدث المميزات ───────────────────────
-      if (interaction.customId.startsWith("ghub_") || interaction.customId.startsWith("ftr_")) {
-        const gid = interaction.customId;
-        if (gid === "ghub_rlt" || gid === "ftr_rlt")   return await handleRouletteCommand(interaction, db);
-        if (gid === "ghub_maf" || gid === "ftr_maf")   return await handleMafiaCommand(interaction, db);
-        if (gid === "ghub_ttt")                         return await handleTTTCommand(interaction, db);
-        if (gid === "ghub_cdn" || gid === "ftr_cdn")   return await handleCodenamesCommand(interaction);
-        if (gid === "ghub_gar" || gid === "ftr_gar")   return await handleGarticCommand(interaction);
-        if (gid === "ghub_meme" || gid === "ftr_meme") return await handleMemeCommand(interaction);
-        if (gid === "ghub_quiz")                        return await startQuizGame(interaction);
-        if (gid === "ghub_rps_easy")                    return await handleRPSBasicCommand(interaction);
-        if (gid === "ghub_rps_ai")                      return await handleRPSCommand(interaction);
-        if (gid === "ghub_banklife")                    return await handleBankLifeButton(interaction, db);
-        if (gid === "ghub_bankluck")                    return await bankLuckEgCommand.execute(interaction, db);
-        if (gid === "ghub_cancel") {
-          const cid = interaction.channel.id;
-          if (channelGames.has(cid))       { channelGames.delete(cid); }
-          if (garticChannelMap.has(cid))   { const gId = garticChannelMap.get(cid); garticGames.delete(gId); garticChannelMap.delete(cid); }
-          if (memeChannelMap.has(cid))     { const mId = memeChannelMap.get(cid);   memeGames.delete(mId);   memeChannelMap.delete(cid); }
-          if (rpsChannelMap.has(cid))      { const rId = rpsChannelMap.get(cid);    rpsGames.delete(rId);    rpsChannelMap.delete(cid); }
-          if (rpsBasicChannelMap.has(cid)) { const rId = rpsBasicChannelMap.get(cid); rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); }
-          // ✅ FIX: lifeChannelMap/lifeGames اتشالوا — لعبة الحياة الجديدة نظام
-          //   مستمر مالوش "جلسة في روم" تتلغى أصلاً
-          if (luckChannelMap.has(cid))     { const lId = luckChannelMap.get(cid);   luckGames.delete(lId);   luckChannelMap.delete(cid); }
-          if (quizChannelMap.has(cid))     quizChannelMap.delete(cid);
-          await interaction.message.delete().catch(() => {});
-          return interaction.reply({ content: "✅ تم إلغاء اللعبة الشغالة في الروم ده!", flags: 64 });
-        }
-
-        // ✅ إضافة: إقفال كل الألعاب الشغالة في كل الرومات دفعة واحدة [إدارة]
-        //   مفيد لو فيه ألعاب عالقة من قبل أو محتاج تنضيف شامل
-        if (gid === "ghub_closeall") {
-          if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) && !config.isOwner(interaction.user.id))
-            return interaction.reply({ content: "❌ الزرار ده للإدارة بس!", ephemeral: true });
-          let count = 0;
-          channelGames.forEach((_, cid)    => { channelGames.delete(cid); count++; });
-          rouletteGames.forEach((_, gid2)  => { rouletteGames.delete(gid2); });
-          mafiaGames.forEach((_, gid2)     => { mafiaGames.delete(gid2); });
-          tttGames.forEach((_, gid2)       => { tttGames.delete(gid2); });
-          rpsChannelMap.forEach((rId, cid) => { rpsGames.delete(rId); rpsChannelMap.delete(cid); count++; });
-          rpsBasicChannelMap.forEach((rId, cid) => { rpsBasicGames.delete(rId); rpsBasicChannelMap.delete(cid); count++; });
-          garticChannelMap.forEach((gId, cid)   => { garticGames.delete(gId); garticChannelMap.delete(cid); count++; });
-          memeChannelMap.forEach((mId, cid)     => { memeGames.delete(mId);   memeChannelMap.delete(cid); count++; });
-          luckChannelMap.forEach((lId, cid)     => { luckGames.delete(lId);   luckChannelMap.delete(cid); count++; });
-          quizChannelMap.clear();
-          return interaction.reply({ content: `🛑 تم إقفال **${count}** لعبة من كل الرومات!`, ephemeral: true });
-        }
+      if ((interaction.customId.startsWith("ghub_") || interaction.customId.startsWith("ftr_")) && interaction.customId !== "ghub_menu") {
+        return await dispatchGamesHubChoice(interaction, db, interaction.customId);
       }
 
       // ─── أزرار تأكيد/إلغاء أوامر التأديب ────────────────────────
@@ -6199,6 +6205,11 @@ client.on("interactionCreate", async (interaction) => {
       // ─── قائمة البنك المركزي ────────────────────────────────────────
       if (interaction.customId === "cbank_menu") {
         return await handleCentralBankSelect(interaction, db);
+      }
+
+      // ─── قائمة هب الألعاب ─────────────────────────────────────────
+      if (interaction.customId === "ghub_menu") {
+        return await dispatchGamesHubChoice(interaction, db, interaction.values[0]);
       }
     } catch (err) {
       logger.error("خطأ في معالجة القائمة:", err);

@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
-  ButtonBuilder, ButtonStyle,
+  ButtonBuilder, ButtonStyle, StringSelectMenuBuilder,
 } from "discord.js";
 
 // ══════════════════════════════════════════════════════════════
@@ -71,50 +71,59 @@ export const speechModeCommand = new SlashCommandBuilder()
 
 function buildHubEmbed() {
   return new EmbedBuilder()
-    .setColor(0x9b59b6).setTitle("🎮 مركز الألعاب — زنجي بوت")
-    .setDescription(
-      `**اضغط على أي لعبة عشان تبدأها في الروم ده الحين!**\n\n` +
-      `🎰 **روليت** — روليت روسية، آخر ناجي يأخذ الكوينز\n` +
-      `🕵️ **مافيا** — اكشف المافيا قبل ما يقضوا على البلدة\n` +
-      `❌⭕ **اكس-اوه** — تيك تاك تو ضد لاعب أو ضد الذكاء الاصطناعي 🤖\n` +
-      `🃏 **كود نيمز** — فريقين يخمنوا الكلمات السرية\n` +
-      `📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة\n` +
-      `😂 **صنع الميم** — اكتب أحلى كابشن وفوز بالكوينز\n` +
-      `🧠 **مسابقة** — أسئلة ثقافية، أول واحد يجاوب صح يكسب الكوينز\n` +
-      `🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك، بدون AI\n` +
-      `✂️ **ح.و.م الخارقة** — اختار أي حاجة في الكون والـ AI يحكم!\n` +
-      `🌍 **الحياة** — نظام اقتصادي مستمر! شغل، اشتري ممتلكات، وابني ثروتك\n` +
-      `🎰 **بنك الحظ المصري** — كرتونة بنك الحظ الأوتنتك، دوّر العجلة وارفع رصيدك!\n\n` +
-      `🛒 **/متجر-قدرات** — اشتري قدرات خاصة للألعاب`
+    .setColor(0x9b59b6)
+    .setTitle("🎮 مركز الألعاب — زنجي بوت")
+    .setDescription("اختار اللعبة اللي عايز تلعبها من القايمة تحت 👇\nولو محتاج قدرات خاصة، جرّب `/متجر-قدرات`")
+    .addFields(
+      {
+        name: "⚔️ ألعاب جماعية",
+        value: "🎰 **روليت** — روليت روسية، آخر ناجي ياخد الكوينز\n🕵️ **مافيا** — اكشف المافيا قبل ما يقضوا على البلدة\n🃏 **كود نيمز** — فريقين يخمنوا الكلمات السرية\n📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة",
+        inline: false,
+      },
+      {
+        name: "🧠 ألعاب فردية وتحدي",
+        value: "❌⭕ **اكس-اوه** — ضد لاعب أو ضد الذكاء الاصطناعي 🤖\n🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك\n✂️ **ح.و.م الخارقة** — اختار أي حاجة والـ AI يحكم!\n🧠 **مسابقة** — أسئلة ثقافية بجوايز\n😂 **صنع الميم** — اكتب أحلى كابشن",
+        inline: false,
+      },
+      {
+        name: "💰 اقتصاد وحظ",
+        value: "🌍 **الحياة** — نظام اقتصادي مستمر: شغل، ممتلكات، وثروة\n🎰 **بنك الحظ المصري** — دوّر العجلة وارفع رصيدك\n🏦 **البنك المركزي** — أمر `/بنك` بقايمة اختيار كاملة",
+        inline: false,
+      },
     )
-    .setFooter({ text: "💡 تحتاج 3+ لاعبين لمعظم الألعاب — دعوّ أصحابك!" })
+    .setFooter({ text: "💡 تحتاج 3+ لاعبين لمعظم الألعاب الجماعية — دعوّ أصحابك!" })
     .setTimestamp();
 }
 
+function buildHubSelectRow() {
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("ghub_menu")
+    .setPlaceholder("🎮 اختار لعبة تبدأها دلوقتي...")
+    .addOptions(
+      { label: "روليت", value: "ghub_rlt", emoji: "🎰", description: "روليت روسية جماعية" },
+      { label: "مافيا", value: "ghub_maf", emoji: "🕵️", description: "اكشف المافيا" },
+      { label: "اكس-اوه", value: "ghub_ttt", emoji: "❌", description: "ضد لاعب أو AI" },
+      { label: "كود نيمز", value: "ghub_cdn", emoji: "🃏", description: "فريقين وكلمات سرية" },
+      { label: "الهاتف المكسور", value: "ghub_gar", emoji: "📞", description: "سلسلة وصف وتخمين" },
+      { label: "صنع الميم", value: "ghub_meme", emoji: "😂", description: "أحلى كابشن يفوز" },
+      { label: "مسابقة", value: "ghub_quiz", emoji: "🧠", description: "أسئلة ثقافية" },
+      { label: "ح.و.م العادية", value: "ghub_rps_easy", emoji: "🪨", description: "حجر ورقة مقص كلاسيك" },
+      { label: "ح.و.م الخارقة", value: "ghub_rps_ai", emoji: "✂️", description: "أي حاجة والـ AI يحكم" },
+      { label: "الحياة", value: "ghub_banklife", emoji: "🌍", description: "نظام اقتصادي مستمر" },
+      { label: "بنك الحظ المصري", value: "ghub_bankluck", emoji: "🎰", description: "دوّر العجلة وارفع رصيدك" },
+    );
+  return new ActionRowBuilder().addComponents(menu);
+}
+
+function buildHubActionRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("ghub_closeall").setLabel("🛑 إقفال الكل [إدارة]").setStyle(ButtonStyle.Danger),
+  );
+}
+
 function buildHubRows() {
-  return [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("ghub_rlt").setLabel("🎰 روليت").setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId("ghub_maf").setLabel("🕵️ مافيا").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("ghub_ttt").setLabel("❌ اكس-اوه").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("ghub_cdn").setLabel("🃏 كود نيمز").setStyle(ButtonStyle.Secondary),
-    ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("ghub_gar").setLabel("📞 الهاتف المكسور").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("ghub_meme").setLabel("😂 صنع الميم").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("ghub_quiz").setLabel("🧠 مسابقة").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("ghub_rps_easy").setLabel("🪨 ح.و.م العادية").setStyle(ButtonStyle.Primary),
-    ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("ghub_rps_ai").setLabel("✂️ ح.و.م الخارقة").setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId("ghub_banklife").setLabel("🌍 الحياة").setStyle(ButtonStyle.Success),
-    ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("ghub_bankluck").setLabel("🎰 بنك الحظ المصري").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("ghub_cancel").setLabel("🚫 إلغاء").setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId("ghub_closeall").setLabel("🛑 إقفال الكل [إدارة]").setStyle(ButtonStyle.Danger),
-    ),
-  ];
+  return [buildHubSelectRow(), buildHubActionRow()];
 }
 
 export async function handleGamesHubCommand(interaction) {
