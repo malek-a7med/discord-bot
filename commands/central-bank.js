@@ -73,23 +73,19 @@ function channelsMention(db, guildId) {
   return getChannelIds(db, guildId).map(id => `<#${id}>`).join(" أو ");
 }
 
-// ── القائمة الرئيسية ────────────────────────────────────────────
+// ── القائمة الرئيسية (أقسام) ─────────────────────────────────────
 function buildMainMenu(interaction, db) {
   const admin = isAdmin(interaction);
   const embed = new EmbedBuilder()
     .setColor(0xf1c40f)
     .setTitle(`🏦 ${CB.name}`)
-    .setDescription(`اختار العملية اللي عايز تعملها من القايمة تحت 👇\n\n💵 مطالبة و راتب — دخل دوري\n🔫 نهب — اسرق من رصيد حد تاني\n🛡️ أمان — احمي رصيدك\n👛 رصيد و 🏆 متصدرين — تابع نفسك والسيرفر`)
+    .setDescription(`أهلاً بيك في ${CB.name}! اختار قسم الأوامر من القايمة تحت 👇\n\n⭐ **الأوامر العامة** — مطالبة، راتب، رصيد، متصدرين\n🎮 **أوامر الألعاب** — نهب وأمان\n💍 **أوامر الزواج** — زواج، طلاق، زواجات`)
     .setFooter({ text: `${CB.icon} ${CB.name} — إدارة أموالك بذكاء` });
 
   const options = [
-    { label: "مطالبة", description: `اطلب من ${CB.claimMin}-${CB.claimMax} ${CB.icon}`, value: "claim", emoji: "💵" },
-    { label: "راتب", description: `استلم من ${CB.salaryMin}-${CB.salaryMax} ${CB.icon}`, value: "salary", emoji: "💼" },
-    { label: "نهب", description: "حاول تسرق من رصيد حد تاني", value: "heist", emoji: "🔫" },
-    { label: "أمان", description: "ارفع مستوى حماية رصيدك", value: "security", emoji: "🛡️" },
-    { label: "رصيد", description: "شوف رصيدك وإحصائياتك", value: "balance", emoji: "👛" },
-    { label: "متصدرين", description: "أغنى أعضاء البنك المركزي", value: "leaderboard", emoji: "🏆" },
-    { label: "مساعدة", description: "كل الأوامر وشرحها", value: "help", emoji: "📜" },
+    { label: "الأوامر العامة", description: "مطالبة، راتب، رصيد، متصدرين، مساعدة", value: "cat_general", emoji: "⭐" },
+    { label: "أوامر الألعاب", description: "نهب، أمان", value: "cat_games", emoji: "🎮" },
+    { label: "أوامر الزواج", description: "زواج، طلاق، زواجات", value: "cat_marriage", emoji: "💍" },
   ];
   if (admin) {
     options.push({ label: "إدارة (أونر/أدمن)", description: "إضافة رصيد أو رومات البنك", value: "admin", emoji: "👑" });
@@ -97,9 +93,62 @@ function buildMainMenu(interaction, db) {
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId("cbank_menu")
-    .setPlaceholder("اختار عملية...")
+    .setPlaceholder("Make a selection")
     .addOptions(options);
 
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
+}
+
+function buildGeneralMenu() {
+  const embed = new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("⭐ الأوامر العامة")
+    .setDescription("اختار الأمر اللي عايز تنفذه 👇");
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("cbank_sub_general")
+    .setPlaceholder("Make a selection")
+    .addOptions([
+      { label: "مطالبة", description: `اطلب من ${CB.claimMin}-${CB.claimMax} ${CB.icon}`, value: "claim", emoji: "💵" },
+      { label: "راتب", description: `استلم من ${CB.salaryMin}-${CB.salaryMax} ${CB.icon}`, value: "salary", emoji: "💼" },
+      { label: "رصيد", description: "شوف رصيدك وإحصائياتك", value: "balance", emoji: "👛" },
+      { label: "متصدرين", description: "أغنى أعضاء البنك المركزي", value: "leaderboard", emoji: "🏆" },
+      { label: "مساعدة", description: "كل الأوامر وشرحها", value: "help", emoji: "📜" },
+      { label: "🔙 رجوع", description: "رجوع للقايمة الرئيسية", value: "back", emoji: "🔙" },
+    ]);
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
+}
+
+function buildGamesMenu() {
+  const embed = new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("🎮 أوامر الألعاب")
+    .setDescription("اختار الأمر اللي عايز تنفذه 👇");
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("cbank_sub_games")
+    .setPlaceholder("Make a selection")
+    .addOptions([
+      { label: "نهب", description: "حاول تسرق من رصيد حد تاني", value: "heist", emoji: "🔫" },
+      { label: "أمان", description: "ارفع مستوى حماية رصيدك", value: "security", emoji: "🛡️" },
+      { label: "🔙 رجوع", description: "رجوع للقايمة الرئيسية", value: "back", emoji: "🔙" },
+    ]);
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
+}
+
+function buildMarriageMenu() {
+  const embed = new EmbedBuilder()
+    .setColor(0xe91e63)
+    .setTitle("💍 أوامر الزواج")
+    .setDescription("اختار الأمر اللي عايز تنفذه 👇");
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("cbank_sub_marriage")
+    .setPlaceholder("Make a selection")
+    .addOptions([
+      { label: "زواج", description: "اطلب يد حد للزواج", value: "marry", emoji: "💍" },
+      { label: "زواجي", description: "شوف حالتك الاجتماعية", value: "mystatus", emoji: "❤️" },
+      { label: "طلاق", description: "اطلق شريكك", value: "divorce", emoji: "💔" },
+      { label: "زواجات", description: "أكتر الأزواج في السيرفر", value: "marriages", emoji: "📋" },
+      { label: "🔙 رجوع", description: "رجوع للقايمة الرئيسية", value: "back", emoji: "🔙" },
+    ]);
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
 }
 
@@ -247,6 +296,117 @@ async function doHeist(interaction, db, targetUser) {
   }
 }
 
+// ── نظام الزواج ─────────────────────────────────────────────────
+async function askMarryTarget(interaction, db) {
+  const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
+  if (p.marriedTo) {
+    return interaction.reply({ content: `❌ انت متجوز بالفعل من <@${p.marriedTo}>! لازم تطلق الأول.`, flags: MessageFlags.Ephemeral });
+  }
+  const menu = new UserSelectMenuBuilder()
+    .setCustomId("cbank_marry_user")
+    .setPlaceholder("اختار الشخص اللي عايز تتجوزه...")
+    .setMaxValues(1);
+  return interaction.reply({
+    content: "💍 اختار شريك حياتك:",
+    components: [new ActionRowBuilder().addComponents(menu)],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+async function sendMarriageProposal(interaction, db, targetUser) {
+  const proposer = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
+  const target = db.getCentralBankProfile(interaction.guildId, targetUser.id);
+
+  if (targetUser.id === interaction.user.id) {
+    return interaction.reply({ content: "❌ مش هتقدر تتجوز نفسك 😄", flags: MessageFlags.Ephemeral });
+  }
+  if (targetUser.bot) {
+    return interaction.reply({ content: "❌ مش هتقدر تتجوز بوت.", flags: MessageFlags.Ephemeral });
+  }
+  if (proposer.marriedTo) {
+    return interaction.reply({ content: "❌ انت متجوز بالفعل! لازم تطلق الأول.", flags: MessageFlags.Ephemeral });
+  }
+  if (target.marriedTo) {
+    return interaction.reply({ content: `❌ <@${targetUser.id}> متجوز بالفعل من حد تاني.`, flags: MessageFlags.Ephemeral });
+  }
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`cbank_marry_accept_${interaction.user.id}_${targetUser.id}`).setLabel("موافقة 💍").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`cbank_marry_reject_${interaction.user.id}_${targetUser.id}`).setLabel("رفض 💔").setStyle(ButtonStyle.Danger),
+  );
+  return interaction.reply({
+    content: `💍 <@${targetUser.id}>، <@${interaction.user.id}> طالب يدك للزواج! هل توافق؟`,
+    components: [row],
+  });
+}
+
+async function handleMarriageDecision(interaction, db, accepted, proposerId, targetId) {
+  if (interaction.user.id !== targetId) {
+    return interaction.reply({ content: "❌ الطلب ده مش ليك.", flags: MessageFlags.Ephemeral });
+  }
+  if (!accepted) {
+    return interaction.update({ content: `💔 <@${targetId}> رفض طلب الزواج من <@${proposerId}>.`, components: [] });
+  }
+  const proposer = db.getCentralBankProfile(interaction.guildId, proposerId);
+  const target = db.getCentralBankProfile(interaction.guildId, targetId);
+  if (proposer.marriedTo || target.marriedTo) {
+    return interaction.update({ content: "❌ واحد منكم اتجوز بالفعل قبل الموافقة.", components: [] });
+  }
+  db.saveCentralBankProfile(interaction.guildId, proposerId, { marriedTo: targetId, marriedAt: Date.now() });
+  db.saveCentralBankProfile(interaction.guildId, targetId, { marriedTo: proposerId, marriedAt: Date.now() });
+  return interaction.update({ content: `🎉💍 مبروك! <@${proposerId}> و <@${targetId}> بقوا متجوزين رسمياً!`, components: [] });
+}
+
+async function doDivorce(interaction, db) {
+  const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
+  if (!p.marriedTo) {
+    return interaction.reply({ content: "❌ انت مش متجوز عشان تطلق.", flags: MessageFlags.Ephemeral });
+  }
+  const partnerId = p.marriedTo;
+  db.saveCentralBankProfile(interaction.guildId, interaction.user.id, { marriedTo: null, marriedAt: 0 });
+  db.saveCentralBankProfile(interaction.guildId, partnerId, { marriedTo: null, marriedAt: 0 });
+  return interaction.reply({
+    embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("💔 تم الطلاق")
+      .setDescription(`اتطلقت من <@${partnerId}>.`)],
+    flags: MessageFlags.Ephemeral,
+  });
+}
+
+function buildMarriageStatusPayload(interaction, db) {
+  const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
+  const embed = new EmbedBuilder().setColor(0xe91e63).setTitle("❤️ حالتك الاجتماعية");
+  if (p.marriedTo) {
+    embed.setDescription(`متجوز من <@${p.marriedTo}> 💍\nمن تاريخ: <t:${Math.floor(p.marriedAt / 1000)}:D>`);
+  } else {
+    embed.setDescription("عازب حالياً 🕊️");
+  }
+  return { embeds: [embed], flags: MessageFlags.Ephemeral };
+}
+
+function buildMarriagesListPayload(interaction, db) {
+  const guild = db.data && db.data.centralBank ? db.data.centralBank[interaction.guildId] : null;
+  const profiles = (guild && guild.profiles) || {};
+  const seen = new Set();
+  const pairs = [];
+  for (const [userId, profile] of Object.entries(profiles)) {
+    if (profile.marriedTo && !seen.has(userId) && !seen.has(profile.marriedTo)) {
+      pairs.push({ a: userId, b: profile.marriedTo, at: profile.marriedAt });
+      seen.add(userId);
+      seen.add(profile.marriedTo);
+    }
+  }
+  if (!pairs.length) {
+    return { content: "❌ لسه محدش اتجوز في السيرفر ده.", flags: MessageFlags.Ephemeral };
+  }
+  pairs.sort((x, y) => x.at - y.at);
+  const lines = pairs.slice(0, 15).map((pr, i) => `**${i + 1}.** <@${pr.a}> 💍 <@${pr.b}>`);
+  const embed = new EmbedBuilder()
+    .setColor(0xe91e63)
+    .setTitle("📋 زواجات السيرفر")
+    .setDescription(lines.join("\n"));
+  return { embeds: [embed], flags: MessageFlags.Ephemeral };
+}
+
 function buildSecurityPayload(interaction, db) {
   const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
   const nextLevel = Math.min(p.security + 1, CB.maxSecurity);
@@ -325,17 +485,43 @@ export async function handleCentralBankSelect(interaction, db) {
       return interaction.reply({ content: `❌ أمر ${CB.name} يشتغل بس في: ${channelsMention(db, interaction.guildId)}.`, flags: MessageFlags.Ephemeral });
     }
     const choice = interaction.values[0];
-    if (choice === "claim")       return doClaim(interaction, db);
-    if (choice === "salary")      return doSalary(interaction, db);
-    if (choice === "heist")       return askHeistTarget(interaction);
-    if (choice === "security")    return interaction.reply(buildSecurityPayload(interaction, db));
-    if (choice === "balance")     return interaction.reply(buildBalancePayload(interaction, db));
-    if (choice === "leaderboard") return interaction.reply(buildLeaderboardPayload(interaction, db));
-    if (choice === "help")        return showHelp(interaction, db);
+    if (choice === "cat_general")  return interaction.reply({ ...buildGeneralMenu(), flags: MessageFlags.Ephemeral });
+    if (choice === "cat_games")    return interaction.reply({ ...buildGamesMenu(), flags: MessageFlags.Ephemeral });
+    if (choice === "cat_marriage") return interaction.reply({ ...buildMarriageMenu(), flags: MessageFlags.Ephemeral });
     if (choice === "admin") {
       if (!isAdmin(interaction)) return interaction.reply({ content: "❌ الخيار ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
       return interaction.reply(buildAdminPayload(db, interaction.guildId));
     }
+    return;
+  }
+
+  if (interaction.customId === "cbank_sub_general") {
+    const choice = interaction.values[0];
+    if (choice === "back")        return interaction.update(buildMainMenu(interaction, db));
+    if (choice === "claim")       return doClaim(interaction, db);
+    if (choice === "salary")      return doSalary(interaction, db);
+    if (choice === "balance")     return interaction.reply(buildBalancePayload(interaction, db));
+    if (choice === "leaderboard") return interaction.reply(buildLeaderboardPayload(interaction, db));
+    if (choice === "help")        return showHelp(interaction, db);
+    return;
+  }
+
+  if (interaction.customId === "cbank_sub_games") {
+    const choice = interaction.values[0];
+    if (choice === "back")     return interaction.update(buildMainMenu(interaction, db));
+    if (choice === "heist")    return askHeistTarget(interaction);
+    if (choice === "security") return interaction.reply(buildSecurityPayload(interaction, db));
+    return;
+  }
+
+  if (interaction.customId === "cbank_sub_marriage") {
+    const choice = interaction.values[0];
+    if (choice === "back")      return interaction.update(buildMainMenu(interaction, db));
+    if (choice === "marry")     return askMarryTarget(interaction, db);
+    if (choice === "mystatus")  return interaction.reply(buildMarriageStatusPayload(interaction, db));
+    if (choice === "divorce")   return doDivorce(interaction, db);
+    if (choice === "marriages") return interaction.reply(buildMarriagesListPayload(interaction, db));
+    return;
   }
 }
 
@@ -361,6 +547,13 @@ export async function handleCentralBankUserSelect(interaction, db) {
       .setRequired(true);
     modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
     return interaction.showModal(modal);
+  }
+  if (interaction.customId === "cbank_marry_user") {
+    if (!inCorrectChannel(interaction, db)) {
+      return interaction.reply({ content: `❌ أمر ${CB.name} يشتغل بس في: ${channelsMention(db, interaction.guildId)}.`, flags: MessageFlags.Ephemeral });
+    }
+    const targetUser = interaction.users.first();
+    return sendMarriageProposal(interaction, db, targetUser);
   }
 }
 
@@ -403,6 +596,13 @@ export async function handleCentralBankModal(interaction, db) {
 }
 
 export async function handleCentralBankButton(interaction, db) {
+  if (interaction.customId.startsWith("cbank_marry_accept_") || interaction.customId.startsWith("cbank_marry_reject_")) {
+    const accepted = interaction.customId.startsWith("cbank_marry_accept_");
+    const prefix = accepted ? "cbank_marry_accept_" : "cbank_marry_reject_";
+    const [proposerId, targetId] = interaction.customId.replace(prefix, "").split("_");
+    return handleMarriageDecision(interaction, db, accepted, proposerId, targetId);
+  }
+
   if (interaction.customId === "cbank_upgrade_security") {
     if (!inCorrectChannel(interaction, db)) {
       return interaction.reply({ content: `❌ أمر ${CB.name} يشتغل بس في: ${channelsMention(db, interaction.guildId)}.`, flags: MessageFlags.Ephemeral });

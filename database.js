@@ -373,6 +373,8 @@ class Database {
         heistWins: 0,
         heistLosses: 0,
         totalEarned: 0,
+        marriedTo: null,
+        marriedAt: 0,
         createdAt: Date.now(),
       };
       this.save();
@@ -387,6 +389,8 @@ class Database {
     if (typeof p.heistWins !== "number") p.heistWins = 0;
     if (typeof p.heistLosses !== "number") p.heistLosses = 0;
     if (typeof p.totalEarned !== "number") p.totalEarned = 0;
+    if (p.marriedTo === undefined) p.marriedTo = null;
+    if (typeof p.marriedAt !== "number") p.marriedAt = 0;
     return p;
   }
 

@@ -314,17 +314,14 @@ const LEGACY_COMMANDS = [
       sub.setName("عرض-مصطلحات").setDescription("عرض القواامس المخزنة / List dictionaries")
         .addStringOption((o) => o.setName("المانهوا").setDescription("اسم مانهوا محددة (اختياري)"))
     ),
+  // ✅ دمج: مسح-الكل بقى جزء من /مسح (سيبها فاضية = امسح الروم بالكامل)
   new SlashCommandBuilder()
     .setName("مسح")
-    .setDescription("مسح رسائل من الشات [مشرف] / Clear messages")
+    .setDescription("مسح رسائل من الشات [مشرف] / Clear messages — سيب «عدد» فاضي عشان تمسح الروم بالكامل")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addIntegerOption((o) =>
-      o.setName("عدد").setDescription("عدد الرسائل (1-10000)").setRequired(true).setMinValue(1).setMaxValue(10000)
+      o.setName("عدد").setDescription("عدد الرسائل (سيبها فاضية لمسح الروم بالكامل) [إدارة]").setMinValue(1).setMaxValue(10000)
     ),
-  new SlashCommandBuilder()
-    .setName("مسح-الكل")
-    .setDescription("مسح كل رسايل الروم بالكامل [إدارة] / Wipe entire channel")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("تعديل-إعلان")
     .setDescription("تعديل رسالة البوت في روم الإعلانات [أونر] / Edit bot announcement")
@@ -755,7 +752,7 @@ function validateLatestFeatures(allCommands) {
       "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة","إيمبد","إيمبد-تعديل",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد","ميوت","تحويل","ليدربورد-ألعاب","متجر","إحصائيات-السيرفر",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
-      "مسح","مسح-الكل","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
+      "مسح","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة","عقوبة",
       "شغل-اغنية","skip","خروج","queue","pause","resume","nowplaying","volume",
       "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
@@ -3829,9 +3826,37 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "مسح") {
         if (isFromDM) {
-          return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** 🤖", ephemeral: true });
+          return interaction.reply({ content: "⚡ عشان تمسح رسايل من الـ DM، قول للـ AI جوه الشات:\n**\"امسح X رسالة من قناة [اسم القناة]\"** أو **\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
         }
         const num = interaction.options.getInteger("عدد");
+
+        // ─── سيب «عدد» فاضي = مسح الروم بالكامل [إدارة] ──────────────
+        if (num === null) {
+          if (!interaction.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: "❌ مسح الروم بالكامل (من غير تحديد عدد) للإدارة بس. لو عايز تمسح عدد معين، اكتب القيمة في خيار «عدد».", ephemeral: true });
+          }
+          const confirmRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId(`wipe_confirm|${channel.id}`)
+              .setLabel("✅ نعم، امسح كل حاجة")
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId("wipe_cancel")
+              .setLabel("❌ إلغاء")
+              .setStyle(ButtonStyle.Secondary)
+          );
+          return interaction.reply({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0xe74c3c)
+                .setTitle("⚠️ تأكيد مسح الروم بالكامل")
+                .setDescription(`هتمسح **كل** رسايل الروم ${channel} بما فيها اللي فوق 14 يوم!\n\nمتقدرش ترجعها، متأكد؟`)
+            ],
+            components: [confirmRow],
+            ephemeral: true
+          });
+        }
+
         await interaction.deferReply({ ephemeral: true });
         try {
           // تأكد إن البوت عنده صلاحية ManageMessages في القناة دي
@@ -3862,32 +3887,6 @@ client.on("interactionCreate", async (interaction) => {
             : `❌ فشل المسح: ${err?.message || "خطأ غير معروف"}`;
           return interaction.editReply({ content: errMsg });
         }
-      }
-
-      if (cmd === "مسح-الكل") {
-        if (isFromDM) {
-          return interaction.reply({ content: "⚡ عشان تمسح روم بالكامل من الـ DM، قول للـ AI:\n**\"امسح قناة [اسم القناة] بالكامل\"** 🤖", ephemeral: true });
-        }
-        const confirmRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`wipe_confirm|${channel.id}`)
-            .setLabel("✅ نعم، امسح كل حاجة")
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId("wipe_cancel")
-            .setLabel("❌ إلغاء")
-            .setStyle(ButtonStyle.Secondary)
-        );
-        return interaction.reply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor(0xe74c3c)
-              .setTitle("⚠️ تأكيد مسح الروم بالكامل")
-              .setDescription(`هتمسح **كل** رسايل الروم ${channel} بما فيها اللي فوق 14 يوم!\n\nمتقدرش ترجعها، متأكد؟`)
-          ],
-          components: [confirmRow],
-          ephemeral: true
-        });
       }
 
       // ─── تعديل إعلان (2-Step: اعرض المحتوى → زر → موداال ممليء) ──
@@ -6229,7 +6228,7 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── قائمة البنك المركزي ────────────────────────────────────────
-      if (interaction.customId === "cbank_menu") {
+      if (interaction.customId === "cbank_menu" || interaction.customId.startsWith("cbank_sub_")) {
         return await handleCentralBankSelect(interaction, db);
       }
 
@@ -6249,7 +6248,7 @@ client.on("interactionCreate", async (interaction) => {
   // ─── قوائم اختيار الأعضاء (User Select Menus) ────────────────────
   if (interaction.isUserSelectMenu()) {
     try {
-      if (interaction.customId === "cbank_heist_user" || interaction.customId === "cbank_admin_addbal_user") {
+      if (interaction.customId === "cbank_heist_user" || interaction.customId === "cbank_admin_addbal_user" || interaction.customId === "cbank_marry_user") {
         return await handleCentralBankUserSelect(interaction, db);
       }
     } catch (err) {
@@ -6261,7 +6260,7 @@ client.on("interactionCreate", async (interaction) => {
   // ─── قوائم اختيار الرومات (Channel Select Menus) ─────────────────
   if (interaction.isChannelSelectMenu()) {
     try {
-      if (interaction.customId === "cbank_admin_setchannel_select") {
+      if (interaction.customId === "cbank_admin_addchannel_select" || interaction.customId === "cbank_admin_removechannel_select") {
         return await handleCentralBankChannelSelect(interaction, db);
       }
     } catch (err) {
