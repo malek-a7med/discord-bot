@@ -82,6 +82,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ActionRowBuilder,
+  StringSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -430,6 +431,7 @@ const LEGACY_COMMANDS = [
   new SlashCommandBuilder().setName("ملخص-السيرفر").setDescription("📊 اعرض ملخص نشاط السيرفر [أونر فقط]"),
   new SlashCommandBuilder().setName("رفيقي").setDescription("🤝 اعرض ما يعرفه زنجي عنك"),
   new SlashCommandBuilder().setName("امسح-ذاكرتك").setDescription("🗑️ امسح معلوماتك من ذاكرة زنجي"),
+  // ✅ دمج: ليدربورد-ألعاب بقى جزء من /ليدربورد (خيار «نوع» موحّد)
   new SlashCommandBuilder()
     .setName("ليدربورد")
     .setDescription("أفضل 10 أعضاء في السيرفر / Top 10 leaderboard")
@@ -439,7 +441,12 @@ const LEGACY_COMMANDS = [
         .setDescription("ترتيب حسب / Sort by")
         .addChoices(
           { name: "🪙 الكوينز", value: "coins" },
-          { name: "✨ الـ XP", value: "xp" }
+          { name: "✨ الـ XP", value: "xp" },
+          { name: "🎰 روليت", value: "roulette" },
+          { name: "❌ اكس اوه", value: "xo" },
+          { name: "🕵️ مافيا", value: "mafia" },
+          { name: "✌️ حجر ورقة مقص", value: "rps" },
+          { name: "📊 إجمالي الألعاب", value: "total" },
         )
     ),
   new SlashCommandBuilder()
@@ -451,13 +458,10 @@ const LEGACY_COMMANDS = [
     .setName("اقتراح")
     .setDescription("إرسال اقتراح للسيرفر / Submit a suggestion")
     .addStringOption((o) => o.setName("نص").setDescription("اقتراحك هنا").setRequired(true)),
+  // ✅ دمج: لوحة-إدارة/لوحة-اقتراحات/لوحة-dm بقوا أمر واحد /لوحة بقايمة اختيار
   new SlashCommandBuilder()
-    .setName("لوحة-إدارة")
-    .setDescription("إرسال لوحة تحكم الإدارة [إدارة] / Post admin control panel")
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-  new SlashCommandBuilder()
-    .setName("لوحة-اقتراحات")
-    .setDescription("إرسال لوحة الاقتراحات مع زر [إدارة] / Post suggestions board")
+    .setName("لوحة")
+    .setDescription("📋 إرسال لوحات التحكم (إدارة/اقتراحات/رسائل الأونر) [إدارة]")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   new SlashCommandBuilder()
     .setName("صورة")
@@ -521,9 +525,6 @@ const LEGACY_COMMANDS = [
     .addChannelOption((o) =>
       o.setName("قناة").setDescription("القناة (لو اخترت إرسال في قناة)")
     ),
-  new SlashCommandBuilder()
-    .setName("لوحة-dm")
-    .setDescription("فتح لوحة تحكم الأونر في الـ DM [أونر فقط]"),
   new SlashCommandBuilder()
     .setName("مفاتيح-جيميني")
     .setDescription("إدارة مفاتيح Gemini API [أونر فقط]")
@@ -672,19 +673,6 @@ const LEGACY_COMMANDS = [
     )
     .addStringOption(o => o.setName("سبب").setDescription("السبب (اختياري)")),
   new SlashCommandBuilder()
-    .setName("ليدربورد-ألعاب")
-    .setDescription("🎮 ليدربورد انتصارات الألعاب — روليت / اكس اوه / مافيا")
-    .addStringOption(o =>
-      o.setName("لعبة").setDescription("اختار اللعبة").setRequired(false)
-        .addChoices(
-          { name: "🎰 روليت", value: "roulette" },
-          { name: "❌ اكس اوه", value: "xo" },
-          { name: "🕵️ مافيا", value: "mafia" },
-          { name: "✌️ حجر ورقة مقص", value: "rps" },
-          { name: "📊 إجمالي", value: "total" },
-        )
-    ),
-  new SlashCommandBuilder()
     .setName("حالة-الحماية")
     .setDescription("🛡️ عرض حالة كل أنظمة الحماية في البوت [أونر فقط]"),
   new ContextMenuCommandBuilder()
@@ -750,14 +738,14 @@ function validateLatestFeatures(allCommands) {
     const skipList = [
       "ping","hello","roll","serverinfo","userinfo",
       "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة","إيمبد","إيمبد-تعديل",
-      "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد","ميوت","تحويل","ليدربورد-ألعاب","متجر","إحصائيات-السيرفر",
+      "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد","ميوت","تحويل","متجر","إحصائيات-السيرفر",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة","عقوبة",
       "شغل-اغنية","skip","خروج","queue","pause","resume","nowplaying","volume",
-      "اقتراح","لوحة-إدارة","لوحة-اقتراحات","صورة",
+      "اقتراح","لوحة","صورة",
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز","نسخ-احتياطي","بوت",
-      "رسالة-جماعية","لوحة-dm","حالة-البوت","مفاتيح-جيميني",
+      "رسالة-جماعية","حالة-البوت","مفاتيح-جيميني",
       "رفع-بلوك","قائمة-مبلوكين","رتب-المستويات","رول-ريأكشن","بلوك",
       "روليت","مافيا","اكس-اوه","الحياة","بنك-الحظ","حياة","بنك-الحظ-مصري",
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
@@ -4185,21 +4173,22 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "ليدربورد") {
         const type = interaction.options.getString("نوع") ?? "coins";
         const allUsers = db.getAllData().users;
-        const sorted = Object.entries(allUsers).sort((a, b) => (b[1][type] || 0) - (a[1][type] || 0)).slice(0, 10);
-        const typeLabel = type === "coins" ? "🪙 الكوينز" : "✨ الـ XP";
-        const embed = new EmbedBuilder()
-          .setColor(0xFFD700)
-          .setTitle(`🏆 ليدربورد ${typeLabel}`)
-          .setDescription(sorted.map(([id, data], i) =>
-            `**#${i+1}** <@${id}> — **${(data[type] || 0).toLocaleString()}** ${type === "coins" ? "🪙" : "XP"}`
-          ).join("\n") || "مفيش بيانات")
-          .setTimestamp();
-        return interaction.reply({ embeds: [embed] });
-      }
 
-      if (cmd === "ليدربورد-ألعاب") {
-        const game = interaction.options.getString("لعبة") ?? "total";
-        const allUsers = db.getAllData().users;
+        if (type === "coins" || type === "xp") {
+          const sorted = Object.entries(allUsers).sort((a, b) => (b[1][type] || 0) - (a[1][type] || 0)).slice(0, 10);
+          const typeLabel = type === "coins" ? "🪙 الكوينز" : "✨ الـ XP";
+          const embed = new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setTitle(`🏆 ليدربورد ${typeLabel}`)
+            .setDescription(sorted.map(([id, data], i) =>
+              `**#${i+1}** <@${id}> — **${(data[type] || 0).toLocaleString()}** ${type === "coins" ? "🪙" : "XP"}`
+            ).join("\n") || "مفيش بيانات")
+            .setTimestamp();
+          return interaction.reply({ embeds: [embed] });
+        }
+
+        // ✅ دمج: أنواع الألعاب (روليت/اكس اوه/مافيا/حجر ورقة مقص/إجمالي)
+        const game = type;
         const gameLabels = { roulette: "🎰 روليت", xo: "❌ اكس اوه", mafia: "🕵️ مافيا", rps: "✌️ حجر ورقة مقص", total: "📊 إجمالي" };
         const sorted = Object.entries(allUsers).map(([id, d]) => {
           const wins = d.gameWins || {};
@@ -4231,35 +4220,24 @@ client.on("interactionCreate", async (interaction) => {
         return await handleSuggestionModalSubmit(interaction, text);
       }
 
-      if (cmd === "لوحة-إدارة") {
-        const embed = new EmbedBuilder().setColor(0x2c3e50).setTitle("🔒 لوحة التحكم").setDescription(`أعضاء السيرفر: ${guild.memberCount}`);
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId("admin_clear_games").setLabel("🎮 تصفير الألعاب").setStyle(ButtonStyle.Danger),
-          new ButtonBuilder().setCustomId("refresh_suggestions_board").setLabel("🔄 تحديث لوحة الاقتراحات").setStyle(ButtonStyle.Primary)
-        );
-        return interaction.reply({ embeds: [embed], components: [row] });
-      }
-
-      if (cmd === "لوحة-اقتراحات") {
-        try {
-          const posted = await ensureSuggestionsPanel(client, true);
-          if (!posted) {
-            return interaction.reply({
-              content: "❌ لم أجد روم الاقتراحات! تأكد من صحة معرف القناة.",
-              ephemeral: true,
-            });
-          }
-          return interaction.reply({
-            content: "✅ تم إرسال لوحة الاقتراحات بنجاح في روم الاقتراحات!",
-            ephemeral: true,
-          });
-        } catch (err) {
-          logger.error("خطأ في إرسال لوحة الاقتراحات:", err);
-          return interaction.reply({
-            content: "معلش يسطا ثواني بس",
-            ephemeral: true,
-          });
+      // ✅ دمج: لوحة-إدارة/لوحة-اقتراحات/لوحة-dm بقوا أمر واحد بقايمة اختيار
+      if (cmd === "لوحة") {
+        const options = [
+          { label: "لوحة تحكم الإدارة", description: "أزرار تصفير الألعاب وتحديث لوحة الاقتراحات", value: "panel_admin", emoji: "🔒" },
+          { label: "لوحة الاقتراحات", description: "إرسال لوحة الاقتراحات مع زر", value: "panel_suggestions", emoji: "📋" },
+        ];
+        if (config.isOwner(user.id)) {
+          options.push({ label: "لوحة رسائل الأونر", description: "لوحة تحكم الرسائل الجماعية [أونر بس]", value: "panel_dm", emoji: "📨" });
         }
+        const menu = new StringSelectMenuBuilder()
+          .setCustomId("panel_menu")
+          .setPlaceholder("Make a selection")
+          .addOptions(options);
+        return interaction.reply({
+          embeds: [new EmbedBuilder().setColor(0x2c3e50).setTitle("📋 لوحات التحكم").setDescription("اختار اللوحة اللي عايز تبعتها 👇")],
+          components: [new ActionRowBuilder().addComponents(menu)],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "صورة") {
@@ -4568,18 +4546,6 @@ client.on("interactionCreate", async (interaction) => {
 
           return;
         }
-      }
-
-      if (cmd === "لوحة-dm") {
-        if (!config.isOwner(user.id)) {
-          return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
-        }
-        const g = guild || client.guilds.cache.first();
-        const panel = buildDMControlPanel(g);
-        if (isFromDM) {
-          return interaction.reply(panel);
-        }
-        return interaction.reply({ ...panel, ephemeral: true });
       }
 
       // ── RPG Commands ───────────────────────────────────────────────
@@ -6228,8 +6194,47 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       // ─── قائمة البنك المركزي ────────────────────────────────────────
-      if (interaction.customId === "cbank_menu" || interaction.customId.startsWith("cbank_sub_")) {
+      if (interaction.customId === "cbank_menu" || interaction.customId.startsWith("cbank_sub_") || interaction.customId === "cbank_job_select") {
         return await handleCentralBankSelect(interaction, db);
+      }
+
+      // ─── قائمة اختيار اللوحة (دمج لوحة-إدارة/لوحة-اقتراحات/لوحة-dm) ──
+      if (interaction.customId === "panel_menu") {
+        const choice = interaction.values[0];
+
+        if (choice === "panel_admin") {
+          const g = interaction.guild;
+          const embed = new EmbedBuilder().setColor(0x2c3e50).setTitle("🔒 لوحة التحكم").setDescription(`أعضاء السيرفر: ${g?.memberCount ?? "-"}`);
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId("admin_clear_games").setLabel("🎮 تصفير الألعاب").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId("refresh_suggestions_board").setLabel("🔄 تحديث لوحة الاقتراحات").setStyle(ButtonStyle.Primary)
+          );
+          return interaction.update({ embeds: [embed], components: [row] });
+        }
+
+        if (choice === "panel_suggestions") {
+          try {
+            const posted = await ensureSuggestionsPanel(client, true);
+            return interaction.update({
+              content: posted ? "✅ تم إرسال لوحة الاقتراحات بنجاح في روم الاقتراحات!" : "❌ لم أجد روم الاقتراحات! تأكد من صحة معرف القناة.",
+              embeds: [], components: [],
+            });
+          } catch (err) {
+            logger.error("خطأ في إرسال لوحة الاقتراحات:", err);
+            return interaction.update({ content: "معلش يسطا ثواني بس", embeds: [], components: [] });
+          }
+        }
+
+        if (choice === "panel_dm") {
+          if (!config.isOwner(interaction.user.id)) {
+            return interaction.update({ content: "❌ الأمر ده للأونر بس!", embeds: [], components: [] });
+          }
+          const g = interaction.guild || client.guilds.cache.first();
+          const panel = buildDMControlPanel(g);
+          return interaction.update({ ...panel });
+        }
+
+        return;
       }
 
       // ─── قائمة هب الألعاب ─────────────────────────────────────────

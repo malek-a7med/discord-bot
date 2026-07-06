@@ -118,6 +118,19 @@ function buildGeneralMenu() {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
 }
 
+const JOBS = [
+  { id: "طبيب", label: "طبيب", emoji: "🩺", multiplier: 1.6 },
+  { id: "مهندس", label: "مهندس", emoji: "👷", multiplier: 1.4 },
+  { id: "شرطي", label: "شرطي", emoji: "👮", multiplier: 1.2 },
+  { id: "سائق", label: "سائق", emoji: "🚕", multiplier: 1.0 },
+  { id: "طالب", label: "طالب", emoji: "🎓", multiplier: 0.6 },
+];
+
+function jobMultiplier(jobId) {
+  const j = JOBS.find(j => j.id === jobId);
+  return j ? j.multiplier : 1.0;
+}
+
 function buildGamesMenu() {
   const embed = new EmbedBuilder()
     .setColor(0xf1c40f)
@@ -129,9 +142,31 @@ function buildGamesMenu() {
     .addOptions([
       { label: "نهب", description: "حاول تسرق من رصيد حد تاني", value: "heist", emoji: "🔫" },
       { label: "أمان", description: "ارفع مستوى حماية رصيدك", value: "security", emoji: "🛡️" },
+      { label: "الوظيفة", description: "اختار وظيفة تزود راتبك", value: "job", emoji: "💼" },
       { label: "🔙 رجوع", description: "رجوع للقايمة الرئيسية", value: "back", emoji: "🔙" },
     ]);
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
+}
+
+function buildJobPayload(interaction, db) {
+  const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
+  const embed = new EmbedBuilder()
+    .setColor(0x1abc9c)
+    .setTitle("💼 نظام الوظائف")
+    .setDescription(
+      `وظيفتك الحالية: **${p.job ? `${JOBS.find(j => j.id === p.job)?.emoji || ""} ${p.job}` : "من غير وظيفة"}**\n` +
+      `كل وظيفة بتأثر في قيمة الراتب (\`/بنك\` ← الأوامر العامة ← راتب).`
+    );
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("cbank_job_select")
+    .setPlaceholder("اختار وظيفة...")
+    .addOptions(JOBS.map(j => ({
+      label: j.label,
+      description: `مضاعف الراتب: x${j.multiplier}`,
+      value: j.id,
+      emoji: j.emoji,
+    })));
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)], flags: MessageFlags.Ephemeral };
 }
 
 function buildMarriageMenu() {
@@ -210,15 +245,17 @@ async function doSalary(interaction, db) {
   if (elapsed < CB.salaryCooldown) {
     return interaction.reply({ content: `⏳ لازم تستنى الراتب الجاي بعد ${formatCooldown(CB.salaryCooldown - elapsed)}.`, flags: MessageFlags.Ephemeral });
   }
-  const amount = Math.floor(Math.random() * (CB.salaryMax - CB.salaryMin + 1)) + CB.salaryMin;
+  const base = Math.floor(Math.random() * (CB.salaryMax - CB.salaryMin + 1)) + CB.salaryMin;
+  const amount = Math.floor(base * jobMultiplier(p.job));
   const updated = db.saveCentralBankProfile(interaction.guildId, interaction.user.id, {
     balance: p.balance + amount,
     lastSalary: Date.now(),
     totalEarned: p.totalEarned + amount,
   });
+  const jobInfo = p.job ? `\n💼 وظيفتك: **${JOBS.find(j => j.id === p.job)?.emoji || ""} ${p.job}** (x${jobMultiplier(p.job)})` : "\n💼 من غير وظيفة — اختار وظيفة من قسم أوامر الألعاب عشان تزود راتبك!";
   return interaction.reply({
     embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("💼 الراتب")
-      .setDescription(`تم صرف راتبك: \`${fmt(amount)}\` ${CB.icon}\n\n👛 رصيدك دلوقتي: \`${fmt(updated.balance)}\` ${CB.icon}`)
+      .setDescription(`تم صرف راتبك: \`${fmt(amount)}\` ${CB.icon}${jobInfo}\n\n👛 رصيدك دلوقتي: \`${fmt(updated.balance)}\` ${CB.icon}`)
       .setTimestamp()],
     flags: MessageFlags.Ephemeral,
   });
@@ -511,7 +548,19 @@ export async function handleCentralBankSelect(interaction, db) {
     if (choice === "back")     return interaction.update(buildMainMenu(interaction, db));
     if (choice === "heist")    return askHeistTarget(interaction);
     if (choice === "security") return interaction.reply(buildSecurityPayload(interaction, db));
+    if (choice === "job")      return interaction.reply(buildJobPayload(interaction, db));
     return;
+  }
+
+  if (interaction.customId === "cbank_job_select") {
+    const jobId = interaction.values[0];
+    db.saveCentralBankProfile(interaction.guildId, interaction.user.id, { job: jobId });
+    const j = JOBS.find(x => x.id === jobId);
+    return interaction.update({
+      embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("✅ تم تعيين الوظيفة")
+        .setDescription(`بقيت دلوقتي **${j.emoji} ${j.label}** — راتبك هيتضاعف بـ x${j.multiplier}!`)],
+      components: [],
+    });
   }
 
   if (interaction.customId === "cbank_sub_marriage") {

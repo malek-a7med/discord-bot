@@ -375,6 +375,7 @@ class Database {
         totalEarned: 0,
         marriedTo: null,
         marriedAt: 0,
+        job: null,
         createdAt: Date.now(),
       };
       this.save();
@@ -391,6 +392,7 @@ class Database {
     if (typeof p.totalEarned !== "number") p.totalEarned = 0;
     if (p.marriedTo === undefined) p.marriedTo = null;
     if (typeof p.marriedAt !== "number") p.marriedAt = 0;
+    if (p.job === undefined) p.job = null;
     return p;
   }
 
