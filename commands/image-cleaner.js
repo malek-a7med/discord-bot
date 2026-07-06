@@ -53,18 +53,32 @@ async function handleCleanChapter(interaction) {
       });
     }
 
-    // إعداد OAuth2 من الملفات المحلية
-    const credentials = JSON.parse(fs.readFileSync('credentials.json', 'utf-8'));
-    const token = JSON.parse(fs.readFileSync('token.json', 'utf-8'));
-    const { client_secret, client_id, redirect_uris } =
-      credentials.installed || credentials.web;
+    // إعداد OAuth2: من متغيرات البيئة أولاً، والملفات المحلية كخيار احتياطي
+    let oAuth2Client;
+    if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN) {
+      oAuth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        'http://localhost'
+      );
+      oAuth2Client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
+    } else if (fs.existsSync('credentials.json') && fs.existsSync('token.json')) {
+      const credentials = JSON.parse(fs.readFileSync('credentials.json', 'utf-8'));
+      const token = JSON.parse(fs.readFileSync('token.json', 'utf-8'));
+      const { client_secret, client_id, redirect_uris } =
+        credentials.installed || credentials.web;
 
-    const oAuth2Client = new google.auth.OAuth2(
-      client_id,
-      client_secret,
-      redirect_uris[0]
-    );
-    oAuth2Client.setCredentials(token);
+      oAuth2Client = new google.auth.OAuth2(
+        client_id,
+        client_secret,
+        redirect_uris[0]
+      );
+      oAuth2Client.setCredentials(token);
+    } else {
+      return await interaction.editReply({
+        content: '❌ لم يتم إعداد بيانات اعتماد Google Drive بعد.'
+      });
+    }
 
     // تهيئة الـ Helpers
     const driveHelper = new GoogleDriveHelper(config.GOOGLE_API_KEY);

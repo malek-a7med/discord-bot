@@ -20,7 +20,14 @@ class GoogleDriveHelper {
   initializeAuth() {
     try {
       let authClient;
-      if (fs.existsSync(TOKEN_PATH) && fs.existsSync(CREDENTIALS_PATH)) {
+      const envClientId = process.env.GOOGLE_CLIENT_ID;
+      const envClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const envRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+      if (envClientId && envClientSecret && envRefreshToken) {
+        authClient = new google.auth.OAuth2(envClientId, envClientSecret, 'http://localhost');
+        authClient.setCredentials({ refresh_token: envRefreshToken });
+      } else if (fs.existsSync(TOKEN_PATH) && fs.existsSync(CREDENTIALS_PATH)) {
         const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf-8'));
         const token = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'));
         const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
