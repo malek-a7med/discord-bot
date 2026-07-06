@@ -43,7 +43,7 @@ import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/d
 import { scheduleLegendaryEvents, handleLegendaryEventButton } from "./commands/legendary-events.js";
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand, LATEST_FEATURES } from "./commands/games-hub.js";
 import { bankSavingsCommand, handleBankButton, handleBankModal } from "./commands/bank-savings.js";
-import { centralBankCommand, handleCentralBankButton } from "./commands/central-bank.js";
+import { centralBankCommand, handleCentralBankButton, handleCentralBankSelect, handleCentralBankUserSelect, handleCentralBankChannelSelect, handleCentralBankModal } from "./commands/central-bank.js";
 import { bankLuckEgCommand, handleBankLuckEgButton, handleBankLuckEgModal } from "./commands/bank-luck-eg.js";
 import {
   animeCommand,
@@ -2923,7 +2923,7 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
       if (cmd === "حياة")          return await handleBankLifeCommand(interaction, db);
       if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
-      if (cmd === "بنك-مركزي") return await centralBankCommand.execute(interaction, db);
+      if (cmd === "بنك") return await centralBankCommand.execute(interaction, db);
       if (cmd === "تغيير-طريقة-الكلام") {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         const mode    = interaction.options.getString("أسلوب");
@@ -5591,6 +5591,11 @@ client.on("interactionCreate", async (interaction) => {
         return handleColorCustomModal(interaction);
       }
 
+      // ─── مودال إضافة رصيد في البنك المركزي ────────────────────────
+      if (interaction.customId.startsWith("cbank_admin_addbal_modal_")) {
+        return await handleCentralBankModal(interaction, db);
+      }
+
       // ─── مودال وايت ليست ماين كرافت ──────────────────────────────
       if (interaction.customId === "mc_whitelist_modal") {
         await interaction.deferReply({ ephemeral: true });
@@ -6190,12 +6195,41 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId === "rpg_select_title") {
         return await handleTitleSelect(interaction);
       }
+
+      // ─── قائمة البنك المركزي ────────────────────────────────────────
+      if (interaction.customId === "cbank_menu") {
+        return await handleCentralBankSelect(interaction, db);
+      }
     } catch (err) {
       logger.error("خطأ في معالجة القائمة:", err);
       return interaction.reply({
         content: "معلش يسطا ثواني بس",
         ephemeral: true
       }).catch(() => {});
+    }
+  }
+
+  // ─── قوائم اختيار الأعضاء (User Select Menus) ────────────────────
+  if (interaction.isUserSelectMenu()) {
+    try {
+      if (interaction.customId === "cbank_heist_user" || interaction.customId === "cbank_admin_addbal_user") {
+        return await handleCentralBankUserSelect(interaction, db);
+      }
+    } catch (err) {
+      logger.error("خطأ في معالجة قائمة اختيار الأعضاء:", err);
+      return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
+    }
+  }
+
+  // ─── قوائم اختيار الرومات (Channel Select Menus) ─────────────────
+  if (interaction.isChannelSelectMenu()) {
+    try {
+      if (interaction.customId === "cbank_admin_setchannel_select") {
+        return await handleCentralBankChannelSelect(interaction, db);
+      }
+    } catch (err) {
+      logger.error("خطأ في معالجة قائمة اختيار الرومات:", err);
+      return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
     }
   }
 });

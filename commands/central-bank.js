@@ -1,6 +1,6 @@
 // ============================================================
-// 🏦 البنك المركزي — نظام اقتصادي احترافي مستقل في روم واحدة
-// مطالبة يومية + راتب + نهب/سرقة + أمان + متصدرين + إدارة أونر
+// 🏦 البنك المركزي — أمر واحد بس: /بنك
+// كل حاجة بتتحكم فيها من قايمة اختيار (Select Menu) واحدة
 // Compatible with discord.js v14/v15 (ESM)
 // ============================================================
 
@@ -10,6 +10,13 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  StringSelectMenuBuilder,
+  UserSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ChannelType,
   PermissionFlagsBits,
   MessageFlags,
 } from "discord.js";
@@ -49,115 +56,63 @@ function formatCooldown(ms) {
   return `${sec} ثانية`;
 }
 
+function isAdmin(interaction) {
+  return config.isOwner(interaction.user.id) || interaction.member?.permissions?.has(PermissionFlagsBits.Administrator);
+}
+
 function getChannelId(db, guildId) {
   return db.getCentralBankChannel(guildId) || CB.defaultChannelId;
 }
 
-async function ensureCorrectChannel(interaction, db) {
-  const channelId = getChannelId(db, interaction.guildId);
-  if (interaction.channelId !== channelId) {
-    await interaction.reply({
-      content: `❌ أوامر ${CB.name} تشتغل بس في روم <#${channelId}>.`,
-      flags: MessageFlags.Ephemeral,
-    });
-    return false;
+function inCorrectChannel(interaction, db) {
+  return interaction.channelId === getChannelId(db, interaction.guildId);
+}
+
+// ── القائمة الرئيسية ────────────────────────────────────────────
+function buildMainMenu(interaction, db) {
+  const admin = isAdmin(interaction);
+  const embed = new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle(`🏦 ${CB.name}`)
+    .setDescription(`اختار العملية اللي عايز تعملها من القايمة تحت 👇\n\n💵 مطالبة و راتب — دخل دوري\n🔫 نهب — اسرق من رصيد حد تاني\n🛡️ أمان — احمي رصيدك\n👛 رصيد و 🏆 متصدرين — تابع نفسك والسيرفر`)
+    .setFooter({ text: `${CB.icon} ${CB.name} — إدارة أموالك بذكاء` });
+
+  const options = [
+    { label: "مطالبة", description: `اطلب من ${CB.claimMin}-${CB.claimMax} ${CB.icon}`, value: "claim", emoji: "💵" },
+    { label: "راتب", description: `استلم من ${CB.salaryMin}-${CB.salaryMax} ${CB.icon}`, value: "salary", emoji: "💼" },
+    { label: "نهب", description: "حاول تسرق من رصيد حد تاني", value: "heist", emoji: "🔫" },
+    { label: "أمان", description: "ارفع مستوى حماية رصيدك", value: "security", emoji: "🛡️" },
+    { label: "رصيد", description: "شوف رصيدك وإحصائياتك", value: "balance", emoji: "👛" },
+    { label: "متصدرين", description: "أغنى أعضاء البنك المركزي", value: "leaderboard", emoji: "🏆" },
+  ];
+  if (admin) {
+    options.push({ label: "إدارة (أونر/أدمن)", description: "إضافة رصيد أو تغيير روم البنك", value: "admin", emoji: "👑" });
   }
-  return true;
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("cbank_menu")
+    .setPlaceholder("اختار عملية...")
+    .addOptions(options);
+
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
 }
 
 export const centralBankCommand = {
   data: new SlashCommandBuilder()
-    .setName("بنك-مركزي")
-    .setDescription(`🏦 ${CB.name} — مطالبة، راتب، نهب، أمان، ومتصدرين`)
-    .addSubcommand(sub => sub.setName("مطالبة").setDescription("💵 اطلب مكافأتك الدورية"))
-    .addSubcommand(sub => sub.setName("راتب").setDescription("💼 استلم راتبك اليومي"))
-    .addSubcommand(sub =>
-      sub.setName("نهب")
-        .setDescription("🔫 حاول تنهب من رصيد حد تاني")
-        .addUserOption(o => o.setName("عضو").setDescription("الشخص اللي هتحاول تنهبه").setRequired(true))
-    )
-    .addSubcommand(sub => sub.setName("امان").setDescription("🛡️ اترقّى في مستوى الأمان بتاعك"))
-    .addSubcommand(sub => sub.setName("رصيد").setDescription("👛 شوف رصيدك ومستوى الأمان بتاعك"))
-    .addSubcommand(sub => sub.setName("متصدرين").setDescription("🏆 أغنى الأعضاء في البنك المركزي"))
-    .addSubcommand(sub => sub.setName("مساعدة").setDescription("📜 كل أوامر البنك المركزي وشرحها"))
-    .addSubcommand(sub =>
-      sub.setName("اضافة-رصيد")
-        .setDescription("👑 [أونر] ضيف رصيد لعضو")
-        .addUserOption(o => o.setName("عضو").setDescription("العضو").setRequired(true))
-        .addIntegerOption(o => o.setName("قيمة").setDescription("الكمية").setRequired(true).setMinValue(1))
-    )
-    .addSubcommand(sub =>
-      sub.setName("تعيين-قناة")
-        .setDescription("👑 [أونر] حدد الروم اللي البنك المركزي هيشتغل فيه")
-        .addChannelOption(o => o.setName("قناة").setDescription("الروم الجديد").setRequired(true))
-    ),
+    .setName("بنك")
+    .setDescription(`🏦 ${CB.name} — كل حاجة من قايمة واحدة`),
 
   async execute(interaction, db) {
-    const sub = interaction.options.getSubcommand();
-
-    if (sub === "مساعدة") return showHelp(interaction, db);
-    if (sub === "تعيين-قناة") return setChannel(interaction, db);
-    if (sub === "اضافة-رصيد") return addBalanceAdmin(interaction, db);
-
-    const ok = await ensureCorrectChannel(interaction, db);
-    if (!ok) return;
-
-    if (sub === "مطالبة")   return handleClaim(interaction, db);
-    if (sub === "راتب")     return handleSalary(interaction, db);
-    if (sub === "نهب")      return handleHeist(interaction, db);
-    if (sub === "امان")     return showSecurityPanel(interaction, db, false);
-    if (sub === "رصيد")     return showBalance(interaction, db);
-    if (sub === "متصدرين") return showLeaderboard(interaction, db);
+    if (!inCorrectChannel(interaction, db)) {
+      const channelId = getChannelId(db, interaction.guildId);
+      return interaction.reply({ content: `❌ أمر ${CB.name} يشتغل بس في روم <#${channelId}>.`, flags: MessageFlags.Ephemeral });
+    }
+    return interaction.reply({ ...buildMainMenu(interaction, db), flags: MessageFlags.Ephemeral });
   },
 };
 
-async function showHelp(interaction, db) {
-  const channelId = getChannelId(db, interaction.guildId);
-  const embed = new EmbedBuilder()
-    .setColor(0xf1c40f)
-    .setTitle(`🏦 ${CB.name} — دليل الأوامر`)
-    .setDescription(`كل أوامر البنك المركزي تشتغل جوه <#${channelId}> فقط.`)
-    .addFields(
-      { name: "💵 /بنك-مركزي مطالبة", value: `اطلب من ${CB.claimMin}-${CB.claimMax} ${CB.icon} كل ${formatCooldown(CB.claimCooldown)}`, inline: false },
-      { name: "💼 /بنك-مركزي راتب", value: `استلم من ${CB.salaryMin}-${CB.salaryMax} ${CB.icon} كل ${formatCooldown(CB.salaryCooldown)}`, inline: false },
-      { name: "🔫 /بنك-مركزي نهب [عضو]", value: "حاول تسرق نسبة من رصيد حد تاني — كل ما مستوى أمانه أعلى كل ما يصعب تنجح، ولو فشلت هتتغرّم وتتسجن مؤقتاً", inline: false },
-      { name: "🛡️ /بنك-مركزي امان", value: `ارفع مستوى الأمان بتاعك (أقصى مستوى ${CB.maxSecurity}) عشان تحمي رصيدك من النهب`, inline: false },
-      { name: "👛 /بنك-مركزي رصيد", value: "شوف رصيدك ومستوى أمانك وإحصائياتك", inline: false },
-      { name: "🏆 /بنك-مركزي متصدرين", value: "أغنى 10 أعضاء في البنك المركزي", inline: false }
-    )
-    .setFooter({ text: `${CB.icon} ${CB.name} — إدارة أموالك بذكاء` });
-  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
-}
-
-async function setChannel(interaction, db) {
-  if (!config.isOwner(interaction.user.id) && !interaction.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
-    return interaction.reply({ content: "❌ الأمر ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
-  }
-  const channel = interaction.options.getChannel("قناة");
-  db.setCentralBankChannel(interaction.guildId, channel.id);
-  return interaction.reply({
-    content: `✅ اتحدد <#${channel.id}> كروم البنك المركزي دلوقتي.`,
-    flags: MessageFlags.Ephemeral,
-  });
-}
-
-async function addBalanceAdmin(interaction, db) {
-  if (!config.isOwner(interaction.user.id) && !interaction.member?.permissions?.has(PermissionFlagsBits.Administrator)) {
-    return interaction.reply({ content: "❌ الأمر ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
-  }
-  const target = interaction.options.getUser("عضو");
-  const amount = interaction.options.getInteger("قيمة");
-  const p = db.saveCentralBankProfile(interaction.guildId, target.id, {
-    balance: db.getCentralBankProfile(interaction.guildId, target.id).balance + amount,
-  });
-  return interaction.reply({
-    embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("✅ تم إضافة الرصيد")
-      .setDescription(`اتضاف \`${fmt(amount)}\` ${CB.icon} لـ <@${target.id}>.\nرصيده دلوقتي: \`${fmt(p.balance)}\` ${CB.icon}`)],
-    flags: MessageFlags.Ephemeral,
-  });
-}
-
-async function handleClaim(interaction, db) {
+// ── منطق العمليات ───────────────────────────────────────────────
+async function doClaim(interaction, db) {
   const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
   const elapsed = Date.now() - p.lastClaim;
   if (elapsed < CB.claimCooldown) {
@@ -173,14 +128,15 @@ async function handleClaim(interaction, db) {
     embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("💵 تم استلام المطالبة!")
       .setDescription(`استلمت \`${fmt(amount)}\` ${CB.icon}!\n\n👛 رصيدك دلوقتي: \`${fmt(updated.balance)}\` ${CB.icon}`)
       .setTimestamp()],
+    flags: MessageFlags.Ephemeral,
   });
 }
 
-async function handleSalary(interaction, db) {
+async function doSalary(interaction, db) {
   const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
   const elapsed = Date.now() - p.lastSalary;
   if (elapsed < CB.salaryCooldown) {
-    return interaction.reply({ content: `⏳ لم يحن ميعاد إعدادك للرات بشكل صحيح — لازم تنتظر الراتب الجديد بعد ${formatCooldown(CB.salaryCooldown - elapsed)}.`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `⏳ لازم تستنى الراتب الجاي بعد ${formatCooldown(CB.salaryCooldown - elapsed)}.`, flags: MessageFlags.Ephemeral });
   }
   const amount = Math.floor(Math.random() * (CB.salaryMax - CB.salaryMin + 1)) + CB.salaryMin;
   const updated = db.saveCentralBankProfile(interaction.guildId, interaction.user.id, {
@@ -192,17 +148,29 @@ async function handleSalary(interaction, db) {
     embeds: [new EmbedBuilder().setColor(0x3498db).setTitle("💼 الراتب")
       .setDescription(`تم صرف راتبك: \`${fmt(amount)}\` ${CB.icon}\n\n👛 رصيدك دلوقتي: \`${fmt(updated.balance)}\` ${CB.icon}`)
       .setTimestamp()],
+    flags: MessageFlags.Ephemeral,
   });
 }
 
-async function handleHeist(interaction, db) {
-  const attacker = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
-  const target = interaction.options.getUser("عضو");
+async function askHeistTarget(interaction) {
+  const menu = new UserSelectMenuBuilder()
+    .setCustomId("cbank_heist_user")
+    .setPlaceholder("اختار الشخص اللي هتحاول تنهبه...")
+    .setMaxValues(1);
+  return interaction.reply({
+    content: "🔫 اختار هدفك:",
+    components: [new ActionRowBuilder().addComponents(menu)],
+    flags: MessageFlags.Ephemeral,
+  });
+}
 
-  if (target.id === interaction.user.id) {
+async function doHeist(interaction, db, targetUser) {
+  const attacker = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
+
+  if (targetUser.id === interaction.user.id) {
     return interaction.reply({ content: "❌ مش هتقدر تنهب نفسك 😄", flags: MessageFlags.Ephemeral });
   }
-  if (target.bot) {
+  if (targetUser.bot) {
     return interaction.reply({ content: "❌ مش هتقدر تنهب بوت.", flags: MessageFlags.Ephemeral });
   }
   if (Date.now() < attacker.jailedUntil) {
@@ -213,22 +181,20 @@ async function handleHeist(interaction, db) {
     return interaction.reply({ content: `⏳ استنى شوية قبل ما تحاول تنهب تاني — متاح بعد ${formatCooldown(CB.heistCooldown - elapsed)}.`, flags: MessageFlags.Ephemeral });
   }
 
-  const defender = db.getCentralBankProfile(interaction.guildId, target.id);
+  const defender = db.getCentralBankProfile(interaction.guildId, targetUser.id);
   if (defender.balance < 100) {
-    return interaction.reply({ content: `❌ ${target.username} مالوش رصيد يكفي عشان يتنهب (لازم 100 ${CB.icon} على الأقل).`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: `❌ ${targetUser.username} مالوش رصيد يكفي عشان يتنهب (لازم 100 ${CB.icon} على الأقل).`, flags: MessageFlags.Ephemeral });
   }
 
-  // فرصة النجاح: كل ما فرق الأمان لصالح المدافع أعلى، كل ما تقل فرصة النجاح
   const gap = defender.security - attacker.security;
   let successChance = 0.55 - gap * 0.06;
   successChance = Math.max(0.1, Math.min(0.85, successChance));
-
   const success = Math.random() < successChance;
 
   if (success) {
-    const stealPct = 0.10 + Math.random() * 0.15; // 10% - 25%
+    const stealPct = 0.10 + Math.random() * 0.15;
     const stolen = Math.max(50, Math.floor(defender.balance * stealPct));
-    db.saveCentralBankProfile(interaction.guildId, target.id, { balance: defender.balance - stolen });
+    db.saveCentralBankProfile(interaction.guildId, targetUser.id, { balance: defender.balance - stolen });
     const updatedAttacker = db.saveCentralBankProfile(interaction.guildId, interaction.user.id, {
       balance: attacker.balance + stolen,
       lastHeist: Date.now(),
@@ -237,8 +203,9 @@ async function handleHeist(interaction, db) {
     });
     return interaction.reply({
       embeds: [new EmbedBuilder().setColor(0xe67e22).setTitle("🔫 نهب ناجح!")
-        .setDescription(`نجحت تسرق \`${fmt(stolen)}\` ${CB.icon} من <@${target.id}>!\n\n👛 رصيدك دلوقتي: \`${fmt(updatedAttacker.balance)}\` ${CB.icon}`)
+        .setDescription(`نجحت تسرق \`${fmt(stolen)}\` ${CB.icon} من <@${targetUser.id}>!\n\n👛 رصيدك دلوقتي: \`${fmt(updatedAttacker.balance)}\` ${CB.icon}`)
         .setTimestamp()],
+      flags: MessageFlags.Ephemeral,
     });
   } else {
     const fine = Math.max(50, Math.floor(attacker.balance * 0.15));
@@ -250,13 +217,14 @@ async function handleHeist(interaction, db) {
     });
     return interaction.reply({
       embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle("🚔 النهب فشل!")
-        .setDescription(`انضبطت وانت بتحاول تنهب <@${target.id}>!\nاتغرّمت \`${fmt(fine)}\` ${CB.icon} واتسجنت لمدة ${formatCooldown(CB.jailDuration)}.\n\n👛 رصيدك دلوقتي: \`${fmt(updatedAttacker.balance)}\` ${CB.icon}`)
+        .setDescription(`انضبطت وانت بتحاول تنهب <@${targetUser.id}>!\nاتغرّمت \`${fmt(fine)}\` ${CB.icon} واتسجنت لمدة ${formatCooldown(CB.jailDuration)}.\n\n👛 رصيدك دلوقتي: \`${fmt(updatedAttacker.balance)}\` ${CB.icon}`)
         .setTimestamp()],
+      flags: MessageFlags.Ephemeral,
     });
   }
 }
 
-async function showSecurityPanel(interaction, db, fromButton) {
+function buildSecurityPayload(interaction, db) {
   const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
   const nextLevel = Math.min(p.security + 1, CB.maxSecurity);
   const maxed = p.security >= CB.maxSecurity;
@@ -279,33 +247,10 @@ async function showSecurityPanel(interaction, db, fromButton) {
       .setStyle(ButtonStyle.Success)
       .setDisabled(maxed || p.balance < cost)
   );
-
-  const payload = { embeds: [embed], components: [row], flags: MessageFlags.Ephemeral };
-  if (fromButton) await interaction.update(payload);
-  else await interaction.reply(payload);
+  return { embeds: [embed], components: [row], flags: MessageFlags.Ephemeral };
 }
 
-export async function handleCentralBankButton(interaction, db) {
-  if (interaction.customId === "cbank_upgrade_security") {
-    const ok = await ensureCorrectChannel(interaction, db);
-    if (!ok) return;
-    const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
-    if (p.security >= CB.maxSecurity) {
-      return interaction.reply({ content: "🏆 وصلت لأعلى مستوى أمان بالفعل.", flags: MessageFlags.Ephemeral });
-    }
-    const cost = securityCost(p.security);
-    if (p.balance < cost) {
-      return interaction.reply({ content: `❌ رصيدك مش كفاية. محتاج \`${fmt(cost)}\` ${CB.icon}.`, flags: MessageFlags.Ephemeral });
-    }
-    db.saveCentralBankProfile(interaction.guildId, interaction.user.id, {
-      balance: p.balance - cost,
-      security: p.security + 1,
-    });
-    return showSecurityPanel(interaction, db, true);
-  }
-}
-
-async function showBalance(interaction, db) {
+function buildBalancePayload(interaction, db) {
   const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
   const embed = new EmbedBuilder()
     .setColor(0xf1c40f)
@@ -319,13 +264,13 @@ async function showBalance(interaction, db) {
       { name: "⏱️ حالة السجن", value: Date.now() < p.jailedUntil ? `مسجون لـ ${formatCooldown(p.jailedUntil - Date.now())}` : "حر ✅", inline: true }
     )
     .setTimestamp();
-  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  return { embeds: [embed], flags: MessageFlags.Ephemeral };
 }
 
-async function showLeaderboard(interaction, db) {
+function buildLeaderboardPayload(interaction, db) {
   const top = db.getCentralBankLeaderboard(interaction.guildId, 10);
   if (!top.length) {
-    return interaction.reply({ content: "❌ لسه محدش عنده رصيد في البنك المركزي.", flags: MessageFlags.Ephemeral });
+    return { content: "❌ لسه محدش عنده رصيد في البنك المركزي.", flags: MessageFlags.Ephemeral };
   }
   const medals = ["🥇", "🥈", "🥉"];
   const lines = top.map((p, i) => `${medals[i] || `**${i + 1}.**`} <@${p.userId}> — \`${fmt(p.balance)}\` ${CB.icon}`);
@@ -334,5 +279,132 @@ async function showLeaderboard(interaction, db) {
     .setTitle(`🏆 أغنى أعضاء ${CB.name}`)
     .setDescription(lines.join("\n"))
     .setTimestamp();
-  await interaction.reply({ embeds: [embed] });
+  return { embeds: [embed], flags: MessageFlags.Ephemeral };
+}
+
+function buildAdminPayload() {
+  const embed = new EmbedBuilder()
+    .setColor(0xe67e22)
+    .setTitle("👑 لوحة إدارة البنك المركزي")
+    .setDescription("اختار العملية:");
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("cbank_admin_addbal").setLabel("إضافة رصيد لعضو").setEmoji("💰").setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId("cbank_admin_setchannel").setLabel("تغيير روم البنك").setEmoji("📌").setStyle(ButtonStyle.Primary),
+  );
+  return { embeds: [embed], components: [row], flags: MessageFlags.Ephemeral };
+}
+
+// ── التوجيه الرئيسي للقايمة ──────────────────────────────────────
+export async function handleCentralBankSelect(interaction, db) {
+  if (interaction.customId === "cbank_menu") {
+    if (!inCorrectChannel(interaction, db)) {
+      const channelId = getChannelId(db, interaction.guildId);
+      return interaction.reply({ content: `❌ أمر ${CB.name} يشتغل بس في روم <#${channelId}>.`, flags: MessageFlags.Ephemeral });
+    }
+    const choice = interaction.values[0];
+    if (choice === "claim")       return doClaim(interaction, db);
+    if (choice === "salary")      return doSalary(interaction, db);
+    if (choice === "heist")       return askHeistTarget(interaction);
+    if (choice === "security")    return interaction.reply(buildSecurityPayload(interaction, db));
+    if (choice === "balance")     return interaction.reply(buildBalancePayload(interaction, db));
+    if (choice === "leaderboard") return interaction.reply(buildLeaderboardPayload(interaction, db));
+    if (choice === "admin") {
+      if (!isAdmin(interaction)) return interaction.reply({ content: "❌ الخيار ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
+      return interaction.reply(buildAdminPayload());
+    }
+  }
+}
+
+export async function handleCentralBankUserSelect(interaction, db) {
+  if (interaction.customId === "cbank_heist_user") {
+    if (!inCorrectChannel(interaction, db)) {
+      const channelId = getChannelId(db, interaction.guildId);
+      return interaction.reply({ content: `❌ أمر ${CB.name} يشتغل بس في روم <#${channelId}>.`, flags: MessageFlags.Ephemeral });
+    }
+    const targetUser = interaction.users.first();
+    return doHeist(interaction, db, targetUser);
+  }
+  if (interaction.customId === "cbank_admin_addbal_user") {
+    if (!isAdmin(interaction)) return interaction.reply({ content: "❌ الخيار ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
+    const targetUser = interaction.users.first();
+    const modal = new ModalBuilder()
+      .setCustomId(`cbank_admin_addbal_modal_${targetUser.id}`)
+      .setTitle(`إضافة رصيد لـ ${targetUser.username}`);
+    const amountInput = new TextInputBuilder()
+      .setCustomId("amount")
+      .setLabel("الكمية")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("مثال: 5000")
+      .setRequired(true);
+    modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
+    return interaction.showModal(modal);
+  }
+}
+
+export async function handleCentralBankChannelSelect(interaction, db) {
+  if (interaction.customId === "cbank_admin_setchannel_select") {
+    if (!isAdmin(interaction)) return interaction.reply({ content: "❌ الخيار ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
+    const channel = interaction.channels.first();
+    db.setCentralBankChannel(interaction.guildId, channel.id);
+    return interaction.reply({ content: `✅ اتحدد <#${channel.id}> كروم البنك المركزي دلوقتي.`, flags: MessageFlags.Ephemeral });
+  }
+}
+
+export async function handleCentralBankModal(interaction, db) {
+  if (interaction.customId.startsWith("cbank_admin_addbal_modal_")) {
+    if (!isAdmin(interaction)) return interaction.reply({ content: "❌ الأمر ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
+    const targetId = interaction.customId.replace("cbank_admin_addbal_modal_", "");
+    const amount = parseInt(interaction.fields.getTextInputValue("amount"), 10);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return interaction.reply({ content: "❌ اكتب رقم صحيح وموجب.", flags: MessageFlags.Ephemeral });
+    }
+    const current = db.getCentralBankProfile(interaction.guildId, targetId);
+    const p = db.saveCentralBankProfile(interaction.guildId, targetId, { balance: current.balance + amount });
+    return interaction.reply({
+      embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("✅ تم إضافة الرصيد")
+        .setDescription(`اتضاف \`${fmt(amount)}\` ${CB.icon} لـ <@${targetId}>.\nرصيده دلوقتي: \`${fmt(p.balance)}\` ${CB.icon}`)],
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+}
+
+export async function handleCentralBankButton(interaction, db) {
+  if (interaction.customId === "cbank_upgrade_security") {
+    if (!inCorrectChannel(interaction, db)) {
+      const channelId = getChannelId(db, interaction.guildId);
+      return interaction.reply({ content: `❌ أمر ${CB.name} يشتغل بس في روم <#${channelId}>.`, flags: MessageFlags.Ephemeral });
+    }
+    const p = db.getCentralBankProfile(interaction.guildId, interaction.user.id);
+    if (p.security >= CB.maxSecurity) {
+      return interaction.reply({ content: "🏆 وصلت لأعلى مستوى أمان بالفعل.", flags: MessageFlags.Ephemeral });
+    }
+    const cost = securityCost(p.security);
+    if (p.balance < cost) {
+      return interaction.reply({ content: `❌ رصيدك مش كفاية. محتاج \`${fmt(cost)}\` ${CB.icon}.`, flags: MessageFlags.Ephemeral });
+    }
+    db.saveCentralBankProfile(interaction.guildId, interaction.user.id, {
+      balance: p.balance - cost,
+      security: p.security + 1,
+    });
+    return interaction.update(buildSecurityPayload(interaction, db));
+  }
+
+  if (interaction.customId === "cbank_admin_addbal") {
+    if (!isAdmin(interaction)) return interaction.reply({ content: "❌ الخيار ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
+    const menu = new UserSelectMenuBuilder()
+      .setCustomId("cbank_admin_addbal_user")
+      .setPlaceholder("اختار العضو اللي هتضيفله رصيد...")
+      .setMaxValues(1);
+    return interaction.reply({ content: "💰 اختار العضو:", components: [new ActionRowBuilder().addComponents(menu)], flags: MessageFlags.Ephemeral });
+  }
+
+  if (interaction.customId === "cbank_admin_setchannel") {
+    if (!isAdmin(interaction)) return interaction.reply({ content: "❌ الخيار ده للأونر أو الأدمن بس.", flags: MessageFlags.Ephemeral });
+    const menu = new ChannelSelectMenuBuilder()
+      .setCustomId("cbank_admin_setchannel_select")
+      .setPlaceholder("اختار الروم الجديد...")
+      .addChannelTypes(ChannelType.GuildText)
+      .setMaxValues(1);
+    return interaction.reply({ content: "📌 اختار الروم:", components: [new ActionRowBuilder().addComponents(menu)], flags: MessageFlags.Ephemeral });
+  }
 }
