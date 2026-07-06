@@ -40,8 +40,10 @@ import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticMod
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
+import { scheduleLegendaryEvents, handleLegendaryEventButton } from "./commands/legendary-events.js";
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand, LATEST_FEATURES } from "./commands/games-hub.js";
 import { bankSavingsCommand, handleBankButton, handleBankModal } from "./commands/bank-savings.js";
+import { centralBankCommand, handleCentralBankButton } from "./commands/central-bank.js";
 import { bankLuckEgCommand, handleBankLuckEgButton, handleBankLuckEgModal } from "./commands/bank-luck-eg.js";
 import {
   animeCommand,
@@ -727,6 +729,9 @@ const LEGACY_COMMANDS = [
 
   // ─── الألوان ────────────────────────────────────────────────────
   colorsCommand,
+
+  // ─── البنك المركزي ────────────────────────────────────────────
+  centralBankCommand.data,
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -1601,6 +1606,7 @@ client.once("clientReady", async (c) => {
   }
   scheduleDailyChallenge(c, db);
   scheduleAnimeNews(c, db);
+  scheduleLegendaryEvents(c, db);
 
   // ── إعطاء البوت صلاحيات كاملة (Administrator) في كل السيرفرات ──
   for (const [, guild] of c.guilds.cache) {
@@ -2917,6 +2923,7 @@ client.on("interactionCreate", async (interaction) => {
       if (cmd === "احدث-المميزات") return await handleLatestFeaturesCommand(interaction);
       if (cmd === "حياة")          return await handleBankLifeCommand(interaction, db);
       if (cmd === "بنك-الحظ-مصري") return await bankLuckEgCommand.execute(interaction, db);
+      if (cmd === "بنك-مركزي") return await centralBankCommand.execute(interaction, db);
       if (cmd === "تغيير-طريقة-الكلام") {
         if (!config.isOwner(user.id)) return interaction.reply({ content: "❌ الأمر ده للأونر بس!", ephemeral: true });
         const mode    = interaction.options.getString("أسلوب");
@@ -4828,6 +4835,16 @@ client.on("interactionCreate", async (interaction) => {
       // ─── أزرار بنك الحظ المصري ───────────────────────────────────
       if (interaction.customId.startsWith("bleg_")) {
         return await handleBankLuckEgButton(interaction, db);
+      }
+
+      // ─── أزرار البنك المركزي ──────────────────────────────────────
+      if (interaction.customId.startsWith("cbank_")) {
+        return await handleCentralBankButton(interaction, db);
+      }
+
+      // ─── أزرار الفعاليات الأسطورية ────────────────────────────────
+      if (interaction.customId.startsWith("legev_")) {
+        return await handleLegendaryEventButton(interaction, db);
       }
 
       // ─── أزرار نظام الأنمي ────────────────────────────────────────

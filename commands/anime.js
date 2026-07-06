@@ -1167,26 +1167,22 @@ export async function handleAnimeSubscribe(interaction, db) {
 //  📰 نظام أخبار الأنمي — يبعت في الثريد فور ما حلقة جديدة تطلع
 // ═══════════════════════════════════════════════════════════════
 
+const ANIME_NEWS_CHANNEL_ID = "1520252043162423317";
+
 export function scheduleAnimeNews(client, db) {
   const CHECK_INTERVAL_MS = 60 * 60 * 1000; // كل ساعة
 
   async function checkAndPostNews() {
-    const threadId = db.getConfig("animeNewsThreadId") || "1520827228425031785";
+    const channelId = db.getConfig("animeNewsChannelId") || ANIME_NEWS_CHANNEL_ID;
 
-    // جيب الثريد
+    // جيب الروم
     let thread;
     try {
-      thread = await client.channels.fetch(threadId);
+      thread = await client.channels.fetch(channelId);
     } catch {
-      return; // الثريد اتحذف أو البوت مش قادر يوصله
+      return; // الروم اتحذف أو البوت مش قادر يوصله
     }
     if (!thread) return;
-
-    // لو الثريد مقفول افتحه مؤقتاً
-    const wasLocked = thread.locked;
-    if (wasLocked) {
-      try { await thread.setLocked(false); } catch { return; }
-    }
 
     // جيب قائمة الأنمي اللي بتعرض دلوقتي
     let airingList;
@@ -1262,11 +1258,6 @@ export function scheduleAnimeNews(client, db) {
     // حفظ المعرفات المنشورة (نحتفظ بآخر 500 بس عشان الملف ما يكبرش)
     const updatedList = [...postedIds].slice(-500);
     db.setConfig("animeNewsPosted", updatedList);
-
-    // لو كان مقفول قبل كده، قفله تاني
-    if (wasLocked) {
-      try { await thread.setLocked(true); } catch {}
-    }
   }
 
   // مسح القائمة القديمة عشان الأخبار تنزل فوراً (مرة واحدة بعد الريستارت)

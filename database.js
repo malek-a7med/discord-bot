@@ -355,6 +355,74 @@ class Database {
     return this.data.lifeProfiles[guildId];
   }
 
+  // ─── 🏦 البنك المركزي — نظام اقتصادي مستقل خاص بروم واحدة، per-guild ──
+  ensureCentralBankProfile(guildId, userId) {
+    if (!this.data.centralBank) this.data.centralBank = {};
+    if (!this.data.centralBank[guildId]) this.data.centralBank[guildId] = { profiles: {}, channelId: null };
+    const guild = this.data.centralBank[guildId];
+    if (!guild.profiles) guild.profiles = {};
+
+    if (!guild.profiles[userId]) {
+      guild.profiles[userId] = {
+        balance: 0,
+        security: 1,
+        lastClaim: 0,
+        lastSalary: 0,
+        lastHeist: 0,
+        jailedUntil: 0,
+        heistWins: 0,
+        heistLosses: 0,
+        totalEarned: 0,
+        createdAt: Date.now(),
+      };
+      this.save();
+    }
+    const p = guild.profiles[userId];
+    if (typeof p.balance !== "number") p.balance = 0;
+    if (typeof p.security !== "number") p.security = 1;
+    if (typeof p.lastClaim !== "number") p.lastClaim = 0;
+    if (typeof p.lastSalary !== "number") p.lastSalary = 0;
+    if (typeof p.lastHeist !== "number") p.lastHeist = 0;
+    if (typeof p.jailedUntil !== "number") p.jailedUntil = 0;
+    if (typeof p.heistWins !== "number") p.heistWins = 0;
+    if (typeof p.heistLosses !== "number") p.heistLosses = 0;
+    if (typeof p.totalEarned !== "number") p.totalEarned = 0;
+    return p;
+  }
+
+  getCentralBankProfile(guildId, userId) {
+    return this.ensureCentralBankProfile(guildId, userId);
+  }
+
+  saveCentralBankProfile(guildId, userId, updates) {
+    const p = this.ensureCentralBankProfile(guildId, userId);
+    Object.assign(p, updates);
+    this.save();
+    return p;
+  }
+
+  getCentralBankLeaderboard(guildId, limit = 10) {
+    if (!this.data.centralBank || !this.data.centralBank[guildId]) return [];
+    const profiles = this.data.centralBank[guildId].profiles || {};
+    return Object.entries(profiles)
+      .map(([userId, p]) => ({ userId, ...p }))
+      .sort((a, b) => b.balance - a.balance)
+      .slice(0, limit);
+  }
+
+  getCentralBankChannel(guildId) {
+    if (!this.data.centralBank || !this.data.centralBank[guildId]) return null;
+    return this.data.centralBank[guildId].channelId || null;
+  }
+
+  setCentralBankChannel(guildId, channelId) {
+    if (!this.data.centralBank) this.data.centralBank = {};
+    if (!this.data.centralBank[guildId]) this.data.centralBank[guildId] = { profiles: {}, channelId: null };
+    this.data.centralBank[guildId].channelId = channelId;
+    this.save();
+    return channelId;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  🎌 نظام الأنمي — Anime Profile
   // ═══════════════════════════════════════════════════════════════
