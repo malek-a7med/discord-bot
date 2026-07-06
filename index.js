@@ -64,6 +64,7 @@ import { colorsCommand, handleColorsCommand, handleColorButton, handleColorNav, 
 import { fullProfileCommand, handleFullProfile } from "./commands/full-profile.js";
 import { serverStatsCommand, handleServerStats } from "./commands/server-stats-live.js";
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
+import { topCommand, handleTopCommand, verifyGateCommand, handleVerifyGateCommand, handleVerifyButton, bankShopCommand, handleShopCommand as handleBankShopCommand, handleShopSelect } from "./commands/community.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -259,6 +260,9 @@ const LEGACY_COMMANDS = [
     .setDescription("User information / معلومات عضو")
     .addUserOption((o) => o.setName("user").setDescription("User / العضو")),
   new SlashCommandBuilder().setName("القوانين").setDescription("عرض قوانين السيرفر / Server rules"),
+  topCommand,
+  verifyGateCommand,
+  bankShopCommand,
   // ✅ دمج: بروفايل/محفظة/متجر/شراء/إعطاء/يومي بقوا subcommands تحت /اقتصاد
   new SlashCommandBuilder()
     .setName("اقتصاد")
@@ -3715,6 +3719,18 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ content: "📜 **قوانين السيرفر:**\n1. الاحترام المتبادل.\n2. عدم نشر روابط خارجية وإعلانات سبام.\n3. التحدث فى الرومات المخصصة." });
       }
 
+      if (cmd === "top") {
+        return await handleTopCommand(interaction, db);
+      }
+
+      if (cmd === "بوابة-التحقق") {
+        return await handleVerifyGateCommand(interaction);
+      }
+
+      if (cmd === "متجر") {
+        return await handleBankShopCommand(interaction, db);
+      }
+
       // ✅ دمج: /اقتصاد بروفايل|محفظة|متجر|شراء|إعطاء|يومي
       if (cmd === "اقتصاد") {
         const econSub = interaction.options.getSubcommand();
@@ -4734,6 +4750,11 @@ client.on("interactionCreate", async (interaction) => {
             ]
           });
         }
+      }
+
+      // ─── زرار بوابة التحقق ──────────────────────────────────────────
+      if (interaction.customId === "verify_gate_accept") {
+        return await handleVerifyButton(interaction);
       }
 
       // ─── أزرار نظام التذاكر ────────────────────────────────────────
@@ -6187,6 +6208,11 @@ client.on("interactionCreate", async (interaction) => {
       }
       if (interaction.customId === "anime_select_episode") {
         return await handleAnimeSelectEpisode(interaction, db);
+      }
+
+      // ─── قايمة متجر البنك المركزي ─────────────────────────────────
+      if (interaction.customId === "shop_menu") {
+        return await handleShopSelect(interaction, db);
       }
 
       // ─── قائمة اختيار وضع AI Spymaster في كود نيمز ────────────────
