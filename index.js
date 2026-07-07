@@ -802,6 +802,9 @@ const QUESTIONS = [
 
 // ─── لوحة تحكم الأونر في الـ DM ───────────────────────────────
 function buildDMControlPanel(guild) {
+  const cpImagePath = path.join(__dirname, 'control_panel.png');
+  const cpAttachment = new AttachmentBuilder(cpImagePath, { name: 'control_panel.png' });
+
   const embed = new EmbedBuilder()
     .setColor(0xa020f0)
     .setTitle("👑 لوحة تحكم الأونر")
@@ -814,6 +817,7 @@ function buildDMControlPanel(guild) {
       { name: "📡 الحالة",    value: "🟢 أونلاين",                        inline: true },
       { name: "⏱️ الـ Uptime", value: `\`${Math.floor(process.uptime() / 60)} دقيقة\``, inline: true }
     )
+    .setImage('attachment://control_panel.png')
     .setFooter({ text: "👑 للأونر فقط — زنجي Bot" })
     .setTimestamp();
 
@@ -833,7 +837,7 @@ function buildDMControlPanel(guild) {
     new ButtonBuilder().setCustomId("dmp_coins").setLabel("🪙 كوينز").setStyle(ButtonStyle.Success)
   );
 
-  return { embeds: [embed], components: [row1, row2] };
+  return { embeds: [embed], files: [cpAttachment], components: [row1, row2] };
 }
 
 function findMember(guild, nameOrId) {
