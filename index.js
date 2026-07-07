@@ -3723,19 +3723,47 @@ client.on("interactionCreate", async (interaction) => {
         if (econSub === "بروفايل") {
           const target = interaction.options.getUser("عضو") ?? user;
           const uData = db.getUser(target.id);
-          return interaction.reply({ content: `✨ **بروفايل ${target.username}:**\n📊 المستوى: \`${uData.level}\`\n🪙 الكوينز: \`${uData.coins}\`\n⭐ الـ XP الحالي: \`${uData.xp}\`` });
+          const nextXp = (uData.level + 1) ** 2 * 50;
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xFFD700)
+              .setTitle(`📊 بروفايل ${target.username}`)
+              .setThumbnail(target.displayAvatarURL({ size: 128 }))
+              .addFields(
+                { name: "📊 المستوى", value: `\`${uData.level || 0}\``, inline: true },
+                { name: "🪙 الكوينز", value: `\`${(uData.coins || 0).toLocaleString()}\``, inline: true },
+                { name: "✨ الـ XP",  value: `\`${(uData.xp || 0).toLocaleString()}\` / \`${nextXp.toLocaleString()}\``, inline: true },
+              )
+              .setFooter({ text: "⚜️ زنجي بوت" })
+              .setTimestamp()],
+            ephemeral: true,
+          });
         }
 
         if (econSub === "محفظة") {
           const uData = db.getUser(user.id);
-          return interaction.reply({ content: `🪙 محفظتك فيها حالياً: **${uData.coins}** كوينز يسطا!` });
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xFFD700)
+              .setTitle("👛 محفظتك")
+              .setDescription(`**الكوينز الحالية:** \`${(uData.coins || 0).toLocaleString()}\` 🪙`)
+              .setFooter({ text: "⚜️ زنجي بوت" })
+              .setTimestamp()],
+            ephemeral: true,
+          });
         }
 
         if (econSub === "متجر") {
           const embed = new EmbedBuilder()
-            .setColor(0xffd700)
+            .setColor(0xFFD700)
             .setTitle("🛒 متجر رتب السيرفر")
-            .setDescription("🥇 Golden: 5000 كوينز\n🥈 Silver: 2500 كوينز\n🥉 Bronze: 1000 كوينز\n\nللشراء اكتب `/اقتصاد شراء الرتبة:(الاسم)`");
+            .setDescription(
+              "🥇 **Golden** — 5,000 كوينز\n" +
+              "🥈 **Silver** — 2,500 كوينز\n" +
+              "🥉 **Bronze** — 1,000 كوينز"
+            )
+            .setFooter({ text: "⚜️ للشراء استخدم: /اقتصاد شراء" })
+            .setTimestamp();
           return interaction.reply({ embeds: [embed] });
         }
 
@@ -3743,20 +3771,25 @@ client.on("interactionCreate", async (interaction) => {
           const choice = interaction.options.getString("الرتبة");
           const uData = db.getUser(user.id);
           const prices = { golden: 5000, silver: 2500, bronze: 1000 };
-          if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية يا غالي!", ephemeral: true });
-
+          if (uData.coins < prices[choice]) return interaction.reply({ content: "❌ معندكش كوينز كفاية!", ephemeral: true });
           const role = guild.roles.cache.find(r => r.name.toLowerCase() === choice);
-          if (!role) return interaction.reply({ content: "❌ الرتبة مش متأسسة بنفس الاسم في السيرفر ده!", ephemeral: true });
-
+          if (!role) return interaction.reply({ content: "❌ الرتبة مش موجودة في السيرفر ده!", ephemeral: true });
           const member = await guild.members.fetch(user.id);
           await member.roles.add(role);
           db.updateUser(user.id, { coins: uData.coins - prices[choice] });
-          return interaction.reply({ content: `🎉 مبروك! اشتريت الرتبة بنجاح واتخصم ${prices[choice]} كوينز.` });
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0x2ecc71)
+              .setTitle("✅ تم الشراء بنجاح!")
+              .setDescription(`اتضافتلك رتبة **${role.name}** واتخصم \`${prices[choice].toLocaleString()}\` كوينز 🎉\n💰 **رصيدك الآن:** \`${(uData.coins - prices[choice]).toLocaleString()}\` 🪙`)
+              .setFooter({ text: "⚜️ زنجي بوت" })
+              .setTimestamp()],
+            ephemeral: true,
+          });
         }
 
         if (econSub === "إعطاء") {
-          // ✅ ملحوظة: Discord مش بيسمح بـ default permissions مختلفة لكل subcommand،
-          //   فبنعمل فحص يدوي هنا للصلاحية بدل الاعتماد على setDefaultMemberPermissions
+          // ✅ ملحوظة: Discord مش بيسمح بـ default permissions مختلفة لكل subcommand
           if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
             return interaction.reply({ content: "❌ الأمر ده للإدارة بس!", ephemeral: true });
           }
@@ -3764,15 +3797,29 @@ client.on("interactionCreate", async (interaction) => {
           const amount = interaction.options.getInteger("كمية");
           const uData = db.getUser(target.id);
           db.updateUser(target.id, { coins: uData.coins + amount });
-          return interaction.reply({ content: `🪙 تم منح **${amount}** كوينز لـ ${target} بنجاح.` });
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0x2ecc71)
+              .setTitle("✅ تم منح الكوينز")
+              .setDescription(`تم منح **${amount.toLocaleString()} 🪙** لـ ${target} بنجاح!`)
+              .setFooter({ text: "⚜️ زنجي بوت — الإدارة" })
+              .setTimestamp()],
+          });
         }
 
         if (econSub === "يومي") {
           const uData = db.getUser(user.id);
           const now = Date.now();
-          if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت المكافأة بتاعتك النهاردة خلاص يسطا تعالي بكره!", ephemeral: true });
-          db.updateUser(user.id, { coins: uData.coins + 200, lastDaily: now });
-          return interaction.reply({ content: "🎁 أخدت الـ **200 كوينز** اليومية بتاعتك بنجاح! نوّرت المحفظة." });
+          if (uData.lastDaily && now - uData.lastDaily < 86400000) return interaction.reply({ content: "❌ أخدت مكافأتك النهارده خلاص! تعالي بكره 🕐", ephemeral: true });
+          db.updateUser(user.id, { coins: (uData.coins || 0) + 200, lastDaily: now });
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xFFD700)
+              .setTitle("🎁 مكافأة يومية!")
+              .setDescription(`استلمت **200 🪙** كوينز يومية!\n\n💰 **رصيدك الآن:** \`${((uData.coins || 0) + 200).toLocaleString()}\` 🪙`)
+              .setFooter({ text: "⚜️ ارجع بكره عشان تاخد بونص أكبر! 🔥" })
+              .setTimestamp()],
+          });
         }
       }
 
@@ -4167,29 +4214,55 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       if (cmd === "مساعدة") {
-        return interaction.reply({ content: "🤖 **جميع الأوامر بتشتغل بـ السلاش (`/`):**\nعامة: `ping`, `hello`, `serverinfo`\nنظام مالي: `/اقتصاد` (بروفايل, محفظة, يومي...)\nليدربورد: `ليدربورد`\nميوزك: `/موسيقى` (تشغيل, إيقاف, تخطي...)\n🎁 متقدم: `clean_chapter`, `translate_chapter`\n🧹 تنظيف سريع: `تنظيف_صورة`, `تنظيف_رابط`, `استخراج_نص`" });
+        return interaction.reply({
+          embeds: [new EmbedBuilder()
+            .setColor(0xFFD700)
+            .setTitle("⚜️ دليل أوامر زنجي بوت")
+            .setDescription("كل الأوامر بتشتغل بـ السلاش `/`")
+            .addFields(
+              { name: "🎮 الألعاب",    value: "`/الألعاب` — كل الألعاب من مكان واحد", inline: true },
+              { name: "🏦 الاقتصاد",  value: "`/بنك` `/يومي` `/تحويل` `/بروفايل`", inline: true },
+              { name: "🏆 ترتيب",     value: "`/ليدربورد` `/top`", inline: true },
+              { name: "🎵 موسيقى",    value: "`/موسيقى` — تشغيل، تخطي، قائمة...", inline: true },
+              { name: "⚔️ RPG",       value: "`/كلاسي` `/بروفايل-rpg` `/الانجازات`", inline: true },
+              { name: "📺 أنمي",      value: "`/أنمي` — بحث، قوائم، ترشيحات", inline: true },
+              { name: "🖼️ صور",       value: "`/صورة` `/تنظيف-صورة` `/تنظيف-رابط`", inline: true },
+              { name: "✨ مميزات",    value: "`/احدث-المميزات` — آخر التحديثات", inline: true },
+            )
+            .setFooter({ text: "⚜️ زنجي بوت" })
+            .setTimestamp()],
+          ephemeral: true,
+        });
       }
 
       if (cmd === "ليدربورد") {
         const type = interaction.options.getString("نوع") ?? "coins";
         const allUsers = db.getAllData().users;
+        const medals = ["🥇", "🥈", "🥉"];
 
         if (type === "coins" || type === "xp") {
-          const sorted = Object.entries(allUsers).sort((a, b) => (b[1][type] || 0) - (a[1][type] || 0)).slice(0, 10);
+          const sorted = Object.entries(allUsers)
+            .sort((a, b) => (b[1][type] || 0) - (a[1][type] || 0)).slice(0, 10);
           const typeLabel = type === "coins" ? "🪙 الكوينز" : "✨ الـ XP";
           const embed = new EmbedBuilder()
             .setColor(0xFFD700)
             .setTitle(`🏆 ليدربورد ${typeLabel}`)
-            .setDescription(sorted.map(([id, data], i) =>
-              `**#${i+1}** <@${id}> — **${(data[type] || 0).toLocaleString()}** ${type === "coins" ? "🪙" : "XP"}`
-            ).join("\n") || "مفيش بيانات")
+            .setDescription(
+              sorted.map(([id, data], i) =>
+                `${medals[i] || `**#${i+1}**`} <@${id}> — \`${(data[type] || 0).toLocaleString()}\` ${type === "coins" ? "🪙" : "XP"}`
+              ).join("\n") || "📭 مفيش بيانات بعد!"
+            )
+            .setFooter({ text: "⚜️ زنجي بوت" })
             .setTimestamp();
           return interaction.reply({ embeds: [embed] });
         }
 
         // ✅ دمج: أنواع الألعاب (روليت/اكس اوه/مافيا/حجر ورقة مقص/إجمالي)
         const game = type;
-        const gameLabels = { roulette: "🎰 روليت", xo: "❌ اكس اوه", mafia: "🕵️ مافيا", rps: "✌️ حجر ورقة مقص", total: "📊 إجمالي" };
+        const gameLabels = {
+          roulette: "🎰 روليت", xo: "❌ اكس اوه", mafia: "🕵️ مافيا",
+          rps: "✌️ حجر ورقة مقص", total: "📊 إجمالي الألعاب",
+        };
         const sorted = Object.entries(allUsers).map(([id, d]) => {
           const wins = d.gameWins || {};
           const score = game === "total"
@@ -4199,12 +4272,14 @@ client.on("interactionCreate", async (interaction) => {
         }).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
 
         const embed = new EmbedBuilder()
-          .setColor(0x9b59b6)
+          .setColor(0xC9A227)
           .setTitle(`🏆 ليدربورد ${gameLabels[game] || game}`)
-          .setDescription(sorted.length > 0
-            ? sorted.map(([id, s], i) => `**#${i+1}** <@${id}> — **${s}** انتصار`).join("\n")
-            : "مفيش انتصارات مسجلة بعد!")
-          .setFooter({ text: "الانتصارات بتتسجل تلقائياً من الألعاب" })
+          .setDescription(
+            sorted.length > 0
+              ? sorted.map(([id, s], i) => `${medals[i] || `**#${i+1}**`} <@${id}> — \`${s}\` انتصار`).join("\n")
+              : "📭 مفيش انتصارات مسجلة بعد!"
+          )
+          .setFooter({ text: "⚜️ الانتصارات بتتسجل تلقائياً من الألعاب" })
           .setTimestamp();
         return interaction.reply({ embeds: [embed] });
       }

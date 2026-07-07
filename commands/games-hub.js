@@ -1,19 +1,19 @@
 // ═══════════════════════════════════════════════════════════════
-//  🎮 Games Hub + احدث المميزات + تغيير طريقة الكلام
+//  🎮 مركز الألعاب + أحدث المميزات + تغيير طريقة الكلام
+//  ⚜️ Black & Gold Luxury Theme
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder, EmbedBuilder, ActionRowBuilder,
   ButtonBuilder, ButtonStyle, StringSelectMenuBuilder,
 } from "discord.js";
+import { COLORS, footer } from "../helpers/theme.js";
 
 // ══════════════════════════════════════════════════════════════
 //  قائمة أحدث المميزات
-//
-//  ⚠️ قواعد إلزامية — لازم تتبعها قبل أي push:
+//  ⚠️ قواعد إلزامية:
 //    1. أضف الميزة الجديدة في الأول (الأحدث فوق دايماً)
-//    2. احذف آخر entry عشان الـ Array يفضل 5 عناصر بس
-//    3. الـ Array لازم يكون 5 عناصر دايماً — مش أكتر مش أقل
-//    الهدف: /احدث-المميزات يعرض الجديد بس — مش تاريخ كامل
+//    2. احذف آخر entry عشان الـ Array يفضل 5 عناصر
+//    3. الـ Array لازم يكون 5 عناصر دايماً
 // ══════════════════════════════════════════════════════════════
 export const LATEST_FEATURES = [
   {
@@ -43,7 +43,7 @@ export const LATEST_FEATURES = [
   },
 ];
 
-// ── هب الألعاب ────────────────────────────────────────────────
+// ── أوامر الأقسام ─────────────────────────────────────────────
 export const gamesHubCommand = new SlashCommandBuilder()
   .setName("الألعاب").setDescription("🎮 كل ألعاب زنجي في مكان واحد — اضغط وابدأ!");
 
@@ -57,41 +57,56 @@ export const speechModeCommand = new SlashCommandBuilder()
     opt.setName("أسلوب").setDescription("اختر الأسلوب المطلوب").setRequired(false)
       .addChoices(
         { name: "🎩 محترم — 0% شتايم", value: "normal" },
-        { name: "😈 باد بوي — 50%", value: "free" },
-        { name: "☠️ إكستريم — 100%", value: "toxic" },
+        { name: "😈 باد بوي — 50%",    value: "free" },
+        { name: "☠️ إكستريم — 100%",   value: "toxic" },
       )
   )
   .addStringOption(opt =>
     opt.setName("لهجة").setDescription("اختر لهجة البوت").setRequired(false)
       .addChoices(
         { name: "🇪🇬 مصري — عامية مصرية طبيعية", value: "egyptian" },
-        { name: "🌐 عربي — فصحى / عربي رسمي", value: "fus-ha" },
+        { name: "🌐 عربي — فصحى / عربي رسمي",    value: "fus-ha" },
       )
   );
 
+// ── إيمبد مركز الألعاب ────────────────────────────────────────
 function buildHubEmbed() {
   return new EmbedBuilder()
-    .setColor(0x9b59b6)
+    .setColor(COLORS.GOLD)
     .setTitle("🎮 مركز الألعاب — زنجي بوت")
-    .setDescription("اختار اللعبة اللي عايز تلعبها من القايمة تحت 👇\nولو محتاج قدرات خاصة، جرّب `/متجر-قدرات`")
+    .setDescription(
+      "```\n⚜️  اختار لعبتك وابدأ الآن\n   من القايمة تحت 👇\n```"
+    )
     .addFields(
       {
         name: "⚔️ ألعاب جماعية",
-        value: "🎰 **روليت** — روليت روسية، آخر ناجي ياخد الكوينز\n🕵️ **مافيا** — اكشف المافيا قبل ما يقضوا على البلدة\n🃏 **كود نيمز** — فريقين يخمنوا الكلمات السرية\n📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة",
+        value:
+          "🎰 **روليت** — روليت روسية، آخر ناجي ياخد الكوينز\n" +
+          "🕵️ **مافيا** — اكشف المافيا قبل ما يقضوا على البلدة\n" +
+          "🃏 **كود نيمز** — فريقين يخمنوا الكلمات السرية\n" +
+          "📞 **الهاتف المكسور** — سلسلة وصف وتخمين مضحكة",
         inline: false,
       },
       {
         name: "🧠 ألعاب فردية وتحدي",
-        value: "❌⭕ **اكس-اوه** — ضد لاعب أو ضد الذكاء الاصطناعي 🤖\n🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك\n✂️ **ح.و.م الخارقة** — اختار أي حاجة والـ AI يحكم!\n🧠 **مسابقة** — أسئلة ثقافية بجوايز\n😂 **صنع الميم** — اكتب أحلى كابشن",
+        value:
+          "❌⭕ **اكس-اوه** — ضد لاعب أو ضد الذكاء الاصطناعي 🤖\n" +
+          "🪨 **ح.و.م العادية** — حجر ورقة مقص كلاسيك\n" +
+          "✂️ **ح.و.م الخارقة** — اختار أي حاجة والـ AI يحكم!\n" +
+          "🧠 **مسابقة** — أسئلة ثقافية بجوايز\n" +
+          "😂 **صنع الميم** — اكتب أحلى كابشن",
         inline: false,
       },
       {
         name: "💰 اقتصاد وحظ",
-        value: "🌍 **الحياة** — نظام اقتصادي مستمر: شغل، ممتلكات، وثروة\n🎰 **بنك الحظ المصري** — دوّر العجلة وارفع رصيدك\n🏦 **البنك المركزي** — أمر `/بنك` بقايمة اختيار كاملة",
+        value:
+          "🌍 **الحياة** — نظام اقتصادي مستمر: شغل، ممتلكات، وثروة\n" +
+          "🎰 **بنك الحظ المصري** — دوّر العجلة وارفع رصيدك\n" +
+          "🏦 **البنك المركزي** — أمر `/بنك` بقايمة اختيار كاملة",
         inline: false,
       },
     )
-    .setFooter({ text: "💡 تحتاج 3+ لاعبين لمعظم الألعاب الجماعية — دعوّ أصحابك!" })
+    .setFooter(footer("تحتاج 3+ لاعبين لمعظم الألعاب الجماعية — دعوّ أصحابك!"))
     .setTimestamp();
 }
 
@@ -100,17 +115,17 @@ function buildHubSelectRow() {
     .setCustomId("ghub_menu")
     .setPlaceholder("🎮 اختار لعبة تبدأها دلوقتي...")
     .addOptions(
-      { label: "روليت", value: "ghub_rlt", emoji: "🎰", description: "روليت روسية جماعية" },
-      { label: "مافيا", value: "ghub_maf", emoji: "🕵️", description: "اكشف المافيا" },
-      { label: "اكس-اوه", value: "ghub_ttt", emoji: "❌", description: "ضد لاعب أو AI" },
-      { label: "كود نيمز", value: "ghub_cdn", emoji: "🃏", description: "فريقين وكلمات سرية" },
-      { label: "الهاتف المكسور", value: "ghub_gar", emoji: "📞", description: "سلسلة وصف وتخمين" },
-      { label: "صنع الميم", value: "ghub_meme", emoji: "😂", description: "أحلى كابشن يفوز" },
-      { label: "مسابقة", value: "ghub_quiz", emoji: "🧠", description: "أسئلة ثقافية" },
-      { label: "ح.و.م العادية", value: "ghub_rps_easy", emoji: "🪨", description: "حجر ورقة مقص كلاسيك" },
-      { label: "ح.و.م الخارقة", value: "ghub_rps_ai", emoji: "✂️", description: "أي حاجة والـ AI يحكم" },
-      { label: "الحياة", value: "ghub_banklife", emoji: "🌍", description: "نظام اقتصادي مستمر" },
-      { label: "بنك الحظ المصري", value: "ghub_bankluck", emoji: "🎰", description: "دوّر العجلة وارفع رصيدك" },
+      { label: "روليت",          value: "ghub_rlt",      emoji: "🎰", description: "روليت روسية جماعية" },
+      { label: "مافيا",          value: "ghub_maf",      emoji: "🕵️", description: "اكشف المافيا" },
+      { label: "اكس-اوه",        value: "ghub_ttt",      emoji: "❌", description: "ضد لاعب أو AI" },
+      { label: "كود نيمز",       value: "ghub_cdn",      emoji: "🃏", description: "فريقين وكلمات سرية" },
+      { label: "الهاتف المكسور", value: "ghub_gar",      emoji: "📞", description: "سلسلة وصف وتخمين" },
+      { label: "صنع الميم",      value: "ghub_meme",     emoji: "😂", description: "أحلى كابشن يفوز" },
+      { label: "مسابقة",         value: "ghub_quiz",     emoji: "🧠", description: "أسئلة ثقافية" },
+      { label: "ح.و.م العادية",  value: "ghub_rps_easy", emoji: "🪨", description: "حجر ورقة مقص كلاسيك" },
+      { label: "ح.و.م الخارقة",  value: "ghub_rps_ai",  emoji: "✂️", description: "أي حاجة والـ AI يحكم" },
+      { label: "الحياة",         value: "ghub_banklife", emoji: "🌍", description: "نظام اقتصادي مستمر" },
+      { label: "بنك الحظ المصري",value: "ghub_bankluck", emoji: "🎰", description: "دوّر العجلة وارفع رصيدك" },
     );
   return new ActionRowBuilder().addComponents(menu);
 }
@@ -130,13 +145,14 @@ export async function handleGamesHubCommand(interaction) {
   return interaction.reply({ embeds: [buildHubEmbed()], components: buildHubRows() });
 }
 
-// ── احدث المميزات ─────────────────────────────────────────────
+// ── أحدث المميزات ─────────────────────────────────────────────
 function buildFeaturesEmbed() {
   return new EmbedBuilder()
-    .setColor(0x3498db).setTitle("✨ أحدث مميزات زنجي بوت")
-    .setDescription("كل ده جديد — جرّب كل حاجة! 🚀")
+    .setColor(COLORS.PALE_GOLD)
+    .setTitle("✨ أحدث مميزات زنجي بوت")
+    .setDescription("```\n⚜️  كل ده جديد — جرّب كل حاجة!\n```")
     .addFields(...LATEST_FEATURES)
-    .setFooter({ text: "زنجي بوت — دايماً في تطور 🤖" })
+    .setFooter(footer("زنجي بوت — دايماً في تطور"))
     .setTimestamp();
 }
 
