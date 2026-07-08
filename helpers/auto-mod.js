@@ -433,7 +433,23 @@ const SAFE_PRESCREEN = [
 //  Throttle & Context
 // ═══════════════════════════════════════════════════════════════
 const _userLastCall = new Map();
-const USER_THROTTLE_MS = 1500;
+const USER_THROTTLE_MS = 30_000; // 30 ثانية per-user
+
+// Global rate limiter — ماكس 10 calls/دقيقة على كل المستخدمين
+const _globalGeminiCalls = { count: 0, windowStart: Date.now() };
+const GLOBAL_GEMINI_LIMIT = 10;
+const GLOBAL_GEMINI_WINDOW_MS = 60_000;
+
+function canCallGeminiGlobal() {
+  const now = Date.now();
+  if (now - _globalGeminiCalls.windowStart > GLOBAL_GEMINI_WINDOW_MS) {
+    _globalGeminiCalls.count = 0;
+    _globalGeminiCalls.windowStart = now;
+  }
+  if (_globalGeminiCalls.count >= GLOBAL_GEMINI_LIMIT) return false;
+  _globalGeminiCalls.count++;
+  return true;
+}
 const _suspectTracker = new Map();
 const SUSPECT_WINDOW_MS = 5 * 60_000;
 const _channelContext = new Map();
@@ -466,15 +482,23 @@ async function getChannelContext(msg) {
 // ═══════════════════════════════════════════════════════════════
 async function analyzeWithGemini(msg, db, geminiTextModel, ageFactor) {
   if (!geminiTextModel) return { level: DANGER.SAFE, reason: "لا يوجد AI" };
+
+  // Trusted user bypass — reputation عالي = مش محتاج Gemini
+  const repScore = getReputation(msg.author.id);
+  if (repScore >= 80) return { level: DANGER.SAFE, reason: "trusted user" };
+
+  // Per-user throttle
   const now = Date.now();
   const last = _userLastCall.get(msg.author.id) || 0;
   if (now - last < USER_THROTTLE_MS) return { level: DANGER.SAFE, reason: "throttle" };
   _userLastCall.set(msg.author.id, now);
 
+  // Global rate limit
+  if (!canCallGeminiGlobal()) return { level: DANGER.SAFE, reason: "global rate limit" };
+
   const contextMessages = await getChannelContext(msg);
   const warnings = db.getWarnings(msg.author.id).length;
   const suspectCount = _suspectTracker.get(msg.author.id)?.count || 0;
-  const repScore = getReputation(msg.author.id);
   const nightMode = isNightMode();
 
   const contextBlock = contextMessages.length > 0
