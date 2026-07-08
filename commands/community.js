@@ -139,7 +139,7 @@ export async function handleVerifyButton(interaction) {
 
 // ── /متجر (متجر البنك المركزي) ───────────────────────────────
 export const bankShopCommand = new SlashCommandBuilder()
-  .setName("متجر")
+  .setName("متجر-البنك")
   .setDescription("🛒 تسوّق بذهب البنك المركزي — رتب ومميزات حصرية");
 
 const BANK_SHOP_ITEMS = [

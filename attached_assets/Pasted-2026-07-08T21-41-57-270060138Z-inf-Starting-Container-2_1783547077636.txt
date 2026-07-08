@@ -1,0 +1,42 @@
+2026-07-08T21:41:57.270060138Z [inf]  Starting Container
+2026-07-08T21:41:57.275578543Z [inf]  
+2026-07-08T21:41:57.275581313Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-08T21:41:57.275584153Z [inf]  > node index.js
+2026-07-08T21:41:57.275587013Z [inf]  
+2026-07-08T21:41:57.321570989Z [err]  ⚠️ تنبيه! المتغير GOOGLE_CLIENT_ID مفقود - بعض الميزات ما تشتغل
+2026-07-08T21:41:57.321575179Z [err]  ⚠️ تنبيه! المتغير GOOGLE_CLIENT_SECRET مفقود - بعض الميزات ما تشتغل
+2026-07-08T21:41:57.321578809Z [err]  ⚠️ تنبيه! المتغير GOOGLE_REFRESH_TOKEN مفقود - بعض الميزات ما تشتغل
+2026-07-08T21:41:57.321583569Z [err]  ⚠️ تنبيه! المتغير YOUTUBE_API_KEY مفقود - بعض الميزات ما تشتغل
+2026-07-08T21:41:57.979681626Z [inf]  🔒 [Lock] احنا النسخة الشرعية (instanceId=14-mrcls9iv-jzi148)
+2026-07-08T21:41:57.979685326Z [inf]  ✅ [Music] النظام جاهز — play-dl + @discordjs/voice + Spotify
+2026-07-08T21:41:57.979689426Z [inf]  ✅ [GeminiKeys] 8 مفتاح جاهز (~12000 طلب/يوم)
+2026-07-08T21:41:57.979692926Z [inf]  ℹ️ [٩:٤١:٥٧ م] 🤖 Gemini AI جاهز!
+2026-07-08T21:41:57.979696656Z [inf]  🔄 [Keep-Alive] شغّال — ping كل 2 دقيقة | مراقبة كل دقيقة | /status للإحصائيات
+2026-07-08T21:41:57.980316698Z [inf]  ✅ Server is ready and listening on port 8080
+2026-07-08T21:41:59.380167183Z [inf]  ✅ [٩:٤١:٥٩ م] نجح: تسجيل الدخول بـ: زنجي
+2026-07-08T21:41:59.380175243Z [inf]  ℹ️ [٩:٤١:٥٩ م] 🔄 رفع 83 أمر على ديسكورد...
+2026-07-08T21:41:59.380178733Z [err]  ❌ [٩:٤١:٥٩ م] خطأ: خطأ في رفع الأوامر:
+2026-07-08T21:41:59.380181333Z [err]     تفاصيل: Invalid Form Body
+2026-07-08T21:41:59.380183963Z [err]  43[APPLICATION_COMMANDS_DUPLICATE_NAME]: Application command names must be unique
+2026-07-08T21:41:59.380187253Z [err]     Stack: DiscordAPIError[50035]: Invalid Form Body
+2026-07-08T21:41:59.380189993Z [err]  43[APPLICATION_COMMANDS_DUPLICATE_NAME]: Application command names must be unique
+2026-07-08T21:41:59.380193113Z [err]      at handleErrors (/app/node_modules/@discordjs/rest/dist/index.js:762:13)
+2026-07-08T21:41:59.380195593Z [err]      at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+2026-07-08T21:41:59.380198573Z [err]      at async SequentialHandler.runRequest (/app/node_modules/@discordjs/rest/dist/index.js:1163:23)
+2026-07-08T21:41:59.380201273Z [err]      at async SequentialHandler.queueRequest (/app/node_modules/@discordjs/rest/dist/index.js:994:14)
+2026-07-08T21:41:59.380203833Z [err]      at async _REST.request (/app/node_modules/@discordjs/rest/dist/index.js:1307:22)
+2026-07-08T21:41:59.380206773Z [err]      at async deployCommands (file:///app/index.js:881:5)
+2026-07-08T21:41:59.380209313Z [err]      at async Client.<anonymous> (file:///app/index.js:1577:3)
+2026-07-08T21:41:59.380211503Z [err]  ═══════════════════════════════════════════════════════
+2026-07-08T21:41:59.380213863Z [err]  ⚠️  تحذير: الأوامر دي مش موثقة في /احدث-المميزات !
+2026-07-08T21:41:59.380216323Z [err]     أضفهم في LATEST_FEATURES داخل commands/games-hub.js
+2026-07-08T21:41:59.385023366Z [err]     الأوامر: بوابة-التحقق, ملخص-السيرفر, امسح-ذاكرتك, ماين-كرافت, الوان
+2026-07-08T21:41:59.385033316Z [err]  ═══════════════════════════════════════════════════════
+2026-07-08T21:41:59.645929070Z [inf]  ℹ️ [٩:٤١:٥٩ م] ℹ️ لوحة الاقتراحات الثابتة موجودة بالفعل — لن نرسل نسخة جديدة
+2026-07-08T21:41:59.645934880Z [inf]  ℹ️ [٩:٤١:٥٩ م] ⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز
+2026-07-08T21:41:59.645939020Z [inf]  ℹ️ [٩:٤١:٥٩ م] 📊 نظام ملخص السيرفر الأسبوعي جاهز
+2026-07-08T21:41:59.645953990Z [inf]  ✅ [WeeklyChallenge] جُدوِل — التحدي القادم يوم الجمعة الساعة 1 ظهراً (بعد 37 ساعة و18 دقيقة)
+2026-07-08T21:41:59.645957390Z [inf]  ✅ [AnimeNews] نظام أخبار الأنمي جاهز — بيتحقق كل ساعة
+2026-07-08T21:41:59.645961050Z [inf]  ✅ [LegendaryEvents] نظام الفعاليات الأسطورية جاهز — أول فعالية بعد 10 دقايق
+2026-07-08T21:41:59.645964310Z [inf]  ℹ️ [٩:٤١:٥٩ م] 👑 البوت عنده Admin بالفعل في: 👑الفࢪا؏ـنة✨
+2026-07-08T21:42:49.813740260Z [err]  ⚠️ [GeminiKeys] المفتاح BJPrfw وصل للحد — بيتحول للتالي
