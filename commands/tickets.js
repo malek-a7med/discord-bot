@@ -6,9 +6,15 @@ import {
   ChannelType, PermissionFlagsBits, ModalBuilder, TextInputBuilder, TextInputStyle,
 } from "discord.js";
 
-const TICKET_CATEGORY_NAME = "🎫 التذاكر";
+const TICKET_CATEGORY_NAME = "✦──── 𝑻𝑰𝑪𝑲𝑬𝑻 𝑺𝑼𝑷𝑷𝑶𝑹𝑻 ─────✦";
 const TICKET_LOG_CHANNEL_NAME = "ticket-logs";
 const openTickets = new Map(); // userId → channelId
+const TICKET_MENTION_ROLE_IDS = [
+  "1485896430957625372",
+  "1509478513407824033",
+  "1520022076491300975",
+  "1516027381456830624",
+];
 
 export function buildTicketButton() {
   return new ButtonBuilder()
@@ -58,7 +64,8 @@ export async function handleTicketModalSubmit(interaction, db) {
   const reason = interaction.fields.getTextInputValue("ticket_reason");
 
   let category = guild.channels.cache.find(c =>
-    c.type === ChannelType.GuildCategory && c.name.includes("التذاكر")
+    c.type === ChannelType.GuildCategory &&
+    (c.name.includes("التذاكر") || c.name.includes("TICKET") || c.name === TICKET_CATEGORY_NAME)
   );
 
   if (!category) {
@@ -87,6 +94,16 @@ export async function handleTicketModalSubmit(interaction, db) {
     permsOverwrites.push({
       id: adminRole.id,
       allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels],
+    });
+  }
+
+  const mentionRoles = TICKET_MENTION_ROLE_IDS
+    .map(id => guild.roles.cache.get(id))
+    .filter(Boolean);
+  for (const role of mentionRoles) {
+    permsOverwrites.push({
+      id: role.id,
+      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
     });
   }
 
@@ -127,8 +144,12 @@ export async function handleTicketModalSubmit(interaction, db) {
     .setFooter({ text: "اضغط 🔒 لإغلاق التذكرة لما تخلص" })
     .setTimestamp();
 
+  const roleMentions = mentionRoles.length > 0
+    ? mentionRoles.map(r => `<@&${r.id}>`).join(" ")
+    : (adminRole ? `${adminRole}` : "الإدارة");
+
   await ticketChannel.send({
-    content: `${interaction.user} ${adminRole ? adminRole : "الإدارة"} — تذكرة جديدة تحتاج مراجعة! 🔔`,
+    content: `${interaction.user} ${roleMentions} — تذكرة جديدة تحتاج مراجعة! 🔔`,
     embeds: [embed],
     components: [closeRow],
   });
