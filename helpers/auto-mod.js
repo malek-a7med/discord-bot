@@ -155,11 +155,13 @@ function checkCrossChannelFlood(userId, channelId) {
   _crossChannel.set(userId, data);
 
   if (data.channels.size >= MAX_CHANNELS) {
-    changeRep(userId, -30);
+    changeRep(userId, -20);
     return {
       type: "cross_channel_flood",
-      reason: `بعت في ${data.channels.size} قنوات في 10 ثواني — هاكر محتمل!`,
-      level: DANGER.CRITICAL,
+      // ✅ FIX: كانت CRITICAL فبتطرد/تباند بسرعة على أعضاء نشطين بيراسلوا
+      //   قنوات كتير عادي — نزّلناها HIGH عشان تمشي في التصاعد العادي.
+      reason: `بعت في ${data.channels.size} قنوات في 10 ثواني — سلوك مشبوه`,
+      level: DANGER.HIGH,
     };
   }
   return null;
@@ -605,7 +607,6 @@ async function executeAction(msg, db, notifyOwner, assessment) {
   const warnings = db.getWarnings(user.id).length;
   const suspectHits = trackSuspect(user.id);
   const repScore = getReputation(user.id);
-  const isLowRep = repScore < 40;
 
   if (level === DANGER.LOW) {
     return { triggered: true, action: "log_only", warnCount: warnings, logData: buildLogData(msg, reason, category, level, 0) };
@@ -624,30 +625,34 @@ async function executeAction(msg, db, notifyOwner, assessment) {
 
   db.addWarning(user.id, reason, "AUTO_MOD");
   const newWarnCount = db.getWarnings(user.id).length;
-  const effectiveWarnCount = isLowRep ? newWarnCount + 1 : newWarnCount;
+  // ✅ FIX: شلنا الـ +1 الوهمي لو الـ reputation منخفض — كان بيسرّع العقاب
+  //   بشكل غير عادل (عضو أخد تحذير واحد يبقى قريب من الطرد أوتوماتيك).
+  const effectiveWarnCount = newWarnCount;
   const isCritical = level === DANGER.CRITICAL;
   let action = "warn";
 
-  if (isCritical && effectiveWarnCount >= 3) {
+  // ✅ FIX: رفعنا العتبات — كانت بتطرد/تباند بسرعة كبيرة جداً على أخطاء بسيطة
+  //   أو false positives من الطبقات الاحترازية (cross-channel-flood, bot behavior).
+  if (isCritical && effectiveWarnCount >= 5) {
     if (member?.bannable) { try { await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 }); db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD"); action = "ban"; } catch { action = "owner_report"; } }
     else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-  } else if (isCritical && effectiveWarnCount >= 2) {
+  } else if (isCritical && effectiveWarnCount >= 3) {
     if (member?.kickable) { try { await member.kick(`Auto-Mod: ${reason}`); action = "kick"; } catch { action = "owner_report"; } }
     else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
   } else if (isCritical) {
     if (member?.manageable) { try { await member.timeout(TIMEOUT_24H, `Auto-Mod: ${reason}`); action = "timeout_24h"; } catch { action = "warn"; } }
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-  } else if (effectiveWarnCount >= 5) {
+  } else if (effectiveWarnCount >= 7) {
     if (member?.bannable) { try { await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 }); db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD"); action = "ban"; } catch { action = "owner_report"; } }
     else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-  } else if (effectiveWarnCount >= 4) {
+  } else if (effectiveWarnCount >= 6) {
     if (member?.kickable) { try { await member.kick(`Auto-Mod: ${reason}`); action = "kick"; } catch { action = "owner_report"; } }
     else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-  } else if (effectiveWarnCount >= 3 || suspectHits >= 3) {
+  } else if (effectiveWarnCount >= 4 || suspectHits >= 5) {
     if (member?.manageable) { try { await member.timeout(TIMEOUT_2H, `Auto-Mod: ${reason}`); action = "timeout"; } catch { action = "warn"; } }
   }
 
