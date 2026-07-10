@@ -429,7 +429,33 @@ function isNightMode() {
 const SAFE_PRESCREEN = [
   /^[\p{Emoji}\s]+$/u,
   /^.{1,3}$/,
+  // ✅ FIX: إيموجيهات السيرفر المخصصة <:name:id> أو <a:name:id> — كانت
+  //   بتفوت الفحص وتروح لـ Gemini كأنها نص عادي وأحياناً تتصنّف غلط.
+  /^(?:<a?:\w+:\d+>|\p{Emoji}|\s)+$/u,
 ];
+
+// ✅ FIX: روابط GIF/صور من مواقع معروفة وموثوقة — تتعامل كآمنة أوتوماتيك
+//   من غير ما تدخل في تحليل Gemini اللي ممكن يغلط في تصنيفها.
+const SAFE_MEDIA_DOMAINS = [
+  "tenor.com", "giphy.com", "media.discordapp.net", "cdn.discordapp.com",
+  "imgur.com", "media.giphy.com", "media.tenor.com",
+];
+
+function isSafeMediaOnlyMessage(content) {
+  const trimmed = content.trim();
+  if (!trimmed) return false;
+  const urlMatches = trimmed.match(/https?:\/\/[^\s]+/g) || [];
+  if (urlMatches.length === 0) return false;
+  // كل الكلام في الرسالة عبارة عن رابط/روابط بس (من غير نص إضافي مشبوه)
+  const withoutUrls = trimmed.replace(/https?:\/\/[^\s]+/g, "").trim();
+  if (withoutUrls.length > 0) return false;
+  return urlMatches.every(url => {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return SAFE_MEDIA_DOMAINS.some(d => host === d || host.endsWith(`.${d}`));
+    } catch { return false; }
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  Throttle & Context
@@ -752,7 +778,7 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner, gemin
   }
 
   // ── Pre-screen ────────────────────────────────────────────────
-  const isObviouslySafe = SAFE_PRESCREEN.some(rx => rx.test(content));
+  const isObviouslySafe = SAFE_PRESCREEN.some(rx => rx.test(content)) || isSafeMediaOnlyMessage(content);
   const hasText = content.length > 3;
   const hasImages = msg.attachments.size > 0 && [...msg.attachments.values()].some(a => a.contentType?.startsWith("image/"));
   if (isObviouslySafe && !hasImages) { updateStats({ triggered: false }, userId); return { triggered: false }; }
