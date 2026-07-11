@@ -264,15 +264,18 @@ JSON:`;
 // ── استدعاء موحد: classify + reply في طلب واحد ─────────────────
 async function classifyAndReply(geminiModel, text, ownerName, guild, userId) {
   const hist = historyToText(userId, ownerName);
+  // ✅ FIX: retries=2 (كانت 1 يعني من غير إعادة محاولة فعلية) — عشان طلب
+  //   بطيء واحد من Gemini ميفشلش الأمر كله فوراً.
   return withRetry(async () => {
     const result = await geminiModel.generateContent(
       buildUnifiedPrompt(text, ownerName, guild, hist, userId)
     );
     const raw   = result.response.text().trim();
+
     const match = raw.match(/\{[\s\S]*?\}/);
     if (!match) return { action: "chat", reply: raw };
     return JSON.parse(match[0]);
-  });
+  }, 2);
 }
 
 // ── اللوج ──────────────────────────────────────────────────────
@@ -360,7 +363,8 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     // ─── call واحد بس: classify + رد في نفس الوقت ───────────────
     let parsed;
     try {
-      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 15000);
+      // ✅ FIX: كانت 15s فبتفشل بسرعة على طلبات عادية شوية بطيئة — رفعناها لـ 30s.
+      parsed = await withTimeout(classifyAndReply(geminiModel, rawText, ownerName, guild, userId), 30000);
     } catch (err) {
       console.error("[OwnerAI] فشل:", err.message);
       const isQuota = err.message?.includes("429") || err.message?.includes("quota") || err.message?.includes("EXHAUSTED");
