@@ -155,13 +155,14 @@ function checkCrossChannelFlood(userId, channelId) {
   _crossChannel.set(userId, data);
 
   if (data.channels.size >= MAX_CHANNELS) {
-    changeRep(userId, -20);
+    changeRep(userId, -10);
     return {
       type: "cross_channel_flood",
-      // ✅ FIX: كانت CRITICAL فبتطرد/تباند بسرعة على أعضاء نشطين بيراسلوا
-      //   قنوات كتير عادي — نزّلناها HIGH عشان تمشي في التصاعد العادي.
+      // ✅ FIX: دي طبقة تخمين سلوكي مش مخالفة فعلية — نزّلناها MEDIUM
+      //   (تحذير ناعم/حذف بس، من غير ما تدخل في سلم العقوبات) عشان
+      //   متبقاش بتوصل لطرد/باند لعضو نشيط بيراسل قنوات كتير عادي.
       reason: `بعت في ${data.channels.size} قنوات في 10 ثواني — سلوك مشبوه`,
-      level: DANGER.HIGH,
+      level: DANGER.MEDIUM,
     };
   }
   return null;
@@ -221,11 +222,14 @@ function trackBehavior(msg) {
       // فحص إن الرسائل من قنوات متعددة (broadcast bot)
       const uniqueChannels = new Set(data.messages.slice(-10).map(m => m.channelId)).size;
       if (uniqueChannels >= 3) {
-        changeRep(userId, -25);
+        changeRep(userId, -10);
         return {
           type: "bot_behavior",
+          // ✅ FIX: ده تخمين سلوكي (timing) مش دليل قاطع — بيغلط مع بني
+          //   آدمين بيردوا بسرعة وبانتظام. نزّلناها MEDIUM (تحذير ناعم
+          //   بس) عشان متوديش لعقوبة حقيقية على أساس تخمين ممكن يبقى غلط.
           reason: `سلوك بوت مكتشف — ردود منتظمة في ${uniqueChannels} قنوات (std: ${stdDev.toFixed(0)}ms)`,
-          level: DANGER.HIGH,
+          level: DANGER.MEDIUM,
         };
       }
     }
@@ -550,12 +554,23 @@ async function analyzeWithGemini(msg, db, geminiTextModel, ageFactor) {
 سمعة: ${repScore}/100 (${getRepLabel(repScore)})
 ${strictnessNote}
 
+═══ قاعدة أساسية ═══
+الأصل في أي رسالة إنها SAFE. متفترضش نية سيئة من غير دليل واضح جداً في
+النص نفسه. لو في أي شك أو احتمال إن الكلام هزار/سياق لعبة/شتيمة ودّية
+بين أصحاب — رجّع SAFE ومتخترعش مخالفة مش موجودة. العقوبة الحقيقية
+(تحذير رسمي/إسكات/طرد/باند) بتترتب على تقييمك، فلازم تكون متحفظ جداً
+ومتاخدش القرار إلا لو متأكد فعلاً.
+
 ═══ قواعد التحليل ═══
-🟢 SAFE (90%+ الرسائل): شتايم عادية بين أصحاب، مجادلات، كلام حماسي في ألعاب، اقتباسات، نقاشات دينية/سياسية، إحباط وغضب عام
+🟢 SAFE (90%+ الرسائل): شتايم عادية بين أصحاب، مجادلات، كلام حماسي في ألعاب، اقتباسات، نقاشات دينية/سياسية، إحباط وغضب عام، سخرية، مزح، ألفاظ عامية عادية
 🟡 LOW: معلومات مضللة خطيرة فعلاً
-🟠 MEDIUM: محتوى جنسي صريح جداً، دوكسينج
-🔴 HIGH: تهديد جسدي صريح لشخص بعينه، خطاب كراهية منظم، مضايقة ممنهجة
-⛔ CRITICAL: استغلال أطفال، تعليمات أسلحة حقيقية، تحريض إرهابي
+🟠 MEDIUM: محتوى جنسي صريح جداً، دوكسينج (نشر بيانات شخصية حقيقية)
+🔴 HIGH: تهديد جسدي صريح وواضح لشخص بعينه (مش "هقتلك في اللعبة")، خطاب كراهية منظم وصريح، مضايقة ممنهجة ومتكررة موجهة لشخص واحد
+⛔ CRITICAL: استغلال أطفال، تعليمات أسلحة حقيقية، تحريض إرهابي صريح
+
+لو مش متأكد 100% إن المستوى HIGH أو CRITICAL، رجّعه SAFE أو LOW بدل ما
+تخاطر بمعاقبة عضو بريء. الـ confidence لازم يعكس ثقتك الحقيقية —
+متحطش confidence عالي إلا لو النص فعلاً واضح ومباشر.
 
 أجب بـ JSON فقط:
 {
@@ -626,13 +641,24 @@ SAFE: عادية/أنيمي/ألعاب/ميمز. MEDIUM: جنسي ضمني/عن�
 const TIMEOUT_2H  = 2  * 60 * 60 * 1000;
 const TIMEOUT_24H = 24 * 60 * 60 * 1000;
 
+// ✅ FIX: أقل درجة ثقة لازم تتوصلها أي تقييم (من Gemini أو غيره) قبل ما
+//   ياخد إجراء فعلي (حذف/تحذير رسمي/عقوبة) — لو الثقة أقل بنعتبرها
+//   مشكوك فيها ونكتفي بتسجيلها في اللوج من غير أي عقاب على العضو.
+const MIN_ACTION_CONFIDENCE = 65;
+
 async function executeAction(msg, db, notifyOwner, assessment) {
-  const { level, reason, shouldDelete, category } = assessment;
+  const { level, reason, shouldDelete, category, confidence } = assessment;
   const member = msg.member;
   const user = msg.author;
   const warnings = db.getWarnings(user.id).length;
   const suspectHits = trackSuspect(user.id);
   const repScore = getReputation(user.id);
+
+  // ✅ FIX: لو الثقة مش موجودة (طبقات regex الأكيدة) بنكمل عادي، لكن لو
+  //   موجودة وأقل من الحد الأدنى، منعاقبش على تخمين مش متأكدين منه.
+  if (typeof confidence === "number" && confidence < MIN_ACTION_CONFIDENCE) {
+    return { triggered: true, action: "log_only", warnCount: warnings, logData: buildLogData(msg, `${reason} (ثقة منخفضة: ${confidence}%)`, category, level, 0) };
+  }
 
   if (level === DANGER.LOW) {
     return { triggered: true, action: "log_only", warnCount: warnings, logData: buildLogData(msg, reason, category, level, 0) };
@@ -670,7 +696,7 @@ async function executeAction(msg, db, notifyOwner, assessment) {
   } else if (isCritical) {
     if (member?.manageable) { try { await member.timeout(TIMEOUT_24H, `Auto-Mod: ${reason}`); action = "timeout_24h"; } catch { action = "warn"; } }
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
-  } else if (effectiveWarnCount >= 7) {
+  } else if (effectiveWarnCount >= 8) {
     if (member?.bannable) { try { await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 }); db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD"); action = "ban"; } catch { action = "owner_report"; } }
     else action = "owner_report";
     await notifyOwner(user.id, member, reason, newWarnCount).catch(() => {});
