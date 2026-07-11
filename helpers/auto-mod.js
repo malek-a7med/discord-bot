@@ -696,40 +696,6 @@ async function executeAction(msg, db, notifyOwner, assessment) {
   return { triggered: true, action, warnCount: newWarnCount, aiLevel: DANGER_LABEL[level], aiCategory: category, repScore, logData: buildLogData(msg, reason, category, level, newWarnCount, savedContent, savedAttachments) };
 }
 
-// ── Honeypot: طرد/باند فوري من غير سلم تحذيرات ────────────────
-async function executeHoneypotAction(msg, db, notifyOwner, reason) {
-  const member = msg.member;
-  const user = msg.author;
-  const category = "DANGEROUS_INFO";
-  const level = DANGER.CRITICAL;
-
-  const savedContent = msg.content || "";
-  const savedAttachments = [...msg.attachments.values()].map(a => a.url);
-  await msg.delete().catch(() => {});
-
-  db.addWarning(user.id, reason, "AUTO_MOD");
-  const warnCount = db.getWarnings(user.id).length;
-
-  let action = "owner_report";
-  if (member?.bannable) {
-    try {
-      await member.ban({ reason: `Auto-Mod: ${reason}`, deleteMessageSeconds: 86400 });
-      db.addBan(user.id, `Auto-Mod: ${reason}`, "AUTO_MOD");
-      action = "ban";
-    } catch { action = "owner_report"; }
-  } else if (member?.kickable) {
-    try { await member.kick(`Auto-Mod: ${reason}`); action = "kick"; } catch { action = "owner_report"; }
-  }
-
-  await notifyOwner(user.id, member, reason, warnCount).catch(() => {});
-
-  const actionEmoji = { ban: "🔨 **باند تلقائي!**", kick: "👢 **طرد تلقائي!**", owner_report: "🚨 **بُلّغت الإدارة!**" }[action] || "";
-  const warnMsg = await msg.channel.send(`🍯 ${user} | **مصيدة هاكرات** — ${reason}\n${actionEmoji}`).catch(() => null);
-  if (warnMsg) setTimeout(() => warnMsg.delete().catch(() => {}), 10_000);
-
-  return { triggered: true, action, warnCount, aiLevel: DANGER_LABEL[level], aiCategory: category, repScore: getReputation(user.id), logData: buildLogData(msg, reason, category, level, warnCount, savedContent, savedAttachments) };
-}
-
 function buildLogData(msg, reason, category, level, warnCount, savedContent = "", savedAttachments = []) {
   return {
     savedContent, savedAttachments,
@@ -787,13 +753,10 @@ export async function scanMessage(msg, db, geminiVisionModel, notifyOwner, gemin
   const userId = msg.author.id;
 
   // ── Honeypot ─────────────────────────────────────────────────
-  // ✅ FIX: أي حد يكتب في قناة الهوني بوت ده أصلاً مصيدة مخصصة للبوتات
-  //   والهاكرز — مفيهاش مجال لتحذيرات متدرجة، لازم طرد/باند فوري
-  //   من غير ما نستنى تراكم تحذيرات زي باقي الرسائل العادية.
   if (isHoneypotChannel(msg.channel.name, msg.channel.id)) {
     changeRep(userId, -50);
-    const reason = "🍯 Honeypot — بوت أو هاكر!";
-    const result = await executeHoneypotAction(msg, db, notifyOwner, reason);
+    const assessment = { level: DANGER.CRITICAL, category: "DANGEROUS_INFO", reason: "🍯 Honeypot — بوت أو هاكر!", shouldDelete: true, confidence: 100 };
+    const result = await executeAction(msg, db, notifyOwner, assessment);
     updateStats(result, userId);
     return result;
   }
