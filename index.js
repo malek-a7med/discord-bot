@@ -2366,12 +2366,19 @@ client.on("messageCreate", async (msg) => {
   //    متراصين. يرد لو قال "يا زنجي" لوحدها أو "يا زنجي إيه رأيك..." —
   //    بس مش لو قال "زنجي" بدون "يا"
   const calledByName = /يا\s+زنجي/i.test(msg.content) && isOwner;
-  let isReplyToBot = false; // مش بيتفعّل في السيرفر دلوقتي — البوت بيرد على المنشن بس (+ "يا زنجي" للأونر)
 
-  // ✅ في السيرفر: البوت يرد بس لو حد منشنه مباشرة، أو الأونر قال "يا زنجي"
-  //   (بمنشن أو من غيره — بس "يا زنجي" شرط أساسي للأونر من غير منشن).
-  //   شيلنا الرد على "ريبلاي على رسالة البوت" عشان مايتدخلش في كلام عادي.
-  if (!calledByName && !isBotDirectMention) return;
+  // 2. ريبلاي على رسالة البوت — رجعناها تاني بناءً على طلب المستخدم
+  let isReplyToBot = false;
+  if (msg.reference?.messageId) {
+    try {
+      const refMsg = await msg.channel.messages.fetch(msg.reference.messageId);
+      isReplyToBot = refMsg.author.id === client.user.id;
+    } catch { }
+  }
+
+  // ✅ في السيرفر: البوت يرد لو حد منشنه مباشرة، أو عمل ريبلاي على رسالته،
+  //   أو الأونر قال "يا زنجي" (بمنشن أو من غيره — شرط أساسي للأونر).
+  if (!calledByName && !isBotDirectMention && !isReplyToBot) return;
 
   msg.channel.sendTyping().catch(() => {});
 
