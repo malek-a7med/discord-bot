@@ -12,6 +12,7 @@ import {
   StringSelectMenuBuilder,
   RoleSelectMenuBuilder,
   ChannelSelectMenuBuilder,
+  UserSelectMenuBuilder,
   ChannelType,
   ButtonBuilder,
   ButtonStyle,
@@ -19,6 +20,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
+import { buildWarningsEmbed } from "./moderation.js";
 
 const COLOR = 0x5865f2;
 
@@ -51,6 +53,7 @@ function buildMainMenu(settings) {
     .setPlaceholder("اختار إعداد عشان تظبطه")
     .addOptions([
       { label: "عتبات التحذيرات", description: "بعد كام تحذير ياخد إسكات/طرد/باند", value: "thresholds", emoji: "⚠️" },
+      { label: "التحذيرات اليدوية", description: "حذّر عضو أو مسح تحذيراته", value: "warnings", emoji: "📋" },
       { label: "الحماية ضد التخريب (Anti-Nuke)", description: "لو مود عمل أفعال خطيرة كتير بسرعة", value: "antinuke", emoji: "🛡️" },
       { label: "رتب إشراف إضافية", description: "رتب تتعامل كمشرفين موثوقين", value: "modroles", emoji: "👮" },
       { label: "قناة سجلات الأمان", description: "فين نبعت تقارير الحماية", value: "logchannel", emoji: "📜" },
@@ -93,6 +96,61 @@ function buildThresholdModal(type) {
     .setRequired(true)
     .setMaxLength(2);
   modal.addComponents(new ActionRowBuilder().addComponents(input));
+  return modal;
+}
+
+// ── قايمة التحذيرات اليدوية ──────────────────────────────────────
+function buildWarningsPickUserMenu() {
+  const embed = new EmbedBuilder()
+    .setColor(COLOR)
+    .setTitle("📋 التحذيرات اليدوية")
+    .setDescription("اختار العضو الأول عشان تشوف سجله وتقدر تحذّره أو تمسح تحذيراته 👇");
+  const userMenu = new UserSelectMenuBuilder()
+    .setCustomId("amset_warn_user_select")
+    .setPlaceholder("اختار عضو");
+  const backRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("amset_back_main").setLabel("🔙 رجوع").setStyle(ButtonStyle.Secondary)
+  );
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(userMenu), backRow] };
+}
+
+async function buildWarningsTargetView(interaction, db, targetId) {
+  const target = await interaction.client.users.fetch(targetId).catch(() => null);
+  if (!target) {
+    return { embeds: [new EmbedBuilder().setColor(0xe74c3c).setDescription("❌ مش لاقي العضو ده.")], components: [] };
+  }
+  const warns = db.getWarnings(targetId);
+  const embed = buildWarningsEmbed(target, warns, 0);
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`amset_warn_add_${targetId}`).setLabel("➕ تحذير جديد").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`amset_warn_remove_${targetId}`).setLabel("🗑️ مسح تحذير برقم").setStyle(ButtonStyle.Secondary).setDisabled(warns.length === 0),
+    new ButtonBuilder().setCustomId(`amset_warn_clearall_${targetId}`).setLabel("🧹 مسح الكل").setStyle(ButtonStyle.Secondary).setDisabled(warns.length === 0),
+  );
+  const backRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("amset_warn_pickuser").setLabel("🔁 عضو تاني").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("amset_back_main").setLabel("🔙 رجوع للرئيسية").setStyle(ButtonStyle.Secondary),
+  );
+  return { embeds: [embed], components: [actionRow, backRow] };
+}
+
+function buildWarnAddModal(targetId) {
+  const modal = new ModalBuilder().setCustomId(`amset_modal_warnadd_${targetId}`).setTitle("تحذير جديد");
+  const reason = new TextInputBuilder()
+    .setCustomId("reason").setLabel("سبب التحذير").setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500);
+  const dm = new TextInputBuilder()
+    .setCustomId("dm").setLabel("تبعتله رسالة خاصة؟ (نعم/لا)").setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(3).setValue("نعم");
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(reason),
+    new ActionRowBuilder().addComponents(dm),
+  );
+  return modal;
+}
+
+function buildWarnRemoveModal(targetId) {
+  const modal = new ModalBuilder().setCustomId(`amset_modal_warnremove_${targetId}`).setTitle("مسح تحذير برقم");
+  const num = new TextInputBuilder()
+    .setCustomId("num").setLabel("رقم التحذير (زي ما هو في السجل)").setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3);
+  modal.addComponents(new ActionRowBuilder().addComponents(num));
   return modal;
 }
 
@@ -198,12 +256,44 @@ export async function handleAutoModSettingsInteraction(interaction, db) {
     return true;
   }
 
+  // زرار "عضو تاني" في التحذيرات اليدوية
+  if (interaction.isButton() && interaction.customId === "amset_warn_pickuser") {
+    await interaction.update({ ...buildWarningsPickUserMenu() });
+    return true;
+  }
+
+  // اختيار عضو في التحذيرات اليدوية
+  if (interaction.isUserSelectMenu() && interaction.customId === "amset_warn_user_select") {
+    const targetId = interaction.values[0];
+    await interaction.update({ ...(await buildWarningsTargetView(interaction, db, targetId)) });
+    return true;
+  }
+
+  // أزرار التحذيرات اليدوية (تحذير جديد / مسح برقم / مسح الكل)
+  if (interaction.isButton() && interaction.customId.startsWith("amset_warn_add_")) {
+    const targetId = interaction.customId.replace("amset_warn_add_", "");
+    await interaction.showModal(buildWarnAddModal(targetId));
+    return true;
+  }
+  if (interaction.isButton() && interaction.customId.startsWith("amset_warn_remove_")) {
+    const targetId = interaction.customId.replace("amset_warn_remove_", "");
+    await interaction.showModal(buildWarnRemoveModal(targetId));
+    return true;
+  }
+  if (interaction.isButton() && interaction.customId.startsWith("amset_warn_clearall_")) {
+    const targetId = interaction.customId.replace("amset_warn_clearall_", "");
+    db.clearAllWarnings(targetId);
+    await interaction.update({ ...(await buildWarningsTargetView(interaction, db, targetId)) });
+    return true;
+  }
+
   if (interaction.isStringSelectMenu()) {
     const settings = db.getAutoModSettings(guildId);
 
     if (interaction.customId === "amset_menu") {
       const choice = interaction.values[0];
       if (choice === "thresholds") await interaction.update({ ...buildThresholdsMenu() });
+      else if (choice === "warnings") await interaction.update({ ...buildWarningsPickUserMenu() });
       else if (choice === "antinuke") await interaction.update({ ...buildAntiNukeMenu(settings) });
       else if (choice === "modroles") await interaction.update({ ...buildModRolesMenu(settings) });
       else if (choice === "logchannel") await interaction.update({ ...buildLogChannelMenu(settings) });
@@ -283,6 +373,47 @@ export async function handleAutoModSettingsInteraction(interaction, db) {
       if (field === "limit") db.updateAntiNukeSettings(guildId, { limit: num });
       else if (field === "window") db.updateAntiNukeSettings(guildId, { windowMs: num * 1000 });
       await interaction.update({ ...buildAntiNukeMenu(db.getAutoModSettings(guildId)) });
+      return true;
+    }
+
+    if (interaction.customId.startsWith("amset_modal_warnadd_")) {
+      const targetId = interaction.customId.replace("amset_modal_warnadd_", "");
+      const reason = interaction.fields.getTextInputValue("reason");
+      const sendDm = (interaction.fields.getTextInputValue("dm") || "نعم").trim() !== "لا";
+      const target = await interaction.client.users.fetch(targetId).catch(() => null);
+      if (!target) {
+        await interaction.reply({ content: "❌ مش لاقي العضو ده.", flags: 64 });
+        return true;
+      }
+      db.addWarning(targetId, reason, "MANUAL_MODERATOR");
+      if (sendDm) {
+        try {
+          await target.send({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(0xe74c3c)
+                .setTitle("⚠️ لقيت تحذير يدوي على حسابك")
+                .setDescription(`اتسجّل عليك تحذير في **${interaction.guild?.name || "السيرفر"}**.\n\n**السبب:** ${reason.slice(0, 500)}`)
+                .setTimestamp(),
+            ],
+          });
+        } catch { /* مبعتش DM */ }
+      }
+      await interaction.update({ ...(await buildWarningsTargetView(interaction, db, targetId)) });
+      return true;
+    }
+
+    if (interaction.customId.startsWith("amset_modal_warnremove_")) {
+      const targetId = interaction.customId.replace("amset_modal_warnremove_", "");
+      const raw = interaction.fields.getTextInputValue("num");
+      const num = parseInt(raw, 10);
+      const warns = db.getWarnings(targetId);
+      if (isNaN(num) || num < 1 || num > warns.length) {
+        await interaction.reply({ content: `❌ رقم غلط. العضو عنده \`${warns.length}\` تحذير.`, flags: 64 });
+        return true;
+      }
+      db.removeWarningByIndex(targetId, num - 1);
+      await interaction.update({ ...(await buildWarningsTargetView(interaction, db, targetId)) });
       return true;
     }
   }
