@@ -10,3 +10,4 @@
 - [Latest Features Rule](latest-features-rule.md) — every new feature MUST be added to LATEST_FEATURES array in commands/games-hub.js (newest entry first)
 - [Codenames 5-Row Limit](codenames-5row.md) — Discord max 5 ActionRows: board alone takes all 5 rows; skip/cancel buttons go as separate control message in channel; spymaster gets "give clue" via DM (sendActiveSpymasterControl); modal submits must NOT use interaction.update() — edit message by fetching state.channelId+state.messageId directly
 - [Music System](music-system.md) — نظام جديد: @discordjs/voice + play-dl بدون Lavalink؛ GuildPlayer class في commands/music.js؛ players Map (guildId→GuildPlayer)؛ musicHandler object يعرض كل الدوال للـ index.js؛ music-handler.js اتحذف
+- [Deploy Target](deploy-target.md) — البوت شغال فعليًا عبر GitHub→Railway مش Replit؛ متسألش عن DISCORD_TOKEN ومتحاولش تشغّل الـ workflow كدليل نجاح
