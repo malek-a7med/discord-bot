@@ -12,3 +12,4 @@
 - [Music System](music-system.md) — نظام جديد: @discordjs/voice + play-dl بدون Lavalink؛ GuildPlayer class في commands/music.js؛ players Map (guildId→GuildPlayer)؛ musicHandler object يعرض كل الدوال للـ index.js؛ music-handler.js اتحذف
 - [Deploy Target](deploy-target.md) — البوت شغال فعليًا عبر GitHub→Railway مش Replit؛ متسألش عن DISCORD_TOKEN ومتحاولش تشغّل الـ workflow كدليل نجاح
 - [Auto-Mod Settings + Anti-Nuke](automod-settings-antinuke.md) — /اعدادات-الاوتومود بقايمة amset_؛ anti-nuke بيراقب حذف رتب/رومات/باند/طرد عبر audit log؛ extraModRoles متسجلة بس مش مفعّلة في أي منطق لسه
+- [Honeypot Channel Bug (Fixed)](honeypot-channel-bug.md) — قناة اللوج الحقيقية كانت متسجلة غلط كـ honeypot فسببت طرد أعضاء بدون سبب؛ لو ID قناة مكرر في أكتر من مكان متضيفهوش لقايمة trap/blacklist
