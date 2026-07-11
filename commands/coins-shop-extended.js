@@ -239,7 +239,13 @@ async function applyColorRole(interaction, colorItem) {
         color: colorItem.color,
         reason: "رول لون من متجر الكوينز",
         position: 1,
+        // ✅ من غير permissions صراحة، ديسكورد بيورّث صلاحيات الـ @everyone
+        permissions: [],
       });
+    }
+    // ✅ تأكيد إن رتبة اللون من غير أي صلاحيات حتى لو كانت قديمة
+    if (role.permissions.bitfield !== 0n) {
+      await role.setPermissions([], "إزالة كل الصلاحيات من رتبة اللون").catch(() => {});
     }
     const oldColorRoles = member.roles.cache.filter(r => r.name.startsWith("🎨 "));
     for (const [, r] of oldColorRoles) {

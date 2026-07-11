@@ -2362,23 +2362,16 @@ client.on("messageCreate", async (msg) => {
   // 1. منشن مباشر للبوت (مش @everyone أو @here) — بس لو ذكر البوت بالـ @
   const isBotDirectMention = msg.mentions.users.has(client.user.id);
 
-  // 2. ريبلاي على رسالة البوت
-  let isReplyToBot = false;
-  if (msg.reference?.messageId) {
-    try {
-      const refMsg = await msg.channel.messages.fetch(msg.reference.messageId);
-      isReplyToBot = refMsg.author.id === client.user.id;
-    } catch { }
-  }
-
-  // 3. "يا زنجي" من الأونر فقط — لازم الكلمتين دول يكونوا موجودين متراصين
-  //    يرد لو قال "يا زنجي" لوحدها أو "يا زنجي إيه رأيك..." — بس مش لو قال "زنجي" بدون "يا"
+  // 2. "يا زنجي" من الأونر فقط — شرط أساسي: لازم الكلمتين دول يكونوا موجودين
+  //    متراصين. يرد لو قال "يا زنجي" لوحدها أو "يا زنجي إيه رأيك..." —
+  //    بس مش لو قال "زنجي" بدون "يا"
   const calledByName = /يا\s+زنجي/i.test(msg.content) && isOwner;
+  let isReplyToBot = false; // مش بيتفعّل في السيرفر دلوقتي — البوت بيرد على المنشن بس (+ "يا زنجي" للأونر)
 
-  // ⏪ رجعنا الطريقة القديمة: البوت مايردش في السيرفر إلا لو حد منشنه،
-  //   عمل ريبلاي على رسالته، أو الأونر قال "يا زنجي" — عشان مايتدخلش في
-  //   كلام عادي بين الأعضاء. أوامر الأونر في الخاص (DM) لسه شغالة زي ما هي.
-  if (!calledByName && !isBotDirectMention && !isReplyToBot) return;
+  // ✅ في السيرفر: البوت يرد بس لو حد منشنه مباشرة، أو الأونر قال "يا زنجي"
+  //   (بمنشن أو من غيره — بس "يا زنجي" شرط أساسي للأونر من غير منشن).
+  //   شيلنا الرد على "ريبلاي على رسالة البوت" عشان مايتدخلش في كلام عادي.
+  if (!calledByName && !isBotDirectMention) return;
 
   msg.channel.sendTyping().catch(() => {});
 

@@ -244,10 +244,19 @@ export async function getOrCreateColorRole(guild, color) {
         reason: "نظام تلوين الأسماء",
         hoist: false,
         mentionable: false,
+        // ✅ FIX: من غير ما نحدد permissions صراحة، ديسكورد بيورّث صلاحيات
+        //   الـ @everyone للرتبة الجديدة — رتبة اللون المفروض تكون شكل بس
+        //   من غير أي صلاحية خالص.
+        permissions: [],
       });
     }
     // كل مرة (سواء اتعملت جديدة أو موجودة قبل كده) نتأكد إنها فوق ومش نازلة تحت
     await raiseColorRole(guild, role);
+    // ✅ نتأكد كمان إنها من غير أي صلاحيات حتى لو كانت رتبة قديمة اتعملت
+    //   قبل الفيكس ده وأخدت صلاحيات من الـ @everyone
+    if (role.permissions.bitfield !== 0n) {
+      await role.setPermissions([], "إزالة كل الصلاحيات من رتبة اللون").catch(() => {});
+    }
     return role;
   })();
 
