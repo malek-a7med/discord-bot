@@ -47,6 +47,37 @@ export function resolveRole(guild, idOrName) {
   );
 }
 
+// ✅ FIX: الأونر ممكن يكتب الـ ID بتاع اليوزر والرول بأي ترتيب أو صياغة —
+//   بدل ما نعتمد على الـ AI يحدد مين مين (وممكن يغلط)، نتأكد كوديّاً من
+//   الداتا الحقيقية في السيرفر: أي ID فعلاً رول وأي ID فعلاً يوزر، وننادّل
+//   بينهم تلقائياً لو الـ AI بعتهم معكوسين.
+export async function resolveUserAndRole(guild, rawUserId, rawRoleId) {
+  const tryMember = async (id) => {
+    if (!id) return null;
+    return guild.members.cache.get(String(id)) || await guild.members.fetch(String(id)).catch(() => null);
+  };
+  const tryRole = (id) => resolveRole(guild, id);
+
+  let member = await tryMember(rawUserId);
+  let role = tryRole(rawRoleId);
+
+  // لو مش لاقيين بالترتيب المعطى، جرب تعكسهم — ده اللي بيحل مشكلة
+  // الصيغ المختلفة زي "شيل رتبة X من Y" أو "اديها Y لـ X" أو IDs من غير سياق
+  if (!member || !role) {
+    const swappedMember = await tryMember(rawRoleId);
+    const swappedRole = tryRole(rawUserId);
+    if (swappedMember && swappedRole) {
+      member = swappedMember;
+      role = swappedRole;
+    } else {
+      if (!member && swappedMember) member = swappedMember;
+      if (!role && swappedRole) role = swappedRole;
+    }
+  }
+
+  return { member, role };
+}
+
 export function smartRolePerms(name) {
   const n = (name || "").toLowerCase();
   if (/إدارة|ادارة|أدمن|ادمن|admin|owner|أونر|ملك|مدير/i.test(n))   return ROLE_PRESETS.admin;
@@ -227,6 +258,11 @@ ${memoryToPromptText(userId)}${history ? `\nسياق المحادثة:\n${histor
 ── رتب ──
 - إعطاء رتبة: {"action":"give_role","user_id":"ID","role_id":"ID"}
 - سحب رتبة: {"action":"remove_role","user_id":"ID","role_id":"ID"}
+  ↳ الأونر ممكن يكتب الطلب بأي صياغة أو ترتيب (مثلاً: "اديها Y لـ X"،
+    "شيل رتبة X من Y"، أو بس رقمين IDs من غير سياق واضح مين اليوزر ومين
+    الرول) — استخرج أي رقمين ID موجودين في الرسالة وضعهم في user_id/role_id
+    بأي ترتيب حتى لو مش متأكد مين مين؛ النظام نفسه بيتأكد ويصححهم تلقائياً
+    بمطابقتهم مع بيانات السيرفر الحقيقية.
 - إنشاء رتبة (ذكي): {"action":"create_role","name":"اسم","color":"hex مثل #ff0000","hoist":false,"permissions":["ManageMessages","KickMembers"]}
   ↳ مهم: لما تنشئ رتبة حدد الـ permissions المناسبة تلقائياً من اسمها:
   ↳ مشرف/mod/staff → ManageMessages+KickMembers+ModerateMembers+BanMembers+ManageNicknames+ViewAuditLog
@@ -517,8 +553,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     }
 
     if (action === "give_role") {
-      const m    = await guild.members.fetch(parsed.user_id).catch(() => null);
-      const role = resolveRole(guild, parsed.role_id);
+      const { member: m, role } = await resolveUserAndRole(guild, parsed.user_id, parsed.role_id);
       if (!m)    return send("❌ مش لاقي العضو!");
       if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
       await m.roles.add(role);
@@ -529,8 +564,7 @@ async function _processOne({ msg, guild, geminiModel, db, buildDashboard }) {
     }
 
     if (action === "remove_role") {
-      const m    = await guild.members.fetch(parsed.user_id).catch(() => null);
-      const role = resolveRole(guild, parsed.role_id);
+      const { member: m, role } = await resolveUserAndRole(guild, parsed.user_id, parsed.role_id);
       if (!m)    return send("❌ مش لاقي العضو!");
       if (!role) return send(`❌ مش لاقي الرتبة "${parsed.role_id}"!`);
       await m.roles.remove(role);
