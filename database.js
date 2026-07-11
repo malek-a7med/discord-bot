@@ -173,6 +173,62 @@ class Database {
     return this.data.welcome[guildId] || null;
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  إعدادات الأوتو مود لكل سيرفر
+  // ═══════════════════════════════════════════════════════════
+  getAutoModSettings(guildId) {
+    if (!this.data.autoModSettings) this.data.autoModSettings = {};
+    if (!this.data.autoModSettings[guildId]) {
+      this.data.autoModSettings[guildId] = {
+        warnTimeoutThreshold: 4,   // عدد التحذيرات قبل الإسكات
+        warnKickThreshold: 6,      // عدد التحذيرات قبل الطرد
+        warnBanThreshold: 8,       // عدد التحذيرات قبل الباند
+        logChannelId: null,        // قناة سجلات الأمان
+        extraModRoles: [],         // رتب إشراف إضافية (زي أمر mod في البوتات المرجعية)
+        antiNuke: {
+          enabled: false,
+          limit: 3,                // عدد الأفعال الخطيرة المسموحة في النافذة الزمنية
+          windowMs: 60_000,        // نافذة الفحص (دقيقة)
+          punishment: "kick",      // kick | ban | timeout
+        },
+      };
+      this.save();
+    }
+    // توافق مع سجلات قديمة ناقصة حقول
+    const s = this.data.autoModSettings[guildId];
+    if (!s.antiNuke) s.antiNuke = { enabled: false, limit: 3, windowMs: 60_000, punishment: "kick" };
+    if (!Array.isArray(s.extraModRoles)) s.extraModRoles = [];
+    return s;
+  }
+
+  updateAutoModSettings(guildId, updates) {
+    const settings = this.getAutoModSettings(guildId);
+    Object.assign(settings, updates);
+    this.save();
+    return settings;
+  }
+
+  updateAntiNukeSettings(guildId, updates) {
+    const settings = this.getAutoModSettings(guildId);
+    Object.assign(settings.antiNuke, updates);
+    this.save();
+    return settings.antiNuke;
+  }
+
+  addExtraModRole(guildId, roleId) {
+    const settings = this.getAutoModSettings(guildId);
+    if (!settings.extraModRoles.includes(roleId)) settings.extraModRoles.push(roleId);
+    this.save();
+    return settings.extraModRoles;
+  }
+
+  removeExtraModRole(guildId, roleId) {
+    const settings = this.getAutoModSettings(guildId);
+    settings.extraModRoles = settings.extraModRoles.filter(r => r !== roleId);
+    this.save();
+    return settings.extraModRoles;
+  }
+
   setWelcomeChannel(guildId, channelId) {
     this.data.welcome[guildId] = channelId;
     this.save();

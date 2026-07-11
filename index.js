@@ -65,6 +65,8 @@ import { fullProfileCommand, handleFullProfile } from "./commands/full-profile.j
 import { serverStatsCommand, handleServerStats } from "./commands/server-stats-live.js";
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
 import { topCommand, handleTopCommand, verifyGateCommand, handleVerifyGateCommand, handleVerifyButton, bankShopCommand, handleShopCommand as handleBankShopCommand, handleShopSelect } from "./commands/community.js";
+import { autoModSettingsCommand, handleAutoModSettingsCommand, handleAutoModSettingsInteraction } from "./commands/automod-settings.js";
+import { onRoleDelete as antiNukeOnRoleDelete, onChannelDelete as antiNukeOnChannelDelete, onGuildBanAdd as antiNukeOnGuildBanAdd, onPossibleKick as antiNukeOnPossibleKick } from "./helpers/anti-nuke.js";
 
 // ───────────────────────────────────────────────────────────────
 //  Standard Imports
@@ -719,6 +721,9 @@ const LEGACY_COMMANDS = [
   // ─── الألوان ────────────────────────────────────────────────────
   colorsCommand,
 
+  // ─── إعدادات الأوتو مود ──────────────────────────────────────
+  autoModSettingsCommand,
+
   // ─── البنك المركزي ────────────────────────────────────────────
   centralBankCommand.data,
 ];
@@ -752,7 +757,7 @@ function validateLatestFeatures(allCommands) {
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
       "قائمة-الباند","رفع-باند",
-      "أنمي",
+      "أنمي","اعدادات-الاوتومود",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -868,6 +873,24 @@ async function resolveMember(guild, nameOrId) {
       m.displayName.toLowerCase().includes(nameOrId.toLowerCase())
     ) ?? results.first() ?? null;
   } catch { return null; }
+}
+
+// ── تبليغ الأونر بإجراء الحماية ضد التخريب (Anti-Nuke) ───────────
+async function notifySecurityOwner(userId, member, reason) {
+  for (const ownerId of config.OWNER_IDS) {
+    try {
+      const ownerUser = await client.users.fetch(ownerId);
+      const embed = new EmbedBuilder()
+        .setColor(0xc0392b)
+        .setTitle("🛡️ تقرير الحماية ضد التخريب")
+        .setDescription(
+          `العضو **${member?.user?.username ?? userId}** (<@${userId}>) اتاخد فيه إجراء تلقائي!\n\n` +
+          `📋 **السبب:** ${reason}`
+        )
+        .setTimestamp();
+      await ownerUser.send({ embeds: [embed] });
+    } catch { /* الأونر عاطل الـ DM */ }
+  }
 }
 
 const COMMANDS_UPDATE_LOG_CHANNEL_ID = "1517362832063074324";
@@ -2569,6 +2592,17 @@ client.on("interactionCreate", async (interaction) => {
   if (processedInteractions.has(interaction.id)) return;
   processedInteractions.add(interaction.id);
   setTimeout(() => processedInteractions.delete(interaction.id), 60_000);
+
+  // ─── إعدادات الأوتو مود (قايمة اختيار + أزرار + مودالز) ─────────
+  if (interaction.customId?.startsWith("amset_")) {
+    try {
+      const handled = await handleAutoModSettingsInteraction(interaction, db);
+      if (handled) return;
+    } catch (err) {
+      logger.error("خطأ في إعدادات الأوتو مود:", err);
+      return interaction.reply({ content: "معلش يسطا ثواني بس", flags: 64 }).catch(() => {});
+    }
+  }
 
   if (interaction.isChatInputCommand()) {
     const cmd = interaction.commandName;
@@ -4428,6 +4462,10 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "إحصائيات-السيرفر") {
         return handleServerStats(interaction, db);
+      }
+
+      if (cmd === "اعدادات-الاوتومود") {
+        return handleAutoModSettingsCommand(interaction, db);
       }
 
       if (cmd === "الوان") {
@@ -6570,6 +6608,8 @@ client.on('guildMemberRemove', async (member) => {
   } catch (error) {
     console.error("خطأ في نظام الوداع:", error);
   }
+
+  antiNukeOnPossibleKick(member, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص الطرد:", e.message));
 });
 
 // ================= لوج تغيير رتب/اسم الأعضاء =================
@@ -6642,6 +6682,7 @@ client.on('channelDelete', (channel) => {
     new EmbedBuilder().setColor(0xe74c3c).setTitle("📁 روم اتمسحت")
       .setDescription(`📌 **${channel.name}**\n🆔 \`${channel.id}\``).setTimestamp()
   );
+  antiNukeOnChannelDelete(channel, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص حذف الروم:", e.message));
 });
 
 client.on('roleCreate', (role) => {
@@ -6656,6 +6697,7 @@ client.on('roleDelete', (role) => {
     new EmbedBuilder().setColor(0xe74c3c).setTitle("🏷️ رتبة اتمسحت")
       .setDescription(`📌 **${role.name}**\n🆔 \`${role.id}\``).setTimestamp()
   );
+  antiNukeOnRoleDelete(role, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص حذف الرتبة:", e.message));
 });
 
 // ================= لوج الباند/الأنباند =================
@@ -6664,6 +6706,7 @@ client.on('guildBanAdd', (ban) => {
     new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 عضو اتبند")
       .setDescription(`👤 **${ban.user?.tag ?? ban.user?.id}**\n🆔 \`${ban.user?.id}\``).setTimestamp()
   );
+  antiNukeOnGuildBanAdd(ban, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص الباند:", e.message));
 });
 
 client.on('guildBanRemove', (ban) => {
