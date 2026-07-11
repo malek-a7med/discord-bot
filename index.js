@@ -2375,10 +2375,10 @@ client.on("messageCreate", async (msg) => {
   //    يرد لو قال "يا زنجي" لوحدها أو "يا زنجي إيه رأيك..." — بس مش لو قال "زنجي" بدون "يا"
   const calledByName = /يا\s+زنجي/i.test(msg.content) && isOwner;
 
-  // ✅ FIX: الأونر مش محتاج يمنشن البوت أو يقول "يا زنجي" عشان ينفّذ أمر —
-  //   أي رسالة من الأونر (في أي قناة) تتفحص، والتصنيف (chat/action) هو اللي
-  //   بيحدد لو دي محادثة عادية أو أمر لازم يتنفذ فوراً.
-  if (!calledByName && !isBotDirectMention && !isReplyToBot && !isOwner) return;
+  // ⏪ رجعنا الطريقة القديمة: البوت مايردش في السيرفر إلا لو حد منشنه،
+  //   عمل ريبلاي على رسالته، أو الأونر قال "يا زنجي" — عشان مايتدخلش في
+  //   كلام عادي بين الأعضاء. أوامر الأونر في الخاص (DM) لسه شغالة زي ما هي.
+  if (!calledByName && !isBotDirectMention && !isReplyToBot) return;
 
   msg.channel.sendTyping().catch(() => {});
 
