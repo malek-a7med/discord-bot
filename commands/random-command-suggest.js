@@ -7,22 +7,23 @@ export const RANDOM_SUGGEST_CHANNEL_ID = "1523688813132644532";
 const EVENT_INTERVAL_MIN_MS = 3 * 60 * 60 * 1000;  // كل 3 ساعات كحد أدنى
 const EVENT_INTERVAL_MAX_MS = 6 * 60 * 60 * 1000;  // كل 6 ساعات كحد أقصى
 
-const COMMAND_NAMES = [
+// أوامر فازبو (من غير نقطة) + أوامر كلوفر (بنقطة) — بالظبط زي ما هي
+const COMMAND_TEXTS = [
   "روليت", "xo", "مافيا", "كراسي", "حجرة", "نرد", "عجلة",
   "hotxo", "غميضة", "ريبلكا", "خمن",
-  "تصويت", "فعالية", "حجره", "سباق", "لغم",
+  ".تصويت", ".فعالية", ".روليت", ".مافيا", ".كراسي", ".غميضة", ".xo", ".حجره", ".سباق", ".لغم",
 ];
 
 function pickRandomCommand() {
-  return COMMAND_NAMES[Math.floor(Math.random() * COMMAND_NAMES.length)];
+  return COMMAND_TEXTS[Math.floor(Math.random() * COMMAND_TEXTS.length)];
 }
 
 export async function postRandomCommandSuggestion(client) {
   const channel = await client.channels.fetch(RANDOM_SUGGEST_CHANNEL_ID).catch(() => null);
   if (!channel) return console.error("❌ [RandomSuggest] مش لاقي الروم:", RANDOM_SUGGEST_CHANNEL_ID);
 
-  const name = pickRandomCommand();
-  await channel.send(`🎲 جرّب دلوقتي أمر: \`${name}\``).catch(() => {});
+  const text = pickRandomCommand();
+  await channel.send(text).catch(() => {});
 }
 
 export function scheduleRandomCommandSuggestion(client) {
