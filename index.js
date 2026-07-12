@@ -40,7 +40,6 @@ import { garticCommand, handleGarticCommand, handleGarticButton, handleGarticMod
 import { pollCommand, handlePollCommand, handlePollButton, activePolls } from "./commands/polls.js";
 import { startQuizGame, handleQuizButton, quizChannelMap } from "./commands/quiz.js";
 import { scheduleDailyChallenge, handleDailyChallengeButton } from "./commands/daily-challenge.js";
-import { scheduleRandomCommandSuggestion } from "./commands/random-command-suggest.js";
 import { gamesHubCommand, latestFeaturesCommand, speechModeCommand, handleGamesHubCommand, handleLatestFeaturesCommand, LATEST_FEATURES } from "./commands/games-hub.js";
 import { bankSavingsCommand, handleBankButton, handleBankModal } from "./commands/bank-savings.js";
 import { centralBankCommand, handleCentralBankButton, handleCentralBankSelect, handleCentralBankUserSelect, handleCentralBankChannelSelect, handleCentralBankModal } from "./commands/central-bank.js";
@@ -1627,7 +1626,6 @@ client.once("clientReady", async (c) => {
   }
   scheduleDailyChallenge(c, db);
   scheduleAnimeNews(c, db);
-  scheduleRandomCommandSuggestion(c);
 
   // ── إعطاء البوت صلاحيات كاملة (Administrator) في كل السيرفرات ──
   for (const [, guild] of c.guilds.cache) {
