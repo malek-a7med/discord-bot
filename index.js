@@ -6535,12 +6535,24 @@ client.on('guildMemberAdd', async (member) => {
 
   if (!_dedupeWelcome(`${member.guild.id}-${member.id}`)) return;
 
-  const WELCOME_CHANNEL_ID = "1486100560494203183";
-
-  const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
-  if (!channel) return;
+  const WELCOME_CHANNEL_ID = db.getWelcomeChannel(member.guild.id) || "1486100560494203183";
 
   try {
+    const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID)
+      || await member.guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null);
+
+    if (!channel) {
+      console.error(`[ترحيب] مش لاقي قناة الترحيب (${WELCOME_CHANNEL_ID}) في سيرفر ${member.guild.name}`);
+      return;
+    }
+
+    const me = member.guild.members.me;
+    if (me && !channel.permissionsFor(me)?.has(["ViewChannel", "SendMessages", "EmbedLinks", "AttachFiles"])) {
+      console.error(`[ترحيب] مفيش صلاحيات كافية في قناة الترحيب (${channel.id}) في سيرفر ${member.guild.name}`);
+      return;
+    }
+
+    const avatarURL = member.user.displayAvatarURL({ dynamic: true, size: 512 });
     const imagePath = path.join(__dirname, 'welcome.png');
     const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
 
@@ -6551,17 +6563,18 @@ client.on('guildMemberAdd', async (member) => {
         `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
-        `👤 **الـعـضـو الـجـديـد:** ${member.displayName}\n` +
+        `👤 **الـعـضـو الـجـديـد:** <@${member.id}> (${member.displayName})\n` +
         `🆔 **الـمـعـرّف الـخـاص:** \`${member.id}\`\n` +
         `📊 **أنـت الـفـرعـون رقـم:** \`${member.guild.memberCount}\` في مملكتنا!\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`
       )
+      .setThumbnail(avatarURL)
       .setImage('attachment://welcome.png')
       .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️' })
       .setTimestamp();
 
-    await channel.send({ embeds: [welcomeEmbed], files: [attachment] });
+    await channel.send({ content: `<@${member.id}>`, embeds: [welcomeEmbed], files: [attachment] });
 
   } catch (error) {
     console.error("خطأ في نظام الترحيب:", error);
@@ -6581,29 +6594,51 @@ client.on('guildMemberRemove', async (member) => {
 
   if (!_dedupeLeave(`${member.guild.id}-${member.id}`)) return;
 
-  const WELCOME_CHANNEL_ID = "1486100560494203183";
-
-  const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
-  if (!channel) return;
+  const WELCOME_CHANNEL_ID = db.getWelcomeChannel(member.guild.id) || "1486100560494203183";
 
   try {
+    const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID)
+      || await member.guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null);
+
+    if (!channel) {
+      console.error(`[وداع] مش لاقي قناة الترحيب (${WELCOME_CHANNEL_ID}) في سيرفر ${member.guild.name}`);
+      return;
+    }
+
+    const me = member.guild.members.me;
+    if (me && !channel.permissionsFor(me)?.has(["ViewChannel", "SendMessages", "EmbedLinks"])) {
+      console.error(`[وداع] مفيش صلاحيات كافية في قناة الترحيب (${channel.id}) في سيرفر ${member.guild.name}`);
+      return;
+    }
+
+    // member.user ممكن يكون undefined لو العضو "partial" (مش متخزن في الكاش) —
+    // ده كان بيسبب فشل صامت في نسبة من حالات الخروج. نجيبه بديل عن طريق fetch.
+    let user = member.user;
+    if (!user) {
+      user = await client.users.fetch(member.id).catch(() => null);
+    }
+    const avatarURL = user
+      ? user.displayAvatarURL({ dynamic: true, size: 256 })
+      : "https://cdn.discordapp.com/embed/avatars/0.png";
+    const displayName = user?.username ?? member.id;
+
     const goodbyeEmbed = new EmbedBuilder()
       .setColor('#A020F0')
       .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
       .setDescription(
         `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `👤 **الفرعون اللي ودعنا:** <@${member.id}>\n` +
+        `👤 **الفرعون اللي ودعنا:** <@${member.id}> (${displayName})\n` +
         `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
         `📊 **بقينا** \`${member.guild.memberCount}\` **فرعون في المملكة.**\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
         `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
       )
-      .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+      .setThumbnail(avatarURL)
       .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️' })
       .setTimestamp();
 
-    await channel.send({ embeds: [goodbyeEmbed] });
+    await channel.send({ content: `<@${member.id}>`, embeds: [goodbyeEmbed] });
 
   } catch (error) {
     console.error("خطأ في نظام الوداع:", error);

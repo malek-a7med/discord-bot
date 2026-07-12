@@ -13,3 +13,4 @@
 - [Deploy Target](deploy-target.md) — البوت شغال فعليًا عبر GitHub→Railway مش Replit؛ متسألش عن DISCORD_TOKEN ومتحاولش تشغّل الـ workflow كدليل نجاح
 - [Auto-Mod Settings + Anti-Nuke](automod-settings-antinuke.md) — /اعدادات-الاوتومود بقايمة amset_؛ anti-nuke بيراقب حذف رتب/رومات/باند/طرد عبر audit log؛ extraModRoles متسجلة بس مش مفعّلة في أي منطق لسه
 - [Honeypot Channel Bug (Fixed)](honeypot-channel-bug.md) — قناة اللوج الحقيقية كانت متسجلة غلط كـ honeypot فسببت طرد أعضاء بدون سبب؛ لو ID قناة مكرر في أكتر من مكان متضيفهوش لقايمة trap/blacklist
+- [Welcome/Goodbye Reliability](welcome-goodbye-reliability.md) — member.user ممكن يكون undefined (partial) في guildMemberRemove؛ استخدم fetch fallback للعضو والقناة، وسجّل خطأ واضح لو نقصت الصلاحيات

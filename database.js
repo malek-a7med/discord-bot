@@ -234,6 +234,10 @@ class Database {
     this.save();
   }
 
+  getWelcomeChannel(guildId) {
+    return this.data.welcome[guildId] || null;
+  }
+
   addManhwaTerm(dictName, term, translation) {
     if (!this.data.manhwa[dictName]) {
       this.data.manhwa[dictName] = {};
