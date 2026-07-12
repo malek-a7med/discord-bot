@@ -1332,6 +1332,10 @@ function buildSuggestionsPanelRow() {
       .setCustomId("suggest_other")
       .setLabel("💬 تعليق")
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("apply_admin")
+      .setLabel("📋 التقديم للإدارة")
+      .setStyle(ButtonStyle.Success),
     buildTicketButton()
   );
 }
@@ -1341,7 +1345,7 @@ function messageHasSuggestionPanel(message, botId) {
   // ✅ [تعديل] فحص الـ embed title بدل custom ID فقط
   const hasBtnId = message.components.some((row) =>
     row.components.some((component) =>
-      ["suggest_idea", "suggest_bug", "suggest_other", SUGGESTION_BTN_ID].includes(component.customId)
+      ["suggest_idea", "suggest_bug", "suggest_other", "apply_admin", SUGGESTION_BTN_ID].includes(component.customId)
     )
   );
   const hasTitle = message.embeds.some(e => e.title?.includes("مركز اقتراحات"));
@@ -5508,6 +5512,48 @@ client.on("interactionCreate", async (interaction) => {
         return await interaction.showModal(modal);
       }
 
+      // ─── زر التقديم للإدارة ─────────────────────────────────────
+      if (interaction.customId === "apply_admin") {
+        const modal = new ModalBuilder()
+          .setCustomId("modal_apply_admin")
+          .setTitle("📋 التقديم للإدارة");
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("apply_age")
+              .setLabel("سنك؟")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMaxLength(50)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("apply_hours")
+              .setLabel("قد إيه بتقعد يوميًا في السيرفر؟")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMaxLength(100)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("apply_experience")
+              .setLabel("عندك خبرة سابقة في الإدارة؟ فين؟")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
+              .setMaxLength(500)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("apply_reason")
+              .setLabel("ليه تستحق تنضم للإدارة؟")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
+              .setMaxLength(1000)
+          )
+        );
+        return await interaction.showModal(modal);
+      }
+
       // ─── زر تعديل الإعلان ← يعرض موداال مملوء بالمحتوى الحالي ──
       if (interaction.customId.startsWith("edit_announce_btn|")) {
         const targetMsgId = interaction.customId.split("|")[1];
@@ -6059,6 +6105,41 @@ client.on("interactionCreate", async (interaction) => {
       if (interaction.customId === "modal_suggest_other") {
         const text = interaction.fields.getTextInputValue("other_text");
         return await handleSuggestionModalSubmit(interaction, text);
+      }
+
+      if (interaction.customId === "modal_apply_admin") {
+        await interaction.deferReply({ ephemeral: true });
+
+        const age        = interaction.fields.getTextInputValue("apply_age");
+        const hours      = interaction.fields.getTextInputValue("apply_hours");
+        const experience = interaction.fields.getTextInputValue("apply_experience");
+        const reason     = interaction.fields.getTextInputValue("apply_reason");
+
+        const adminChannel = await interaction.client.channels
+          .fetch(ADMIN_SUGGESTIONS_CHANNEL_ID)
+          .catch(() => null);
+
+        if (!adminChannel?.isTextBased()) {
+          return interaction.editReply({ content: "❌ حصل خطأ، حاول تاني بعد شوية." });
+        }
+
+        const applyEmbed = new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle("📋 طلب تقديم للإدارة")
+          .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+          .addFields(
+            { name: "👤 المتقدم", value: `${interaction.user} (\`${interaction.user.id}\`)`, inline: false },
+            { name: "🔢 السن", value: age, inline: true },
+            { name: "⏰ التواجد اليومي", value: hours, inline: true },
+            { name: "🧠 الخبرة السابقة", value: experience, inline: false },
+            { name: "💬 ليه يستحق ينضم", value: reason, inline: false },
+          )
+          .setFooter({ text: "طلب تقديم للإدارة" })
+          .setTimestamp();
+
+        await adminChannel.send({ embeds: [applyEmbed] });
+
+        return interaction.editReply({ content: "✅ اتبعت طلبك للإدارة، هتتراجع وهتوصلك ردهم." });
       }
 
       if (interaction.customId.startsWith(`${ADMIN_REPLY_MODAL_ID}|`)) {
