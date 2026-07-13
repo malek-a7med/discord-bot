@@ -282,6 +282,41 @@ class Database {
     return this.data.trapChannels[guildId] || null;
   }
 
+  // ── قناة السجلات ─────────────────────────────────────────────
+  setLogChannel(guildId, channelId) {
+    if (!this.data.logChannels) this.data.logChannels = {};
+    this.data.logChannels[guildId] = channelId;
+    this.save();
+  }
+  getLogChannel(guildId) {
+    return this.data.logChannels?.[guildId] || null;
+  }
+
+  // ── بوابة التحقق ──────────────────────────────────────────────
+  setVerifyChannel(guildId, channelId) {
+    if (!this.data.verifyChannels) this.data.verifyChannels = {};
+    this.data.verifyChannels[guildId] = channelId;
+    this.save();
+  }
+  getVerifyChannel(guildId) {
+    return this.data.verifyChannels?.[guildId] || null;
+  }
+
+  // ── تشغيل/إيقاف الأنظمة ──────────────────────────────────────
+  _getToggles(guildId) {
+    if (!this.data.toggles) this.data.toggles = {};
+    if (!this.data.toggles[guildId]) this.data.toggles[guildId] = {};
+    return this.data.toggles[guildId];
+  }
+  setToggle(guildId, key, value) {
+    this._getToggles(guildId)[key] = value;
+    this.save();
+  }
+  getToggle(guildId, key, defaultVal = true) {
+    const t = this._getToggles(guildId);
+    return key in t ? t[key] : defaultVal;
+  }
+
   addManhwaTerm(dictName, term, translation) {
     if (!this.data.manhwa[dictName]) {
       this.data.manhwa[dictName] = {};

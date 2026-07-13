@@ -65,7 +65,7 @@ import { serverStatsCommand, handleServerStats } from "./commands/server-stats-l
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
 import { topCommand, handleTopCommand, verifyGateCommand, handleVerifyGateCommand, handleVerifyButton, bankShopCommand, handleShopCommand as handleBankShopCommand, handleShopSelect } from "./commands/community.js";
 import { autoModSettingsCommand, handleAutoModSettingsCommand, handleAutoModSettingsInteraction } from "./commands/automod-settings.js";
-// ══ /setup — inline (no external import) ══════════════════════════
+// ══ /اعداد — inline ════════════════════════════════════════════════
 const DEFAULT_WELCOME_MSG =
   "👋 أهلاً **{mention}** في **{server}**!\nأنت العضو رقم **{count}**. نتمنالك وقت حلو معنا 🎉";
 const DEFAULT_GOODBYE_MSG =
@@ -80,107 +80,218 @@ function applyPlaceholders(template, vars = {}) {
     .replace(/{id}/g,      vars.id      ?? "");
 }
 
+// helpers
+const ON  = (v) => v ? "🟢 شغّال" : "🔴 مقفول";
+const CH  = (id) => id ? `<#${id}>` : "❌ غير محددة";
+
 const setupCommand = new SlashCommandBuilder()
   .setName("اعداد")
   .setDescription("⚙️ لوحة إعداد السيرفر الشاملة [أدمن]")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
-async function handleSetupCommand(interaction, db) {
-  const gid  = interaction.guild.id;
-  const wCh  = db.getWelcomeChannel(gid);
-  const gCh  = db.getGoodbyeChannel(gid);
-  const trap = db.getTrapChannel(gid);
-  const wMsg = db.getWelcomeMessage(gid) || DEFAULT_WELCOME_MSG;
-  const gMsg = db.getGoodbyeMessage(gid) || DEFAULT_GOODBYE_MSG;
+function buildSetupEmbed(gid, db) {
+  const wCh   = db.getWelcomeChannel(gid);
+  const gCh   = db.getGoodbyeChannel(gid);
+  const trap  = db.getTrapChannel(gid);
+  const log   = db.getLogChannel(gid);
+  const vrfy  = db.getVerifyChannel(gid);
+  const wOn   = db.getToggle(gid, "welcome",  true);
+  const gOn   = db.getToggle(gid, "goodbye",  true);
+  const tOn   = db.getToggle(gid, "trap",     true);
+  const amOn  = db.getToggle(gid, "automod",  true);
+  const anOn  = db.getAutoModSettings(gid).antiNuke?.enabled ?? false;
 
-  const embed = new EmbedBuilder()
+  return new EmbedBuilder()
     .setColor(0xf1c40f)
     .setTitle("⚙️ لوحة إعداد السيرفر")
-    .setDescription("اختار القسم اللي تريد تعديله:")
+    .setDescription("اضغط على أي زرار للتعديل أو التشغيل/الإيقاف")
     .addFields(
-      { name: "👋 قناة الترحيب",   value: wCh   ? `<#${wCh}>`  : "❌ غير محددة", inline: true },
-      { name: "🥀 قناة الوداع",    value: gCh   ? `<#${gCh}>`  : "❌ غير محددة", inline: true },
-      { name: "🪤 مصيدة الهاكرات", value: trap  ? `<#${trap}>` : "❌ غير محددة", inline: true },
-      { name: "✏️ رسالة الترحيب",  value: `\`\`\`${wMsg.slice(0, 80)}${wMsg.length > 80 ? "…" : ""}\`\`\``, inline: false },
-      { name: "✏️ رسالة الوداع",   value: `\`\`\`${gMsg.slice(0, 80)}${gMsg.length > 80 ? "…" : ""}\`\`\``, inline: false },
+      { name: "👋 ترحيب",         value: `${ON(wOn)}\n${CH(wCh)}`,  inline: true },
+      { name: "🥀 وداع",          value: `${ON(gOn)}\n${CH(gCh)}`,  inline: true },
+      { name: "📜 سجلات",         value: CH(log),                    inline: true },
+      { name: "🪤 مصيدة",         value: `${ON(tOn)}\n${CH(trap)}`, inline: true },
+      { name: "🔐 تحقق",          value: CH(vrfy),                   inline: true },
+      { name: "🛡️ أوتو مود",     value: ON(amOn),                   inline: true },
+      { name: "⚔️ أنتي نيوك",    value: ON(anOn),                   inline: true },
     )
-    .setFooter({ text: "Placeholders: {mention} {user} {server} {count} {id}" })
+    .setFooter({ text: "Placeholders في الرسايل: {mention} {user} {server} {count} {id}" })
     .setTimestamp();
+}
 
+function buildSetupRows(gid, db) {
+  const wOn  = db.getToggle(gid, "welcome", true);
+  const gOn  = db.getToggle(gid, "goodbye", true);
+  const tOn  = db.getToggle(gid, "trap",    true);
+  const amOn = db.getToggle(gid, "automod", true);
+  const anOn = db.getAutoModSettings(gid).antiNuke?.enabled ?? false;
+
+  // ─── صف 1: قنوات ──────────────────────────────────────────────
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("setup_welcome_ch").setLabel("👋 قناة ترحيب").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("setup_goodbye_ch").setLabel("🥀 قناة وداع").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("setup_log_ch").setLabel("📜 قناة سجلات").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("setup_trap_ch").setLabel("🪤 مصيدة").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("setup_verify_ch").setLabel("🔐 تحقق").setStyle(ButtonStyle.Primary),
   );
+  // ─── صف 2: رسايل + رتب ────────────────────────────────────────
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("setup_welcome_msg").setLabel("✏️ رسالة ترحيب").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("setup_goodbye_msg").setLabel("✏️ رسالة وداع").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId("setup_modroles").setLabel("👮 رتب إشراف").setStyle(ButtonStyle.Secondary),
   );
+  // ─── صف 3: تشغيل/إيقاف ───────────────────────────────────────
+  const row3 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("setup_tog_welcome")
+      .setLabel(wOn  ? "🟢 ترحيب"     : "🔴 ترحيب")   .setStyle(wOn  ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_tog_goodbye")
+      .setLabel(gOn  ? "🟢 وداع"      : "🔴 وداع")    .setStyle(gOn  ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_tog_trap")
+      .setLabel(tOn  ? "🟢 مصيدة"     : "🔴 مصيدة")  .setStyle(tOn  ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_tog_automod")
+      .setLabel(amOn ? "🟢 أوتو مود"  : "🔴 أوتو مود").setStyle(amOn ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_tog_antinuke")
+      .setLabel(anOn ? "🟢 أنتي نيوك" : "🔴 أنتي نيوك").setStyle(anOn ? ButtonStyle.Success : ButtonStyle.Secondary),
+  );
 
-  return interaction.reply({ embeds: [embed], components: [row1, row2], flags: 64 });
+  return [row1, row2, row3];
+}
+
+async function handleSetupCommand(interaction, db) {
+  const embed = buildSetupEmbed(interaction.guild.id, db);
+  const rows  = buildSetupRows(interaction.guild.id, db);
+  return interaction.reply({ embeds: [embed], components: rows, flags: 64 });
 }
 
 async function handleSetupInteraction(interaction, db) {
   const id  = interaction.customId;
   const gid = interaction.guild.id;
 
-  // ── أزرار اختيار قناة ──────────────────────────────────────────
+  // ── helper: أعد رسم اللوحة ──────────────────────────────────
+  const refreshPanel = () => interaction.update({
+    embeds: [buildSetupEmbed(gid, db)],
+    components: buildSetupRows(gid, db),
+  });
+
+  // ══ أزرار تشغيل / إيقاف ════════════════════════════════════════
+  if (id === "setup_tog_welcome") {
+    db.setToggle(gid, "welcome", !db.getToggle(gid, "welcome", true));
+    return refreshPanel();
+  }
+  if (id === "setup_tog_goodbye") {
+    db.setToggle(gid, "goodbye", !db.getToggle(gid, "goodbye", true));
+    return refreshPanel();
+  }
+  if (id === "setup_tog_trap") {
+    db.setToggle(gid, "trap", !db.getToggle(gid, "trap", true));
+    return refreshPanel();
+  }
+  if (id === "setup_tog_automod") {
+    db.setToggle(gid, "automod", !db.getToggle(gid, "automod", true));
+    return refreshPanel();
+  }
+  if (id === "setup_tog_antinuke") {
+    const cur = db.getAutoModSettings(gid).antiNuke?.enabled ?? false;
+    db.updateAntiNukeSettings(gid, { enabled: !cur });
+    return refreshPanel();
+  }
+
+  // ══ اختيار قناة ترحيب ══════════════════════════════════════════
   if (id === "setup_welcome_ch") {
-    const row = new ActionRowBuilder().addComponents(
-      new ChannelSelectMenuBuilder().setCustomId("setup_set_welcome_ch")
-        .setPlaceholder("اختار قناة الترحيب").addChannelTypes(ChannelType.GuildText)
-    );
-    return interaction.reply({ content: "👋 اختار قناة الترحيب:", components: [row], flags: 64 });
+    return interaction.reply({
+      content: "👋 اختار قناة الترحيب:",
+      components: [new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder().setCustomId("setup_set_welcome_ch")
+          .setPlaceholder("قناة الترحيب").addChannelTypes(ChannelType.GuildText)
+      )], flags: 64,
+    });
   }
   if (id === "setup_set_welcome_ch") {
     db.setWelcomeChannel(gid, interaction.values[0]);
     return interaction.reply({ content: `✅ قناة الترحيب: <#${interaction.values[0]}>`, flags: 64 });
   }
 
+  // ══ اختيار قناة وداع ═══════════════════════════════════════════
   if (id === "setup_goodbye_ch") {
-    const row = new ActionRowBuilder().addComponents(
-      new ChannelSelectMenuBuilder().setCustomId("setup_set_goodbye_ch")
-        .setPlaceholder("اختار قناة الوداع").addChannelTypes(ChannelType.GuildText)
-    );
-    return interaction.reply({ content: "🥀 اختار قناة الوداع:", components: [row], flags: 64 });
+    return interaction.reply({
+      content: "🥀 اختار قناة الوداع:",
+      components: [new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder().setCustomId("setup_set_goodbye_ch")
+          .setPlaceholder("قناة الوداع").addChannelTypes(ChannelType.GuildText)
+      )], flags: 64,
+    });
   }
   if (id === "setup_set_goodbye_ch") {
     db.setGoodbyeChannel(gid, interaction.values[0]);
     return interaction.reply({ content: `✅ قناة الوداع: <#${interaction.values[0]}>`, flags: 64 });
   }
 
+  // ══ اختيار قناة سجلات ══════════════════════════════════════════
+  if (id === "setup_log_ch") {
+    return interaction.reply({
+      content: "📜 اختار قناة السجلات:",
+      components: [new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder().setCustomId("setup_set_log_ch")
+          .setPlaceholder("قناة السجلات").addChannelTypes(ChannelType.GuildText)
+      )], flags: 64,
+    });
+  }
+  if (id === "setup_set_log_ch") {
+    db.setLogChannel(gid, interaction.values[0]);
+    return interaction.reply({ content: `✅ قناة السجلات: <#${interaction.values[0]}>`, flags: 64 });
+  }
+
+  // ══ اختيار قناة مصيدة ══════════════════════════════════════════
   if (id === "setup_trap_ch") {
-    const row = new ActionRowBuilder().addComponents(
-      new ChannelSelectMenuBuilder().setCustomId("setup_set_trap_ch")
-        .setPlaceholder("مصيدة الهاكرات — أي كتابة فيها = طرد فوري").addChannelTypes(ChannelType.GuildText)
-    );
-    return interaction.reply({ content: "🪤 اختار قناة المصيدة:", components: [row], flags: 64 });
+    return interaction.reply({
+      content: "🪤 اختار قناة المصيدة (أي حد يكتب فيها يتطرد فوراً):",
+      components: [new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder().setCustomId("setup_set_trap_ch")
+          .setPlaceholder("قناة المصيدة").addChannelTypes(ChannelType.GuildText)
+      )], flags: 64,
+    });
   }
   if (id === "setup_set_trap_ch") {
     db.setTrapChannel(gid, interaction.values[0]);
     return interaction.reply({ content: `✅ مصيدة الهاكرات: <#${interaction.values[0]}>`, flags: 64 });
   }
 
+  // ══ اختيار قناة تحقق ═══════════════════════════════════════════
+  if (id === "setup_verify_ch") {
+    return interaction.reply({
+      content: "🔐 اختار قناة بوابة التحقق:",
+      components: [new ActionRowBuilder().addComponents(
+        new ChannelSelectMenuBuilder().setCustomId("setup_set_verify_ch")
+          .setPlaceholder("قناة التحقق").addChannelTypes(ChannelType.GuildText)
+      )], flags: 64,
+    });
+  }
+  if (id === "setup_set_verify_ch") {
+    db.setVerifyChannel(gid, interaction.values[0]);
+    return interaction.reply({ content: `✅ بوابة التحقق: <#${interaction.values[0]}>`, flags: 64 });
+  }
+
+  // ══ رتب الإشراف ════════════════════════════════════════════════
   if (id === "setup_modroles") {
-    const row = new ActionRowBuilder().addComponents(
-      new RoleSelectMenuBuilder().setCustomId("setup_set_modrole")
-        .setPlaceholder("اختار رتب الإشراف الإضافية").setMinValues(1).setMaxValues(5)
-    );
-    return interaction.reply({ content: "👮 اختار رتب الإشراف:", components: [row], flags: 64 });
+    return interaction.reply({
+      content: "👮 اختار رتب الإشراف الإضافية:",
+      components: [new ActionRowBuilder().addComponents(
+        new RoleSelectMenuBuilder().setCustomId("setup_set_modrole")
+          .setPlaceholder("رتب الإشراف").setMinValues(1).setMaxValues(5)
+      )], flags: 64,
+    });
   }
   if (id === "setup_set_modrole") {
     if (db.addExtraModRole) interaction.values.forEach(r => db.addExtraModRole(gid, r));
     return interaction.reply({ content: `✅ اتضافت ${interaction.values.length} رتبة للإشراف.`, flags: 64 });
   }
 
-  // ── مودالز رسايل مخصصة ─────────────────────────────────────────
+  // ══ رسالة ترحيب مخصصة ══════════════════════════════════════════
   if (id === "setup_welcome_msg") {
     const cur = db.getWelcomeMessage(gid) || DEFAULT_WELCOME_MSG;
     const modal = new ModalBuilder().setCustomId("setup_modal_wmsg").setTitle("✏️ رسالة الترحيب");
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId("msg")
-        .setLabel("{mention} {user} {server} {count} {id}")
+        .setLabel("المتغيرات: {mention} {user} {server} {count} {id}")
         .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
     ));
     return interaction.showModal(modal);
@@ -189,15 +300,16 @@ async function handleSetupInteraction(interaction, db) {
     const text = interaction.fields.getTextInputValue("msg").trim();
     if (!text) return interaction.reply({ content: "❌ النص فاضي!", flags: 64 });
     db.setWelcomeMessage(gid, text);
-    return interaction.reply({ content: `✅ رسالة الترحيب اتحدثت:\n${text}`, flags: 64 });
+    return interaction.reply({ content: `✅ رسالة الترحيب اتحدثت!\n\n${text}`, flags: 64 });
   }
 
+  // ══ رسالة وداع مخصصة ═══════════════════════════════════════════
   if (id === "setup_goodbye_msg") {
     const cur = db.getGoodbyeMessage(gid) || DEFAULT_GOODBYE_MSG;
     const modal = new ModalBuilder().setCustomId("setup_modal_gmsg").setTitle("✏️ رسالة الوداع");
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId("msg")
-        .setLabel("{mention} {user} {server} {count} {id}")
+        .setLabel("المتغيرات: {mention} {user} {server} {count} {id}")
         .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
     ));
     return interaction.showModal(modal);
@@ -206,12 +318,12 @@ async function handleSetupInteraction(interaction, db) {
     const text = interaction.fields.getTextInputValue("msg").trim();
     if (!text) return interaction.reply({ content: "❌ النص فاضي!", flags: 64 });
     db.setGoodbyeMessage(gid, text);
-    return interaction.reply({ content: `✅ رسالة الوداع اتحدثت:\n${text}`, flags: 64 });
+    return interaction.reply({ content: `✅ رسالة الوداع اتحدثت!\n\n${text}`, flags: 64 });
   }
 
-  return false; // مش من اختصاص setup
+  return false;
 }
-// ══ نهاية /setup ══════════════════════════════════════════════════
+// ══ نهاية /اعداد ══════════════════════════════════════════════════
 import { onRoleDelete as antiNukeOnRoleDelete, onChannelDelete as antiNukeOnChannelDelete, onGuildBanAdd as antiNukeOnGuildBanAdd, onPossibleKick as antiNukeOnPossibleKick } from "./helpers/anti-nuke.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -6789,6 +6901,9 @@ client.on('guildMemberAdd', async (member) => {
 
   if (!_dedupeWelcome(`${member.guild.id}-${member.id}`)) return;
 
+  // تحقق من التشغيل/الإيقاف
+  if (!db.getToggle(member.guild.id, "welcome", true)) return;
+
   const WELCOME_CHANNEL_ID = db.getWelcomeChannel(member.guild.id) || "1486100560494203183";
 
   try {
@@ -6852,6 +6967,9 @@ client.on('guildMemberRemove', async (member) => {
   );
 
   if (!_dedupeLeave(`${member.guild.id}-${member.id}`)) return;
+
+  // تحقق من التشغيل/الإيقاف
+  if (!db.getToggle(member.guild.id, "goodbye", true)) return;
 
   const GOODBYE_CHANNEL_ID = db.getGoodbyeChannel(member.guild.id)
     || db.getWelcomeChannel(member.guild.id)
