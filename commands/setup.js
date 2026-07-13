@@ -1,494 +1,245 @@
 // ═══════════════════════════════════════════════════════════════
 //  /setup — لوحة إعداد شاملة للسيرفر
-//  بتغطي: ترحيب، وداع، لوج، مصيدة هاكرات، رتب إشراف،
-//          بوابة تحقق، الحماية ضد التخريب، رسايل مخصصة،
-//          إعدادات الأوتو مود الكاملة
 // ═══════════════════════════════════════════════════════════════
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
   EmbedBuilder,
   ActionRowBuilder,
-  StringSelectMenuBuilder,
-  ChannelSelectMenuBuilder,
-  RoleSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelSelectMenuBuilder,
+  RoleSelectMenuBuilder,
   ChannelType,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
-import { buildAutoModMainMenu } from "./automod-settings.js";
 
-const COLOR  = 0xf1c40f;
-const PREFIX = "setup_";
-
-// ── متغيرات الـ placeholders ─────────────────────────────────────
-export const PLACEHOLDER_GUIDE =
-  "`{mention}` = منشن العضو • `{user}` = اسمه • `{server}` = اسم السيرفر • `{count}` = عدد الأعضاء • `{id}` = الـ ID";
-
-export function applyPlaceholders(template, { mention, user, server, count, id }) {
-  return template
-    .replace(/{mention}/g, mention)
-    .replace(/{user}/g, user)
-    .replace(/{server}/g, server)
-    .replace(/{count}/g, String(count))
-    .replace(/{id}/g, id);
-}
-
-// ── النصوص الافتراضية المحايدة ───────────────────────────────────
 export const DEFAULT_WELCOME_MSG =
   "👋 أهلاً **{mention}** في **{server}**!\nأنت العضو رقم **{count}**. نتمنالك وقت حلو معنا 🎉";
 export const DEFAULT_GOODBYE_MSG =
   "🥀 وداعاً **{user}** — شكراً على وجودك معنا.\nعدد الأعضاء الآن: **{count}**.";
 
-// ─── بناء الإيمبد الرئيسي ──────────────────────────────────────
-function buildMainEmbed(guildId, db) {
-  const welcome   = db.getWelcomeChannel(guildId);
-  const goodbye   = db.getGoodbyeChannel(guildId);
-  const trap      = db.getTrapChannel(guildId);
-  const automod   = db.getAutoModSettings(guildId);
-  const logCh     = automod.logChannelId;
-  const an        = automod.antiNuke;
-  const modRoles  = automod.extraModRoles;
-  const wMsg      = db.getWelcomeMessage(guildId);
-  const gMsg      = db.getGoodbyeMessage(guildId);
+export const PLACEHOLDER_GUIDE =
+  "`{mention}` منشن • `{user}` اسم • `{server}` سيرفر • `{count}` عدد أعضاء • `{id}` الـ ID";
 
-  return new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle("⚙️ لوحة إعداد السيرفر")
-    .setDescription("اختار القسم اللي عايز تظبطه من القايمة تحت 👇\n\u200B")
-    .addFields(
-      { name: "👋 قناة الترحيب",         value: welcome  ? `<#${welcome}>`  : "❌ مش متحددة", inline: true },
-      { name: "🥀 قناة الوداع",           value: goodbye  ? `<#${goodbye}>`  : welcome ? `<#${welcome}> (نفس الترحيب)` : "❌ مش متحددة", inline: true },
-      { name: "📜 قناة السجلات",          value: logCh    ? `<#${logCh}>`    : "❌ مش متحددة", inline: true },
-      { name: "🪤 مصيدة الهاكرات",        value: trap     ? `<#${trap}>`     : "❌ مش متحددة", inline: true },
-      { name: "🛡️ حماية ضد التخريب",     value: an.enabled ? `🟢 شغّالة (${an.limit} فعل/${Math.round(an.windowMs/1000)}ث)` : "🔴 متوقفة", inline: true },
-      { name: "👮 رتب الإشراف",           value: modRoles.length ? modRoles.map(r => `<@&${r}>`).join(", ") : "مفيش", inline: true },
-      { name: "💬 رسالة الترحيب",         value: wMsg ? "✅ مخصصة" : "🔘 افتراضية", inline: true },
-      { name: "💬 رسالة الوداع",          value: gMsg ? "✅ مخصصة" : "🔘 افتراضية", inline: true },
-    )
-    .setFooter({ text: "⚙️ إعداد السيرفر — اختار من القايمة" });
+export function applyPlaceholders(template, { mention = "", user = "", server = "", count = 0, id = "" } = {}) {
+  return String(template)
+    .replace(/{mention}/g, mention)
+    .replace(/{user}/g,    user)
+    .replace(/{server}/g,  server)
+    .replace(/{count}/g,   String(count))
+    .replace(/{id}/g,      id);
 }
 
-function buildMainMenu() {
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`${PREFIX}menu`)
-    .setPlaceholder("اختار إعداد تحب تظبطه")
-    .addOptions([
-      { label: "قناة الترحيب",             description: "القناة اللي البوت يرحب فيها بالأعضاء الجداد",    value: "welcome",    emoji: "👋" },
-      { label: "قناة الوداع",              description: "القناة اللي البوت يودع فيها الأعضاء اللي بيخرجوا", value: "goodbye",    emoji: "🥀" },
-      { label: "قناة السجلات (Log)",       description: "القناة اللي بتوصلها تقارير الحماية والأوتو مود",  value: "log",        emoji: "📜" },
-      { label: "مصيدة الهاكرات",           description: "قناة سرية — أي حد يكتب فيها يتطرد فوراً",        value: "trap",       emoji: "🪤" },
-      { label: "بوابة التحقق",             description: "ابعت رسالة بوابة الموافقة على القوانين في روم",  value: "verify",     emoji: "🔐" },
-      { label: "رتب الإشراف الإضافية",    description: "رتب تتعامل كمشرفين موثوقين في الأوتو مود",       value: "modroles",   emoji: "👮" },
-      { label: "رسايل الترحيب والوداع",   description: "خصص نص رسالة الترحيب والوداع",                   value: "messages",   emoji: "💬" },
-      { label: "إعدادات الأوتو مود",       description: "عتبات التحذيرات والحماية ضد التخريب والمزيد",    value: "automod",    emoji: "🛡️" },
-    ]);
-  return new ActionRowBuilder().addComponents(menu);
-}
-
-// ─── قناة الترحيب ──────────────────────────────────────────────
-function buildWelcomePanel(guildId, db) {
-  const current = db.getWelcomeChannel(guildId);
-  const embed = new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle("👋 قناة الترحيب")
-    .setDescription(`الحالي: ${current ? `<#${current}>` : "❌ مش متحددة"}\n\nاختار القناة اللي عايز البوت يرحب فيها بالأعضاء الجداد 👇`);
-  const chMenu = new ChannelSelectMenuBuilder()
-    .setCustomId(`${PREFIX}welcome_ch`)
-    .setPlaceholder("اختار قناة الترحيب")
-    .addChannelTypes(ChannelType.GuildText);
-  return {
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(chMenu),
-      new ActionRowBuilder().addComponents(backBtn()),
-    ],
-  };
-}
-
-// ─── قناة الوداع ───────────────────────────────────────────────
-function buildGoodbyePanel(guildId, db) {
-  const current = db.getGoodbyeChannel(guildId);
-  const welcome = db.getWelcomeChannel(guildId);
-  const embed = new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle("🥀 قناة الوداع")
-    .setDescription(`الحالي: ${current ? `<#${current}>` : welcome ? `<#${welcome}> (نفس الترحيب افتراضياً)` : "❌ مش متحددة"}\n\nاختار القناة اللي عايز البوت يبعت فيها رسايل الوداع 👇`);
-  const chMenu = new ChannelSelectMenuBuilder()
-    .setCustomId(`${PREFIX}goodbye_ch`)
-    .setPlaceholder("اختار قناة الوداع")
-    .addChannelTypes(ChannelType.GuildText);
-  return {
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(chMenu),
-      new ActionRowBuilder().addComponents(backBtn()),
-    ],
-  };
-}
-
-// ─── قناة السجلات ──────────────────────────────────────────────
-function buildLogPanel(guildId, db) {
-  const settings = db.getAutoModSettings(guildId);
-  const current  = settings.logChannelId;
-  const embed = new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle("📜 قناة السجلات")
-    .setDescription(`الحالي: ${current ? `<#${current}>` : "❌ مش متحددة"}\n\nاختار القناة اللي بتوصلها تقارير الأوتو مود والحماية 👇`);
-  const chMenu = new ChannelSelectMenuBuilder()
-    .setCustomId(`${PREFIX}log_ch`)
-    .setPlaceholder("اختار قناة السجلات")
-    .addChannelTypes(ChannelType.GuildText);
-  return {
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(chMenu),
-      new ActionRowBuilder().addComponents(backBtn()),
-    ],
-  };
-}
-
-// ─── مصيدة الهاكرات ────────────────────────────────────────────
-function buildTrapPanel(guildId, db) {
-  const current = db.getTrapChannel(guildId);
-  const embed = new EmbedBuilder()
-    .setColor(0xe74c3c)
-    .setTitle("🪤 مصيدة الهاكرات")
-    .setDescription(
-      `الحالي: ${current ? `<#${current}>` : "❌ مش متحددة"}\n\n` +
-      "**إيه ده؟**\nروم سري — أي عضو يكتب فيه يتطرد فوراً.\n" +
-      "الأعضاء الحقيقيين مش المفروض يلاقوه أصلاً.\n\nاختار القناة 👇"
-    );
-  const chMenu = new ChannelSelectMenuBuilder()
-    .setCustomId(`${PREFIX}trap_ch`)
-    .setPlaceholder("اختار قناة المصيدة")
-    .addChannelTypes(ChannelType.GuildText);
-  const disableBtn = new ButtonBuilder()
-    .setCustomId(`${PREFIX}trap_disable`)
-    .setLabel("🚫 تعطيل المصيدة")
-    .setStyle(ButtonStyle.Danger);
-  return {
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(chMenu),
-      new ActionRowBuilder().addComponents(disableBtn, backBtn()),
-    ],
-  };
-}
-
-// ─── بوابة التحقق ──────────────────────────────────────────────
-function buildVerifyPanel() {
-  const embed = new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle("🔐 بوابة التحقق")
-    .setDescription(
-      "اختار الروم اللي عايز تبعت فيها رسالة بوابة التحقق.\n\n" +
-      "البوت هيبعت رسالة فيها زرار **✅ أنا موافق على القوانين** — أي عضو يضغطه بياخد رتبة Verified ويشوف باقي الرومات.\n\nاختار الروم 👇"
-    );
-  const chMenu = new ChannelSelectMenuBuilder()
-    .setCustomId(`${PREFIX}verify_ch`)
-    .setPlaceholder("اختار الروم")
-    .addChannelTypes(ChannelType.GuildText);
-  return {
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(chMenu),
-      new ActionRowBuilder().addComponents(backBtn()),
-    ],
-  };
-}
-
-// ─── رتب الإشراف الإضافية ──────────────────────────────────────
-function buildModRolesPanel(guildId, db) {
-  const settings = db.getAutoModSettings(guildId);
-  const roles    = settings.extraModRoles;
-  const embed = new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle("👮 رتب الإشراف الإضافية")
-    .setDescription(
-      `الحالي: ${roles.length ? roles.map(r => `<@&${r}>`).join(", ") : "مفيش"}\n\n` +
-      "اختار رتبة تضيفها أو تشيلها 👇"
-    );
-  const roleMenu = new RoleSelectMenuBuilder()
-    .setCustomId(`${PREFIX}modroles_select`)
-    .setPlaceholder("اختار رتبة تضيفها أو تشيلها")
-    .setMinValues(0)
-    .setMaxValues(10);
-  const clearBtn = new ButtonBuilder()
-    .setCustomId(`${PREFIX}modroles_clear`)
-    .setLabel("🗑️ مسح الكل")
-    .setStyle(ButtonStyle.Danger);
-  return {
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(roleMenu),
-      new ActionRowBuilder().addComponents(clearBtn, backBtn()),
-    ],
-  };
-}
-
-// ─── رسايل الترحيب والوداع ─────────────────────────────────────
-function buildMessagesPanel(guildId, db) {
-  const wMsg = db.getWelcomeMessage(guildId) || DEFAULT_WELCOME_MSG;
-  const gMsg = db.getGoodbyeMessage(guildId) || DEFAULT_GOODBYE_MSG;
-  const embed = new EmbedBuilder()
-    .setColor(COLOR)
-    .setTitle("💬 رسايل الترحيب والوداع")
-    .setDescription(
-      `**Placeholders المتاحة:**\n${PLACEHOLDER_GUIDE}\n\u200B`
-    )
-    .addFields(
-      { name: "👋 رسالة الترحيب الحالية", value: `\`\`\`${wMsg.slice(0, 900)}\`\`\``, inline: false },
-      { name: "🥀 رسالة الوداع الحالية",  value: `\`\`\`${gMsg.slice(0, 900)}\`\`\``, inline: false },
-    )
-    .setFooter({ text: "اضغط تعديل عشان تكتب نصك المخصص" });
-  const editWelcomeBtn = new ButtonBuilder()
-    .setCustomId(`${PREFIX}welcome_edit`)
-    .setLabel("✏️ تعديل رسالة الترحيب")
-    .setStyle(ButtonStyle.Primary);
-  const editGoodbyeBtn = new ButtonBuilder()
-    .setCustomId(`${PREFIX}goodbye_edit`)
-    .setLabel("✏️ تعديل رسالة الوداع")
-    .setStyle(ButtonStyle.Primary);
-  const resetWelcomeBtn = new ButtonBuilder()
-    .setCustomId(`${PREFIX}welcome_reset`)
-    .setLabel("↺ إعادة تعيين الترحيب")
-    .setStyle(ButtonStyle.Secondary);
-  const resetGoodbyeBtn = new ButtonBuilder()
-    .setCustomId(`${PREFIX}goodbye_reset`)
-    .setLabel("↺ إعادة تعيين الوداع")
-    .setStyle(ButtonStyle.Secondary);
-  return {
-    embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(editWelcomeBtn, editGoodbyeBtn),
-      new ActionRowBuilder().addComponents(resetWelcomeBtn, resetGoodbyeBtn),
-      new ActionRowBuilder().addComponents(backBtn()),
-    ],
-  };
-}
-
-function buildWelcomeModal(current) {
-  const modal = new ModalBuilder()
-    .setCustomId(`${PREFIX}modal_welcome`)
-    .setTitle("✏️ تعديل رسالة الترحيب");
-  const input = new TextInputBuilder()
-    .setCustomId("text")
-    .setLabel("نص الرسالة (الـ placeholders شغّالة)")
-    .setStyle(TextInputStyle.Paragraph)
-    .setRequired(true)
-    .setMaxLength(1800)
-    .setValue(current || DEFAULT_WELCOME_MSG);
-  modal.addComponents(new ActionRowBuilder().addComponents(input));
-  return modal;
-}
-
-function buildGoodbyeModal(current) {
-  const modal = new ModalBuilder()
-    .setCustomId(`${PREFIX}modal_goodbye`)
-    .setTitle("✏️ تعديل رسالة الوداع");
-  const input = new TextInputBuilder()
-    .setCustomId("text")
-    .setLabel("نص الرسالة (الـ placeholders شغّالة)")
-    .setStyle(TextInputStyle.Paragraph)
-    .setRequired(true)
-    .setMaxLength(1800)
-    .setValue(current || DEFAULT_GOODBYE_MSG);
-  modal.addComponents(new ActionRowBuilder().addComponents(input));
-  return modal;
-}
-
-// ─── مساعد: زرار الرجوع ────────────────────────────────────────
-function backBtn() {
-  return new ButtonBuilder()
-    .setCustomId(`${PREFIX}back`)
-    .setLabel("↩️ رجوع")
-    .setStyle(ButtonStyle.Secondary);
-}
-
-// ─── الأمر الرئيسي ─────────────────────────────────────────────
+// ─── الأمر ─────────────────────────────────────────────────────
 export const setupCommand = new SlashCommandBuilder()
   .setName("setup")
-  .setDescription("⚙️ لوحة إعداد شاملة للسيرفر — ترحيب، وداع، لوج، مصيدة، تحقق، إشراف [أدمن]")
+  .setDescription("⚙️ لوحة إعداد السيرفر الشاملة [أدمن]")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
-// ─── تنفيذ الأمر ───────────────────────────────────────────────
-export async function handleSetupCommand(interaction, db) {
-  const embed = buildMainEmbed(interaction.guild.id, db);
-  const menu  = buildMainMenu();
-  return interaction.reply({ embeds: [embed], components: [menu], flags: 64 });
+// ─── بناء لوحة الإعداد الرئيسية ────────────────────────────────
+function buildMainPanel(guildId, db) {
+  const wCh  = db.getWelcomeChannel(guildId);
+  const gCh  = db.getGoodbyeChannel(guildId);
+  const trap = db.getTrapChannel(guildId);
+  const log  = db.getLogChannel   ? db.getLogChannel(guildId)    : null;
+  const vrfy = db.getVerifyChannel ? db.getVerifyChannel(guildId) : null;
+
+  const embed = new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("⚙️ لوحة إعداد السيرفر")
+    .setDescription("اختر القسم اللي تريد تعديله من الأزرار تحت:")
+    .addFields(
+      { name: "👋 قناة الترحيب",   value: wCh   ? `<#${wCh}>`   : "غير محددة", inline: true },
+      { name: "🥀 قناة الوداع",    value: gCh   ? `<#${gCh}>`   : "غير محددة", inline: true },
+      { name: "📜 قناة السجلات",   value: log   ? `<#${log}>`   : "غير محددة", inline: true },
+      { name: "🪤 مصيدة الهاكرات", value: trap  ? `<#${trap}>`  : "غير محددة", inline: true },
+      { name: "🔐 بوابة التحقق",   value: vrfy  ? `<#${vrfy}>`  : "غير محددة", inline: true },
+    )
+    .setFooter({ text: "التعديلات تُحفظ فور اختيارها" })
+    .setTimestamp();
+
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("setup_welcome_ch").setLabel("👋 ترحيب").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("setup_goodbye_ch").setLabel("🥀 وداع").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("setup_log_ch").setLabel("📜 سجلات").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("setup_trap_ch").setLabel("🪤 مصيدة").setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId("setup_verify_ch").setLabel("🔐 تحقق").setStyle(ButtonStyle.Primary),
+  );
+
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("setup_welcome_msg").setLabel("✏️ رسالة ترحيب").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_goodbye_msg").setLabel("✏️ رسالة وداع").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_modroles").setLabel("👮 رتب إشراف").setStyle(ButtonStyle.Secondary),
+  );
+
+  return { embed, components: [row1, row2] };
 }
 
-// ─── التعامل مع كل الإنتراكشنز ────────────────────────────────
+// ─── تنفيذ الأمر ────────────────────────────────────────────────
+export async function handleSetupCommand(interaction, db) {
+  const { embed, components } = buildMainPanel(interaction.guild.id, db);
+  await interaction.reply({ embeds: [embed], components, ephemeral: true });
+}
+
+// ─── معالج كل تفاعلات setup_ ───────────────────────────────────
 export async function handleSetupInteraction(interaction, db, client) {
-  const guildId = interaction.guild?.id;
-  if (!guildId) return false;
-
   const id = interaction.customId;
-  if (!id?.startsWith(PREFIX)) return false;
 
-  // ── المودالات ────────────────────────────────────────────────
-  if (interaction.isModalSubmit()) {
-    if (id === `${PREFIX}modal_welcome`) {
-      const text = interaction.fields.getTextInputValue("text").trim();
-      if (!text) {
-        await interaction.reply({ content: "❌ لازم تكتب نص.", flags: 64 });
-        return true;
-      }
-      db.setWelcomeMessage(guildId, text);
-      await interaction.update(buildMessagesPanel(guildId, db));
-      return true;
-    }
-    if (id === `${PREFIX}modal_goodbye`) {
-      const text = interaction.fields.getTextInputValue("text").trim();
-      if (!text) {
-        await interaction.reply({ content: "❌ لازم تكتب نص.", flags: 64 });
-        return true;
-      }
-      db.setGoodbyeMessage(guildId, text);
-      await interaction.update(buildMessagesPanel(guildId, db));
-      return true;
-    }
-    return false;
+  // ── اختيار قناة ترحيب ──
+  if (id === "setup_welcome_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId("setup_set_welcome_ch")
+        .setPlaceholder("اختار قناة الترحيب")
+        .addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "👋 اختار قناة الترحيب:", components: [row], ephemeral: true });
   }
 
-  // ── القايمة الرئيسية ─────────────────────────────────────────
-  if (interaction.isStringSelectMenu() && id === `${PREFIX}menu`) {
-    const val = interaction.values[0];
-    if (val === "welcome")   return interaction.update(buildWelcomePanel(guildId, db));
-    if (val === "goodbye")   return interaction.update(buildGoodbyePanel(guildId, db));
-    if (val === "log")       return interaction.update(buildLogPanel(guildId, db));
-    if (val === "trap")      return interaction.update(buildTrapPanel(guildId, db));
-    if (val === "verify")    return interaction.update(buildVerifyPanel());
-    if (val === "modroles")  return interaction.update(buildModRolesPanel(guildId, db));
-    if (val === "messages")  return interaction.update(buildMessagesPanel(guildId, db));
-    if (val === "automod") {
-      // عرض قايمة الأوتو مود الكاملة (amset_ handlers في index.js بيكملوا من هنا)
-      const settings = db.getAutoModSettings(guildId);
-      return interaction.update(buildAutoModMainMenu(settings));
-    }
+  if (id === "setup_set_welcome_ch") {
+    const ch = interaction.values[0];
+    db.setWelcomeChannel(interaction.guild.id, ch);
+    return interaction.reply({ content: `✅ قناة الترحيب اتحددت: <#${ch}>`, ephemeral: true });
   }
 
-  // ── زرار الرجوع ──────────────────────────────────────────────
-  if (interaction.isButton() && id === `${PREFIX}back`) {
-    const embed = buildMainEmbed(guildId, db);
-    const menu  = buildMainMenu();
-    return interaction.update({ embeds: [embed], components: [menu] });
+  // ── اختيار قناة وداع ──
+  if (id === "setup_goodbye_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId("setup_set_goodbye_ch")
+        .setPlaceholder("اختار قناة الوداع")
+        .addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "🥀 اختار قناة الوداع:", components: [row], ephemeral: true });
   }
 
-  // ── اختيار قناة الترحيب ──────────────────────────────────────
-  if (interaction.isChannelSelectMenu() && id === `${PREFIX}welcome_ch`) {
-    db.setWelcomeChannel(guildId, interaction.values[0]);
-    return interaction.update(buildWelcomePanel(guildId, db));
+  if (id === "setup_set_goodbye_ch") {
+    const ch = interaction.values[0];
+    db.setGoodbyeChannel(interaction.guild.id, ch);
+    return interaction.reply({ content: `✅ قناة الوداع اتحددت: <#${ch}>`, ephemeral: true });
   }
 
-  // ── اختيار قناة الوداع ───────────────────────────────────────
-  if (interaction.isChannelSelectMenu() && id === `${PREFIX}goodbye_ch`) {
-    db.setGoodbyeChannel(guildId, interaction.values[0]);
-    return interaction.update(buildGoodbyePanel(guildId, db));
+  // ── اختيار قناة سجلات ──
+  if (id === "setup_log_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId("setup_set_log_ch")
+        .setPlaceholder("اختار قناة السجلات")
+        .addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "📜 اختار قناة السجلات:", components: [row], ephemeral: true });
   }
 
-  // ── اختيار قناة السجلات ──────────────────────────────────────
-  if (interaction.isChannelSelectMenu() && id === `${PREFIX}log_ch`) {
-    db.updateAutoModSettings(guildId, { logChannelId: interaction.values[0] });
-    return interaction.update(buildLogPanel(guildId, db));
+  if (id === "setup_set_log_ch") {
+    const ch = interaction.values[0];
+    if (db.setLogChannel) db.setLogChannel(interaction.guild.id, ch);
+    return interaction.reply({ content: `✅ قناة السجلات اتحددت: <#${ch}>`, ephemeral: true });
   }
 
-  // ── اختيار مصيدة الهاكرات ────────────────────────────────────
-  if (interaction.isChannelSelectMenu() && id === `${PREFIX}trap_ch`) {
-    db.setTrapChannel(guildId, interaction.values[0]);
-    return interaction.update(buildTrapPanel(guildId, db));
+  // ── اختيار قناة مصيدة ──
+  if (id === "setup_trap_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId("setup_set_trap_ch")
+        .setPlaceholder("اختار قناة المصيدة (honeypot)")
+        .addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "🪤 اختار قناة المصيدة (أي حد يكتب فيها يتطرد):", components: [row], ephemeral: true });
   }
 
-  // ── تعطيل المصيدة ────────────────────────────────────────────
-  if (interaction.isButton() && id === `${PREFIX}trap_disable`) {
-    db.setTrapChannel(guildId, null);
-    return interaction.update(buildTrapPanel(guildId, db));
+  if (id === "setup_set_trap_ch") {
+    const ch = interaction.values[0];
+    db.setTrapChannel(interaction.guild.id, ch);
+    return interaction.reply({ content: `✅ قناة المصيدة اتحددت: <#${ch}>`, ephemeral: true });
   }
 
-  // ── بوابة التحقق ─────────────────────────────────────────────
-  if (interaction.isChannelSelectMenu() && id === `${PREFIX}verify_ch`) {
-    const chId = interaction.values[0];
-    const ch   = interaction.guild.channels.cache.get(chId)
-              || await interaction.guild.channels.fetch(chId).catch(() => null);
-    if (!ch) {
-      await interaction.reply({ content: "❌ مش لاقي الروم دي.", flags: 64 });
-      return true;
-    }
-    try {
-      const { EmbedBuilder: E, ActionRowBuilder: AR, ButtonBuilder: BB, ButtonStyle: BS } = await import("discord.js");
-      const verifyEmbed = new EmbedBuilder()
-        .setColor(0xffd700)
-        .setTitle("𓂀 بوابة دخول السيرفر 𓂀")
-        .setDescription(
-          "```\n⚜️  أهلاً بك في السيرفر\n```\n" +
-          "قبل ما تشوف باقي الرومات، لازم توافق على قوانين السيرفر.\n\n" +
-          "دوس على الزرار تحت عشان تأكد إنك موافق — وهتفتحلك باقي الرومات على طول ✅"
-        )
-        .setFooter({ text: "التحقق بياخد ثانية واحدة بس 🔐" });
-      const verifyRow = new AR().addComponents(
-        new BB()
-          .setCustomId("verify_gate_accept")
-          .setLabel("✅ أنا موافق على القوانين")
-          .setStyle(BS.Success)
-      );
-      await ch.send({ embeds: [verifyEmbed], components: [verifyRow] });
-      await interaction.update({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(0x2ecc71)
-            .setTitle("✅ اتبعت بوابة التحقق!")
-            .setDescription(`اتبعتت رسالة بوابة التحقق في <#${chId}> بنجاح 🎉`)
-        ],
-        components: [new AR().addComponents(
-          new BB().setCustomId(`${PREFIX}back`).setLabel("↩️ رجوع").setStyle(BS.Secondary)
-        )],
-      });
-    } catch (err) {
-      console.error("[Setup] خطأ في بوابة التحقق:", err);
-      await interaction.reply({ content: "❌ في مشكلة وانا ببعت البوابة. اتأكد البوت عنده صلاحيات في الروم دي.", flags: 64 });
-    }
-    return true;
+  // ── اختيار قناة التحقق ──
+  if (id === "setup_verify_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder()
+        .setCustomId("setup_set_verify_ch")
+        .setPlaceholder("اختار قناة بوابة التحقق")
+        .addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "🔐 اختار قناة بوابة التحقق:", components: [row], ephemeral: true });
   }
 
-  // ── رتب الإشراف الإضافية ─────────────────────────────────────
-  if (interaction.isRoleSelectMenu() && id === `${PREFIX}modroles_select`) {
-    const selected = interaction.values;
-    const settings = db.getAutoModSettings(guildId);
-    for (const roleId of selected) {
-      if (settings.extraModRoles.includes(roleId)) db.removeExtraModRole(guildId, roleId);
-      else db.addExtraModRole(guildId, roleId);
-    }
-    return interaction.update(buildModRolesPanel(guildId, db));
+  if (id === "setup_set_verify_ch") {
+    const ch = interaction.values[0];
+    if (db.setVerifyChannel) db.setVerifyChannel(interaction.guild.id, ch);
+    return interaction.reply({ content: `✅ قناة التحقق اتحددت: <#${ch}>`, ephemeral: true });
   }
 
-  if (interaction.isButton() && id === `${PREFIX}modroles_clear`) {
-    db.updateAutoModSettings(guildId, { extraModRoles: [] });
-    return interaction.update(buildModRolesPanel(guildId, db));
+  // ── رتب الإشراف ──
+  if (id === "setup_modroles") {
+    const row = new ActionRowBuilder().addComponents(
+      new RoleSelectMenuBuilder()
+        .setCustomId("setup_set_modrole")
+        .setPlaceholder("اختار رتبة مشرف إضافية")
+        .setMinValues(1)
+        .setMaxValues(5)
+    );
+    return interaction.reply({ content: "👮 اختار رتب الإشراف الإضافية:", components: [row], ephemeral: true });
   }
 
-  // ── رسايل — فتح المودال ──────────────────────────────────────
-  if (interaction.isButton() && id === `${PREFIX}welcome_edit`) {
-    const current = db.getWelcomeMessage(guildId);
-    return interaction.showModal(buildWelcomeModal(current));
-  }
-  if (interaction.isButton() && id === `${PREFIX}goodbye_edit`) {
-    const current = db.getGoodbyeMessage(guildId);
-    return interaction.showModal(buildGoodbyeModal(current));
+  if (id === "setup_set_modrole") {
+    const roles = interaction.values;
+    if (db.addExtraModRole) roles.forEach(r => db.addExtraModRole(interaction.guild.id, r));
+    return interaction.reply({ content: `✅ اتضافت ${roles.length} رتبة للإشراف.`, ephemeral: true });
   }
 
-  // ── رسايل — إعادة تعيين ──────────────────────────────────────
-  if (interaction.isButton() && id === `${PREFIX}welcome_reset`) {
-    db.setWelcomeMessage(guildId, null);
-    return interaction.update(buildMessagesPanel(guildId, db));
-  }
-  if (interaction.isButton() && id === `${PREFIX}goodbye_reset`) {
-    db.setGoodbyeMessage(guildId, null);
-    return interaction.update(buildMessagesPanel(guildId, db));
+  // ── رسالة ترحيب مخصصة ──
+  if (id === "setup_welcome_msg") {
+    const current = db.getWelcomeMessage(interaction.guild.id) || DEFAULT_WELCOME_MSG;
+    const modal = new ModalBuilder()
+      .setCustomId("setup_modal_welcome_msg")
+      .setTitle("✏️ رسالة الترحيب المخصصة");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("msg")
+          .setLabel(`المتاح: {mention} {user} {server} {count} {id}`)
+          .setStyle(TextInputStyle.Paragraph)
+          .setValue(current)
+          .setMaxLength(1000)
+      )
+    );
+    return interaction.showModal(modal);
   }
 
-  return false;
+  if (id === "setup_modal_welcome_msg") {
+    const text = interaction.fields.getTextInputValue("msg").trim();
+    if (!text) return interaction.reply({ content: "❌ النص فاضي!", ephemeral: true });
+    db.setWelcomeMessage(interaction.guild.id, text);
+    return interaction.reply({ content: `✅ رسالة الترحيب اتحدثت!\n\n**معاينة:**\n${text}`, ephemeral: true });
+  }
+
+  // ── رسالة وداع مخصصة ──
+  if (id === "setup_goodbye_msg") {
+    const current = db.getGoodbyeMessage(interaction.guild.id) || DEFAULT_GOODBYE_MSG;
+    const modal = new ModalBuilder()
+      .setCustomId("setup_modal_goodbye_msg")
+      .setTitle("✏️ رسالة الوداع المخصصة");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("msg")
+          .setLabel(`المتاح: {mention} {user} {server} {count} {id}`)
+          .setStyle(TextInputStyle.Paragraph)
+          .setValue(current)
+          .setMaxLength(1000)
+      )
+    );
+    return interaction.showModal(modal);
+  }
+
+  if (id === "setup_modal_goodbye_msg") {
+    const text = interaction.fields.getTextInputValue("msg").trim();
+    if (!text) return interaction.reply({ content: "❌ النص فاضي!", ephemeral: true });
+    db.setGoodbyeMessage(interaction.guild.id, text);
+    return interaction.reply({ content: `✅ رسالة الوداع اتحدثت!\n\n**معاينة:**\n${text}`, ephemeral: true });
+  }
 }
