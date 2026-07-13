@@ -249,6 +249,28 @@ class Database {
     return this.data.goodbyeChannels[guildId] || null;
   }
 
+  setWelcomeMessage(guildId, message) {
+    if (!this.data.customMessages) this.data.customMessages = {};
+    if (!this.data.customMessages[guildId]) this.data.customMessages[guildId] = {};
+    this.data.customMessages[guildId].welcome = message;
+    this.save();
+  }
+
+  getWelcomeMessage(guildId) {
+    return this.data.customMessages?.[guildId]?.welcome || null;
+  }
+
+  setGoodbyeMessage(guildId, message) {
+    if (!this.data.customMessages) this.data.customMessages = {};
+    if (!this.data.customMessages[guildId]) this.data.customMessages[guildId] = {};
+    this.data.customMessages[guildId].goodbye = message;
+    this.save();
+  }
+
+  getGoodbyeMessage(guildId) {
+    return this.data.customMessages?.[guildId]?.goodbye || null;
+  }
+
   setTrapChannel(guildId, channelId) {
     if (!this.data.trapChannels) this.data.trapChannels = {};
     this.data.trapChannels[guildId] = channelId;

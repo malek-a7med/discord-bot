@@ -238,10 +238,16 @@ function buildLogChannelMenu(settings) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(channelMenu), backRow] };
 }
 
-// ── تنفيذ الأمر ──────────────────────────────────────────────────
+// ── تصدير القايمة الرئيسية لاستخدامها من /setup ─────────────────
+export function buildAutoModMainMenu(settings) {
+  return buildMainMenu(settings);
+}
+
+// ── تنفيذ الأمر — بيحوّل لـ /setup مباشرة ──────────────────────
 export async function handleAutoModSettingsCommand(interaction, db) {
-  const settings = db.getAutoModSettings(interaction.guildId);
-  return interaction.reply({ ...buildMainMenu(settings), flags: 64 });
+  // الأمر ده بقى alias لـ /setup — بنفتح لوحة /setup مباشرة
+  const { handleSetupCommand } = await import("./setup.js");
+  return handleSetupCommand(interaction, db);
 }
 
 // ── معالج القوايم والأزرار ────────────────────────────────────────

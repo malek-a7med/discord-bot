@@ -65,7 +65,7 @@ import { serverStatsCommand, handleServerStats } from "./commands/server-stats-l
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
 import { topCommand, handleTopCommand, verifyGateCommand, handleVerifyGateCommand, handleVerifyButton, bankShopCommand, handleShopCommand as handleBankShopCommand, handleShopSelect } from "./commands/community.js";
 import { autoModSettingsCommand, handleAutoModSettingsCommand, handleAutoModSettingsInteraction } from "./commands/automod-settings.js";
-import { setupCommand, handleSetupCommand, handleSetupInteraction } from "./commands/setup.js";
+import { setupCommand, handleSetupCommand, handleSetupInteraction, applyPlaceholders, DEFAULT_WELCOME_MSG, DEFAULT_GOODBYE_MSG } from "./commands/setup.js";
 import { onRoleDelete as antiNukeOnRoleDelete, onChannelDelete as antiNukeOnChannelDelete, onGuildBanAdd as antiNukeOnGuildBanAdd, onPossibleKick as antiNukeOnPossibleKick } from "./helpers/anti-nuke.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -6645,28 +6645,33 @@ client.on('guildMemberAdd', async (member) => {
     }
 
     const avatarURL = member.user.displayAvatarURL({ dynamic: true, size: 512 });
-    const imagePath = path.join(__dirname, 'welcome.png');
-    const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
+    const customMsg = db.getWelcomeMessage(member.guild.id);
+    const welcomeText = applyPlaceholders(customMsg || DEFAULT_WELCOME_MSG, {
+      mention: `<@${member.id}>`,
+      user:    member.displayName,
+      server:  member.guild.name,
+      count:   member.guild.memberCount,
+      id:      member.id,
+    });
 
     const welcomeEmbed = new EmbedBuilder()
-      .setColor('#A020F0')
-      .setTitle('⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️')
-      .setDescription(
-        `🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n` +
-        `👤 **الـعـضـو الـجـديـد:** <@${member.id}> (${member.displayName})\n` +
-        `🆔 **الـمـعـرّف الـخـاص:** \`${member.id}\`\n` +
-        `📊 **أنـت الـفـرعـون رقـم:** \`${member.guild.memberCount}\` في مملكتنا!\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑`
-      )
+      .setColor('#5865F2')
+      .setTitle('👋 عضو جديد!')
+      .setDescription(welcomeText)
       .setThumbnail(avatarURL)
-      .setImage('attachment://welcome.png')
-      .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️' })
       .setTimestamp();
 
-    await channel.send({ content: `<@${member.id}>`, embeds: [welcomeEmbed], files: [attachment] });
+    // لو مفيش رسالة مخصصة، ضيف الصورة الافتراضية
+    const sendOpts = { content: `<@${member.id}>`, embeds: [welcomeEmbed] };
+    if (!customMsg) {
+      try {
+        const imagePath = path.join(__dirname, 'welcome.png');
+        const attachment = new AttachmentBuilder(imagePath, { name: 'welcome.png' });
+        welcomeEmbed.setImage('attachment://welcome.png');
+        sendOpts.files = [attachment];
+      } catch { /* الصورة مش موجودة أو فيه مشكلة — بنكمل بدونها */ }
+    }
+    await channel.send(sendOpts);
 
   } catch (error) {
     console.error("خطأ في نظام الترحيب:", error);
@@ -6716,20 +6721,20 @@ client.on('guildMemberRemove', async (member) => {
       : "https://cdn.discordapp.com/embed/avatars/0.png";
     const displayName = user?.username ?? member.id;
 
+    const customGoodbyeMsg = db.getGoodbyeMessage(member.guild.id);
+    const goodbyeText = applyPlaceholders(customGoodbyeMsg || DEFAULT_GOODBYE_MSG, {
+      mention: `<@${member.id}>`,
+      user:    displayName,
+      server:  member.guild.name,
+      count:   member.guild.memberCount,
+      id:      member.id,
+    });
+
     const goodbyeEmbed = new EmbedBuilder()
-      .setColor('#A020F0')
-      .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
-      .setDescription(
-        `🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `👤 **الفرعون اللي ودعنا:** <@${member.id}> (${displayName})\n` +
-        `🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n` +
-        `📊 **بقينا** \`${member.guild.memberCount}\` **فرعون في المملكة.**\n` +
-        `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑`
-      )
+      .setColor('#5865F2')
+      .setTitle('🥀 عضو غادر السيرفر')
+      .setDescription(goodbyeText)
       .setThumbnail(avatarURL)
-      .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️' })
       .setTimestamp();
 
     await channel.send({ content: `<@${member.id}>`, embeds: [goodbyeEmbed] });
@@ -6843,6 +6848,58 @@ client.on('guildBanRemove', (ban) => {
     new EmbedBuilder().setColor(0x2ecc71).setTitle("🔓 عضو اتشال منه الباند")
       .setDescription(`👤 **${ban.user?.tag ?? ban.user?.id}**\n🆔 \`${ban.user?.id}\``).setTimestamp()
   );
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  📨 استقبال السيرفر الجديد — بيبعت دليل الإعداد للأدمن
+// ═══════════════════════════════════════════════════════════════
+client.on('guildCreate', async (guild) => {
+  logger.info(`[guildCreate] البوت اتضاف لسيرفر جديد: ${guild.name} (${guild.id})`);
+
+  const setupEmbed = new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("👋 أهلاً في البوت — خطوات البداية")
+    .setDescription(
+      `شكراً لإضافة البوت لسيرفر **${guild.name}** 🎉\n\n` +
+      "**عشان تبدأ صح، نفّذ الأمر ده في أي قناة:**\n" +
+      "```\n/setup\n```\n" +
+      "**الأمر ده بيظبط كل حاجة:**\n" +
+      "👋 قناة الترحيب والوداع\n" +
+      "📜 قناة السجلات (Log)\n" +
+      "🪤 مصيدة الهاكرات (Honeypot)\n" +
+      "🔐 بوابة التحقق للأعضاء الجداد\n" +
+      "👮 رتب الإشراف الإضافية\n" +
+      "🛡️ الحماية ضد التخريب (Anti-Nuke)\n" +
+      "💬 تخصيص رسايل الترحيب والوداع\n\n" +
+      "لو عندك أسئلة، `/مساعدة` بيفيدك ✅"
+    )
+    .setFooter({ text: "استخدم /setup لإعداد السيرفر" })
+    .setTimestamp();
+
+  // حاول تبعت DM للأونر الأول
+  let sentDM = false;
+  try {
+    const owner = await guild.fetchOwner().catch(() => null);
+    if (owner) {
+      await owner.send({ embeds: [setupEmbed] }).catch(() => null);
+      sentDM = true;
+    }
+  } catch { /* DM مغلقة */ }
+
+  // fallback: أول قناة نصية عندها صلاحيات
+  if (!sentDM) {
+    try {
+      const ch = guild.channels.cache
+        .filter(c =>
+          c.type === 0 /* GuildText */ &&
+          guild.members.me &&
+          c.permissionsFor(guild.members.me)?.has(["SendMessages", "EmbedLinks"])
+        )
+        .sort((a, b) => (a.rawPosition ?? 0) - (b.rawPosition ?? 0))
+        .first();
+      if (ch) await ch.send({ embeds: [setupEmbed] }).catch(() => {});
+    } catch { /* مفيش قناة متاحة */ }
+  }
 });
 
 
