@@ -81,7 +81,7 @@ function applyPlaceholders(template, vars = {}) {
 }
 
 const setupCommand = new SlashCommandBuilder()
-  .setName("setup")
+  .setName("اعداد")
   .setDescription("⚙️ لوحة إعداد السيرفر الشاملة [أدمن]")
   .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
 
@@ -909,7 +909,7 @@ function validateLatestFeatures(allCommands) {
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
       "قائمة-الباند","رفع-باند",
-      "أنمي","اعدادات-الاوتومود","setup",
+      "أنمي","اعدادات-الاوتومود","اعداد",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -1052,12 +1052,25 @@ async function deployCommands(token, clientId) {
   const advancedCommands = await getAdvancedCommands();
   const allCommands = [...LEGACY_COMMANDS, ...advancedCommands];
 
+  // تحقق من كل أمر قبل الإرسال
+  const bodies = [];
+  for (const cmd of allCommands) {
+    try {
+      bodies.push(cmd.toJSON());
+    } catch (err) {
+      const name = cmd?.name ?? cmd?.data?.name ?? "???";
+      logger.error(`[deployCommands] فشل toJSON على أمر: ${name} — ${err.message}`);
+    }
+  }
+
+  const names = bodies.map(b => b.name);
+  logger.info(`🔄 رفع ${bodies.length} أمر: ${names.join(", ")}`);
+
   try {
-    logger.info(`🔄 رفع ${allCommands.length} أمر على ديسكورد...`);
-    await rest.put(Routes.applicationCommands(clientId), { body: allCommands.map((c) => c.toJSON()) });
-    logger.success(`تم رفع ${allCommands.length} أمر بنجاح!`);
+    await rest.put(Routes.applicationCommands(clientId), { body: bodies });
+    logger.success(`✅ تم رفع ${bodies.length} أمر بنجاح! الأوامر: ${names.join(", ")}`);
   } catch (e) {
-    logger.error("خطأ في رفع الأوامر:", e);
+    logger.error("❌ خطأ في رفع الأوامر:", e);
   }
 }
 
@@ -4633,7 +4646,7 @@ client.on("interactionCreate", async (interaction) => {
         return handleAutoModSettingsCommand(interaction, db);
       }
 
-      if (cmd === "setup") {
+      if (cmd === "اعداد") {
         return handleSetupCommand(interaction, db);
       }
 
