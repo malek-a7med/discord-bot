@@ -65,7 +65,153 @@ import { serverStatsCommand, handleServerStats } from "./commands/server-stats-l
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
 import { topCommand, handleTopCommand, verifyGateCommand, handleVerifyGateCommand, handleVerifyButton, bankShopCommand, handleShopCommand as handleBankShopCommand, handleShopSelect } from "./commands/community.js";
 import { autoModSettingsCommand, handleAutoModSettingsCommand, handleAutoModSettingsInteraction } from "./commands/automod-settings.js";
-import { setupCommand, handleSetupCommand, handleSetupInteraction, applyPlaceholders, DEFAULT_WELCOME_MSG, DEFAULT_GOODBYE_MSG } from "./commands/setup.js";
+// ══ /setup — inline (no external import) ══════════════════════════
+const DEFAULT_WELCOME_MSG =
+  "👋 أهلاً **{mention}** في **{server}**!\nأنت العضو رقم **{count}**. نتمنالك وقت حلو معنا 🎉";
+const DEFAULT_GOODBYE_MSG =
+  "🥀 وداعاً **{user}** — شكراً على وجودك معنا.\nعدد الأعضاء الآن: **{count}**.";
+
+function applyPlaceholders(template, vars = {}) {
+  return String(template)
+    .replace(/{mention}/g, vars.mention ?? "")
+    .replace(/{user}/g,    vars.user    ?? "")
+    .replace(/{server}/g,  vars.server  ?? "")
+    .replace(/{count}/g,   String(vars.count ?? 0))
+    .replace(/{id}/g,      vars.id      ?? "");
+}
+
+const setupCommand = new SlashCommandBuilder()
+  .setName("setup")
+  .setDescription("⚙️ لوحة إعداد السيرفر الشاملة [أدمن]")
+  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator);
+
+async function handleSetupCommand(interaction, db) {
+  const gid  = interaction.guild.id;
+  const wCh  = db.getWelcomeChannel(gid);
+  const gCh  = db.getGoodbyeChannel(gid);
+  const trap = db.getTrapChannel(gid);
+  const wMsg = db.getWelcomeMessage(gid) || DEFAULT_WELCOME_MSG;
+  const gMsg = db.getGoodbyeMessage(gid) || DEFAULT_GOODBYE_MSG;
+
+  const embed = new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("⚙️ لوحة إعداد السيرفر")
+    .setDescription("اختار القسم اللي تريد تعديله:")
+    .addFields(
+      { name: "👋 قناة الترحيب",   value: wCh   ? `<#${wCh}>`  : "❌ غير محددة", inline: true },
+      { name: "🥀 قناة الوداع",    value: gCh   ? `<#${gCh}>`  : "❌ غير محددة", inline: true },
+      { name: "🪤 مصيدة الهاكرات", value: trap  ? `<#${trap}>` : "❌ غير محددة", inline: true },
+      { name: "✏️ رسالة الترحيب",  value: `\`\`\`${wMsg.slice(0, 80)}${wMsg.length > 80 ? "…" : ""}\`\`\``, inline: false },
+      { name: "✏️ رسالة الوداع",   value: `\`\`\`${gMsg.slice(0, 80)}${gMsg.length > 80 ? "…" : ""}\`\`\``, inline: false },
+    )
+    .setFooter({ text: "Placeholders: {mention} {user} {server} {count} {id}" })
+    .setTimestamp();
+
+  const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("setup_welcome_ch").setLabel("👋 قناة ترحيب").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("setup_goodbye_ch").setLabel("🥀 قناة وداع").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("setup_trap_ch").setLabel("🪤 مصيدة").setStyle(ButtonStyle.Danger),
+  );
+  const row2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("setup_welcome_msg").setLabel("✏️ رسالة ترحيب").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_goodbye_msg").setLabel("✏️ رسالة وداع").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("setup_modroles").setLabel("👮 رتب إشراف").setStyle(ButtonStyle.Secondary),
+  );
+
+  return interaction.reply({ embeds: [embed], components: [row1, row2], flags: 64 });
+}
+
+async function handleSetupInteraction(interaction, db) {
+  const id  = interaction.customId;
+  const gid = interaction.guild.id;
+
+  // ── أزرار اختيار قناة ──────────────────────────────────────────
+  if (id === "setup_welcome_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder().setCustomId("setup_set_welcome_ch")
+        .setPlaceholder("اختار قناة الترحيب").addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "👋 اختار قناة الترحيب:", components: [row], flags: 64 });
+  }
+  if (id === "setup_set_welcome_ch") {
+    db.setWelcomeChannel(gid, interaction.values[0]);
+    return interaction.reply({ content: `✅ قناة الترحيب: <#${interaction.values[0]}>`, flags: 64 });
+  }
+
+  if (id === "setup_goodbye_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder().setCustomId("setup_set_goodbye_ch")
+        .setPlaceholder("اختار قناة الوداع").addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "🥀 اختار قناة الوداع:", components: [row], flags: 64 });
+  }
+  if (id === "setup_set_goodbye_ch") {
+    db.setGoodbyeChannel(gid, interaction.values[0]);
+    return interaction.reply({ content: `✅ قناة الوداع: <#${interaction.values[0]}>`, flags: 64 });
+  }
+
+  if (id === "setup_trap_ch") {
+    const row = new ActionRowBuilder().addComponents(
+      new ChannelSelectMenuBuilder().setCustomId("setup_set_trap_ch")
+        .setPlaceholder("مصيدة الهاكرات — أي كتابة فيها = طرد فوري").addChannelTypes(ChannelType.GuildText)
+    );
+    return interaction.reply({ content: "🪤 اختار قناة المصيدة:", components: [row], flags: 64 });
+  }
+  if (id === "setup_set_trap_ch") {
+    db.setTrapChannel(gid, interaction.values[0]);
+    return interaction.reply({ content: `✅ مصيدة الهاكرات: <#${interaction.values[0]}>`, flags: 64 });
+  }
+
+  if (id === "setup_modroles") {
+    const row = new ActionRowBuilder().addComponents(
+      new RoleSelectMenuBuilder().setCustomId("setup_set_modrole")
+        .setPlaceholder("اختار رتب الإشراف الإضافية").setMinValues(1).setMaxValues(5)
+    );
+    return interaction.reply({ content: "👮 اختار رتب الإشراف:", components: [row], flags: 64 });
+  }
+  if (id === "setup_set_modrole") {
+    if (db.addExtraModRole) interaction.values.forEach(r => db.addExtraModRole(gid, r));
+    return interaction.reply({ content: `✅ اتضافت ${interaction.values.length} رتبة للإشراف.`, flags: 64 });
+  }
+
+  // ── مودالز رسايل مخصصة ─────────────────────────────────────────
+  if (id === "setup_welcome_msg") {
+    const cur = db.getWelcomeMessage(gid) || DEFAULT_WELCOME_MSG;
+    const modal = new ModalBuilder().setCustomId("setup_modal_wmsg").setTitle("✏️ رسالة الترحيب");
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId("msg")
+        .setLabel("{mention} {user} {server} {count} {id}")
+        .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
+    ));
+    return interaction.showModal(modal);
+  }
+  if (id === "setup_modal_wmsg") {
+    const text = interaction.fields.getTextInputValue("msg").trim();
+    if (!text) return interaction.reply({ content: "❌ النص فاضي!", flags: 64 });
+    db.setWelcomeMessage(gid, text);
+    return interaction.reply({ content: `✅ رسالة الترحيب اتحدثت:\n${text}`, flags: 64 });
+  }
+
+  if (id === "setup_goodbye_msg") {
+    const cur = db.getGoodbyeMessage(gid) || DEFAULT_GOODBYE_MSG;
+    const modal = new ModalBuilder().setCustomId("setup_modal_gmsg").setTitle("✏️ رسالة الوداع");
+    modal.addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId("msg")
+        .setLabel("{mention} {user} {server} {count} {id}")
+        .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
+    ));
+    return interaction.showModal(modal);
+  }
+  if (id === "setup_modal_gmsg") {
+    const text = interaction.fields.getTextInputValue("msg").trim();
+    if (!text) return interaction.reply({ content: "❌ النص فاضي!", flags: 64 });
+    db.setGoodbyeMessage(gid, text);
+    return interaction.reply({ content: `✅ رسالة الوداع اتحدثت:\n${text}`, flags: 64 });
+  }
+
+  return false; // مش من اختصاص setup
+}
+// ══ نهاية /setup ══════════════════════════════════════════════════
 import { onRoleDelete as antiNukeOnRoleDelete, onChannelDelete as antiNukeOnChannelDelete, onGuildBanAdd as antiNukeOnGuildBanAdd, onPossibleKick as antiNukeOnPossibleKick } from "./helpers/anti-nuke.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -91,6 +237,9 @@ import {
   AttachmentBuilder,
   ContextMenuCommandBuilder,
   ApplicationCommandType,
+  ChannelSelectMenuBuilder,
+  RoleSelectMenuBuilder,
+  ChannelType,
 } from "discord.js";
 import {
   joinVoiceChannel,
