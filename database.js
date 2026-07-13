@@ -238,6 +238,28 @@ class Database {
     return this.data.welcome[guildId] || null;
   }
 
+  setGoodbyeChannel(guildId, channelId) {
+    if (!this.data.goodbyeChannels) this.data.goodbyeChannels = {};
+    this.data.goodbyeChannels[guildId] = channelId;
+    this.save();
+  }
+
+  getGoodbyeChannel(guildId) {
+    if (!this.data.goodbyeChannels) return null;
+    return this.data.goodbyeChannels[guildId] || null;
+  }
+
+  setTrapChannel(guildId, channelId) {
+    if (!this.data.trapChannels) this.data.trapChannels = {};
+    this.data.trapChannels[guildId] = channelId;
+    this.save();
+  }
+
+  getTrapChannel(guildId) {
+    if (!this.data.trapChannels) return null;
+    return this.data.trapChannels[guildId] || null;
+  }
+
   addManhwaTerm(dictName, term, translation) {
     if (!this.data.manhwa[dictName]) {
       this.data.manhwa[dictName] = {};

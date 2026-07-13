@@ -65,6 +65,7 @@ import { serverStatsCommand, handleServerStats } from "./commands/server-stats-l
 import { buildTicketButton, handleTicketButton, handleTicketModalSubmit, handleTicketClose, handleTicketClaim } from "./commands/tickets.js";
 import { topCommand, handleTopCommand, verifyGateCommand, handleVerifyGateCommand, handleVerifyButton, bankShopCommand, handleShopCommand as handleBankShopCommand, handleShopSelect } from "./commands/community.js";
 import { autoModSettingsCommand, handleAutoModSettingsCommand, handleAutoModSettingsInteraction } from "./commands/automod-settings.js";
+import { setupCommand, handleSetupCommand, handleSetupInteraction } from "./commands/setup.js";
 import { onRoleDelete as antiNukeOnRoleDelete, onChannelDelete as antiNukeOnChannelDelete, onGuildBanAdd as antiNukeOnGuildBanAdd, onPossibleKick as antiNukeOnPossibleKick } from "./helpers/anti-nuke.js";
 
 // ───────────────────────────────────────────────────────────────
@@ -723,6 +724,9 @@ const LEGACY_COMMANDS = [
   // ─── إعدادات الأوتو مود ──────────────────────────────────────
   autoModSettingsCommand,
 
+  // ─── إعداد السيرفر الشامل ────────────────────────────────────
+  setupCommand,
+
   // ─── البنك المركزي ────────────────────────────────────────────
   centralBankCommand.data,
 ];
@@ -756,7 +760,7 @@ function validateLatestFeatures(allCommands) {
       "متجر-قدرات","قدراتي","كود-نيمز","الهاتف-المكسور","صنع-الميم","استفتاء",
       "حجر-ورقة-مقص","حجر-ورقة-مقص-العادية","حجر-ورقة-مقص-الخارقة","تحدي-يومي",
       "قائمة-الباند","رفع-باند",
-      "أنمي","اعدادات-الاوتومود",
+      "أنمي","اعدادات-الاوتومود","setup",
     ];
     if (skipList.includes(name)) continue;
     if (!documented.includes(name.replace(/-/g, " ").replace(/-/g, ""))) {
@@ -1939,13 +1943,12 @@ async function checkAndReplyOwnerInsult(msg) {
 
 // ─── DM من الأونر ───────────────────────────────────────────────
 // ─── مصيدة الهاكرات — اي حد يكتب في القناة دي يتطرد فوراً ──────
-const TRAP_CHANNEL_ID = "1523348823798321242";
-
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-  // ── مصيدة الهاكرات ───────────────────────────────────────────
-  if (msg.channel?.id === TRAP_CHANNEL_ID && msg.guild && msg.author.id !== "954816748140503090") {
+  // ── مصيدة الهاكرات (per-guild) ──────────────────────────────
+  const TRAP_CHANNEL_ID = msg.guild ? db.getTrapChannel(msg.guild.id) : null;
+  if (TRAP_CHANNEL_ID && msg.channel?.id === TRAP_CHANNEL_ID && msg.guild && msg.author.id !== "954816748140503090") {
     const trapMember = msg.member;
     try { await msg.delete().catch(() => {}); } catch {}
     try {
@@ -2594,6 +2597,17 @@ client.on("interactionCreate", async (interaction) => {
   if (processedInteractions.has(interaction.id)) return;
   processedInteractions.add(interaction.id);
   setTimeout(() => processedInteractions.delete(interaction.id), 60_000);
+
+  // ─── إعداد السيرفر الشامل ─────────────────────────────────────
+  if (interaction.customId?.startsWith("setup_")) {
+    try {
+      const handled = await handleSetupInteraction(interaction, db, client);
+      if (handled) return;
+    } catch (err) {
+      logger.error("خطأ في setup interaction:", err);
+      return interaction.reply({ content: "معلش في مشكلة، جرب تاني", flags: 64 }).catch(() => {});
+    }
+  }
 
   // ─── إعدادات الأوتو مود (قايمة اختيار + أزرار + مودالز) ─────────
   if (interaction.customId?.startsWith("amset_")) {
@@ -4468,6 +4482,10 @@ client.on("interactionCreate", async (interaction) => {
 
       if (cmd === "اعدادات-الاوتومود") {
         return handleAutoModSettingsCommand(interaction, db);
+      }
+
+      if (cmd === "setup") {
+        return handleSetupCommand(interaction, db);
       }
 
       if (cmd === "الوان") {
@@ -6668,14 +6686,16 @@ client.on('guildMemberRemove', async (member) => {
 
   if (!_dedupeLeave(`${member.guild.id}-${member.id}`)) return;
 
-  const WELCOME_CHANNEL_ID = db.getWelcomeChannel(member.guild.id) || "1486100560494203183";
+  const GOODBYE_CHANNEL_ID = db.getGoodbyeChannel(member.guild.id)
+    || db.getWelcomeChannel(member.guild.id)
+    || "1486100560494203183";
 
   try {
-    const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID)
-      || await member.guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null);
+    const channel = member.guild.channels.cache.get(GOODBYE_CHANNEL_ID)
+      || await member.guild.channels.fetch(GOODBYE_CHANNEL_ID).catch(() => null);
 
     if (!channel) {
-      console.error(`[وداع] مش لاقي قناة الترحيب (${WELCOME_CHANNEL_ID}) في سيرفر ${member.guild.name}`);
+      console.error(`[وداع] مش لاقي قناة الوداع (${GOODBYE_CHANNEL_ID}) في سيرفر ${member.guild.name}`);
       return;
     }
 
