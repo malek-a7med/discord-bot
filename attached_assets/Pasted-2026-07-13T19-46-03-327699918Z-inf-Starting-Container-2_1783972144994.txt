@@ -1,0 +1,61 @@
+2026-07-13T19:46:03.327699918Z [inf]  Starting Container
+2026-07-13T19:46:04.184761380Z [inf]  
+2026-07-13T19:46:04.184765040Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:04.184768580Z [inf]  > node index.js
+2026-07-13T19:46:04.184771840Z [inf]  
+2026-07-13T19:46:04.184775401Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:04.184779081Z [err]  npm notice
+2026-07-13T19:46:04.184782331Z [err]  npm notice New major version of npm available! 10.9.8 -> 12.0.1
+2026-07-13T19:46:04.184785531Z [err]  npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.1
+2026-07-13T19:46:04.184789291Z [err]  npm notice To update run: npm install -g npm@12.0.1
+2026-07-13T19:46:04.184792941Z [err]  npm notice
+2026-07-13T19:46:04.184796611Z [inf]  
+2026-07-13T19:46:04.184801861Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:04.184805151Z [inf]  > node index.js
+2026-07-13T19:46:04.184808281Z [inf]  
+2026-07-13T19:46:04.184811611Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:04.950059654Z [inf]  
+2026-07-13T19:46:04.950066544Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:04.950070264Z [inf]  > node index.js
+2026-07-13T19:46:04.950074284Z [inf]  
+2026-07-13T19:46:05.057520164Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:05.784131195Z [inf]  
+2026-07-13T19:46:05.784134595Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:05.784138815Z [inf]  > node index.js
+2026-07-13T19:46:05.784141855Z [inf]  
+2026-07-13T19:46:05.916654505Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:06.719094935Z [inf]  
+2026-07-13T19:46:06.719099655Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:06.719103155Z [inf]  > node index.js
+2026-07-13T19:46:06.719105935Z [inf]  
+2026-07-13T19:46:06.846002037Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:07.621439102Z [inf]  
+2026-07-13T19:46:07.621444952Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:07.621448472Z [inf]  > node index.js
+2026-07-13T19:46:07.621451922Z [inf]  
+2026-07-13T19:46:07.742670955Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:08.499528392Z [inf]  
+2026-07-13T19:46:08.499531362Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:08.499534202Z [inf]  > node index.js
+2026-07-13T19:46:08.499536712Z [inf]  
+2026-07-13T19:46:08.635153120Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:09.430410388Z [inf]  
+2026-07-13T19:46:09.430413558Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:09.430416278Z [inf]  > node index.js
+2026-07-13T19:46:09.430419088Z [inf]  
+2026-07-13T19:46:09.553201546Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:10.327878808Z [inf]  
+2026-07-13T19:46:10.327884568Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:10.327888748Z [inf]  > node index.js
+2026-07-13T19:46:10.327892288Z [inf]  
+2026-07-13T19:46:10.454543509Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:11.249518274Z [inf]  
+2026-07-13T19:46:11.249522244Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:11.249524854Z [inf]  > node index.js
+2026-07-13T19:46:11.249527354Z [inf]  
+2026-07-13T19:46:11.364015787Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
+2026-07-13T19:46:12.226223305Z [inf]  
+2026-07-13T19:46:12.226230995Z [inf]  > @workspace/discord-bot@1.0.0 start
+2026-07-13T19:46:12.226236225Z [inf]  > node index.js
+2026-07-13T19:46:12.226241495Z [inf]  
+2026-07-13T19:46:12.285468822Z [err]  ❌ متوجود! المتغير DISCORD_TOKEN مفقود في .env
