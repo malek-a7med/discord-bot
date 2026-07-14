@@ -10,16 +10,9 @@ class Logger {
     this.client = client;
   }
 
-  async sendToAdmin(embed) {
-    try {
-      if (!this.client) return;
-      const channel = await this.client.channels.fetch(this.adminChannelId);
-      if (channel) {
-        await channel.send({ embeds: [embed] });
-      }
-    } catch (err) {
-      console.error('❌ ما تقدرتش أبعت للقناة الإدارية:', err.message);
-    }
+  async sendToAdmin(_embed) {
+    // 🔒 اللوجات على قنوات الديسكورد كلها مقفولة عمداً بطلب المستخدم — البوت بقى بيعتمد على بوتات تانية لأي لوج.
+    return;
   }
 
   info(message) {

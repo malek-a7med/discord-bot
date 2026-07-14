@@ -1267,36 +1267,9 @@ function canSendError(key) {
 }
 
 // ── إشعار الأونرز أوتوماتيك لو أمر حصله خطأ وهو شغال ─────────────
-async function notifyOwnersOfError(cmdName, err, interaction) {
-  if (!canSendError(`cmd_fail_${cmdName}`)) return;
-
-  const embed = new EmbedBuilder()
-    .setColor(0xe74c3c)
-    .setTitle("🚨 خطأ في تنفيذ أمر")
-    .addFields(
-      { name: "📌 الأمر", value: `\`/${cmdName}\``, inline: true },
-      { name: "👤 نفّذه", value: `${interaction.user?.tag || interaction.user?.id || "غير معروف"}`, inline: true },
-      { name: "🏛️ السيرفر", value: `${interaction.guild?.name || "DM"}`, inline: true },
-      { name: "🧾 نص الخطأ", value: `\`\`\`${String(err?.message || err).slice(0, 1000)}\`\`\`` }
-    )
-    .setTimestamp();
-
-  try {
-    const logChannelId = db?.data?.settings?.ownerLogsChannelId;
-    if (logChannelId) {
-      const logChannel = await client.channels.fetch(logChannelId).catch(() => null);
-      if (logChannel) {
-        await logChannel.send({ embeds: [embed] }).catch(() => {});
-        return;
-      }
-    }
-  } catch {}
-
-  // مفيش قناة لوجز متعينة (أو فشل الإرسال فيها) — ابعت DM لأول أونر
-  try {
-    const owner = await client.users.fetch(config.OWNER_ID).catch(() => null);
-    if (owner) await owner.send({ embeds: [embed] }).catch(() => {});
-  } catch {}
+async function notifyOwnersOfError(_cmdName, _err, _interaction) {
+  // 🔒 اللوجات/التنبيهات كلها مقفولة عمداً بطلب المستخدم — هو معتمد على بوتات تانية لأي لوج.
+  return;
 }
 
 const client = new Client({
@@ -2224,31 +2197,9 @@ const autoModLogs = new Map();          // logId → logData
 const pendingAnnounceEdits = new Map(); // msgId → { content, channelId } — 10 دقايق
 
 // ─── دالة إرسال سجل التأديب ─────────────────────────────────────
-async function sendModLog(type, modUser, targetId, reason, extra = {}) {
-  const colors = { warn:0xf39c12, mute:0x3498db, kick:0xe74c3c, ban:0xc0392b, clear:0x95a5a6, wipe:0x7f8c8d };
-  const icons  = { warn:"⚠️", mute:"🔇", kick:"👢", ban:"🔨", clear:"🧹", wipe:"💣" };
-  const labels = { warn:"تحذير", mute:"إسكات", kick:"طرد", ban:"تبنيد", clear:"مسح رسايل", wipe:"مسح الروم بالكامل" };
-
-  const embed = new EmbedBuilder()
-    .setColor(colors[type] ?? 0x555555)
-    .setTitle(`${icons[type] ?? "📋"} سجل التأديب | ${labels[type] ?? type}`)
-    .addFields(
-      { name: "👮 المشرف",   value: `<@${modUser.id}>\n\`${modUser.username}\``, inline: true },
-      { name: "🎯 المستهدف", value: targetId ? `<@${targetId}>` : "—",           inline: true },
-      { name: "📋 السبب",    value: reason || "غير محدد",                         inline: true },
-    )
-    .setFooter({ text: "زنجي Mod Log" })
-    .setTimestamp();
-
-  if (extra.duration) embed.addFields({ name: "⏱️ المدة",             value: `**${extra.duration}** دقيقة`,    inline: true });
-  if (extra.count)    embed.addFields({ name: "🗑️ الرسايل المحذوفة", value: `**${extra.count}** رسالة`,        inline: true });
-  if (extra.channel)  embed.addFields({ name: "📍 القناة",            value: `<#${extra.channel}>`,             inline: true });
-  if (extra.warns)    embed.addFields({ name: "⚠️ إجمالي التحذيرات", value: `**${extra.warns}**`,               inline: true });
-
-  try {
-    const logCh = await client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID);
-    await logCh.send({ embeds: [embed] });
-  } catch { /* فشل اللوج — تجاهل */ }
+async function sendModLog(_type, _modUser, _targetId, _reason, _extra = {}) {
+  // 🔒 اللوجات كلها مقفولة عمداً بطلب المستخدم — هو معتمد على بوتات تانية لأي لوج.
+  return;
 }
 
 // ─── رد البوت لو حد شتم الأونر ─────────────────────────────────
@@ -2589,7 +2540,8 @@ client.on("messageCreate", async (msg) => {
         };
         const actionLabel = actionLabels[amResult.action] || amResult.action;
 
-        client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID).then(async logCh => {
+        // 🔒 إرسال لوج الأوتومود لقناة الديسكورد مقفول عمداً بطلب المستخدم (معتمد على بوتات تانية للوج).
+        if (false) client.channels.fetch(AUTO_MOD_LOG_CHANNEL_ID).then(async logCh => {
           const embed = new EmbedBuilder()
             .setColor(embedColor)
             .setTitle(`${levelEmoji} Auto-Mod AI | ${isLogOnly ? "رصد" : "رسالة محذوفة"}`)
