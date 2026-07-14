@@ -1330,6 +1330,10 @@ const activeGames = new Collection();
 // إجراءات التأديب المعلقة — تنتظر تأكيد المشرف
 const pendingModActions = new Map(); // actionId → { type, targetId, reason, duration, modId, guildId }
 let autoModEnabled = true; // تشغيل/إيقاف Auto-Mod
+
+// 🔒 قفل نظام الحماية (Anti-Raid + Anti-Nuke) بالكامل بطلب المستخدم — دلوقتي متوقف.
+// لإعادة تفعيله لاحقًا: خليها true بس.
+const PROTECTION_ENABLED = false;
 // ✅ FIX: ModerationListener كانت معمولة new بس مش متربطة بأي event (كانت ميتة فعليًا).
 //   بنفعّل بس anti-raid (scanGuildJoin في guildMemberAdd) لأنها الميزة الوحيدة الناقصة فعلاً.
 //   anti-spam وanti-link اللي جوه moderation.scanMessage() متعمدين مانستخدمهاش —
@@ -6952,13 +6956,16 @@ async function sendServerActivityLog(_embed) {
 }
 
 client.on('guildMemberAdd', async (member) => {
-  // ✅ FIX: تفعيل anti-raid من moderation-listener.js (كانت معمولة new بس مش مربوطة بأي event)
-  //   بنستدعيها هنا بشكل مستقل عن منطق الترحيب عشان تشتغل دايمًا حتى لو الترحيب اتعمله dedupe
-  moderation.scanGuildJoin(member).catch((err) => {
-    logger.error("[Anti-Raid] خطأ في فحص انضمام العضو:", err);
-  });
+  // 🔒 نظام الحماية (Anti-Raid/Anti-Nuke) مقفول عمداً بطلب المستخدم — راجع PROTECTION_ENABLED فوق.
+  if (PROTECTION_ENABLED) {
+    // ✅ FIX: تفعيل anti-raid من moderation-listener.js (كانت معمولة new بس مش مربوطة بأي event)
+    //   بنستدعيها هنا بشكل مستقل عن منطق الترحيب عشان تشتغل دايمًا حتى لو الترحيب اتعمله dedupe
+    moderation.scanGuildJoin(member).catch((err) => {
+      logger.error("[Anti-Raid] خطأ في فحص انضمام العضو:", err);
+    });
 
-  checkAntiRaid(member).catch(e => console.error("[Anti-Raid] خطأ:", e.message));
+    checkAntiRaid(member).catch(e => console.error("[Anti-Raid] خطأ:", e.message));
+  }
 
   sendServerActivityLog(
     new EmbedBuilder()
@@ -7103,7 +7110,7 @@ client.on('guildMemberRemove', async (member) => {
     console.error("خطأ في نظام الوداع:", error);
   }
 
-  antiNukeOnPossibleKick(member, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص الطرد:", e.message));
+  if (PROTECTION_ENABLED) antiNukeOnPossibleKick(member, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص الطرد:", e.message));
 });
 
 // ================= لوج تغيير رتب/اسم الأعضاء =================
@@ -7176,7 +7183,7 @@ client.on('channelDelete', (channel) => {
     new EmbedBuilder().setColor(0xe74c3c).setTitle("📁 روم اتمسحت")
       .setDescription(`📌 **${channel.name}**\n🆔 \`${channel.id}\``).setTimestamp()
   );
-  antiNukeOnChannelDelete(channel, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص حذف الروم:", e.message));
+  if (PROTECTION_ENABLED) antiNukeOnChannelDelete(channel, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص حذف الروم:", e.message));
 });
 
 client.on('roleCreate', (role) => {
@@ -7191,7 +7198,7 @@ client.on('roleDelete', (role) => {
     new EmbedBuilder().setColor(0xe74c3c).setTitle("🏷️ رتبة اتمسحت")
       .setDescription(`📌 **${role.name}**\n🆔 \`${role.id}\``).setTimestamp()
   );
-  antiNukeOnRoleDelete(role, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص حذف الرتبة:", e.message));
+  if (PROTECTION_ENABLED) antiNukeOnRoleDelete(role, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص حذف الرتبة:", e.message));
 });
 
 // ================= لوج الباند/الأنباند =================
@@ -7200,7 +7207,7 @@ client.on('guildBanAdd', (ban) => {
     new EmbedBuilder().setColor(0xc0392b).setTitle("🔨 عضو اتبند")
       .setDescription(`👤 **${ban.user?.tag ?? ban.user?.id}**\n🆔 \`${ban.user?.id}\``).setTimestamp()
   );
-  antiNukeOnGuildBanAdd(ban, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص الباند:", e.message));
+  if (PROTECTION_ENABLED) antiNukeOnGuildBanAdd(ban, db, notifySecurityOwner).catch((e) => logger.error("[Anti-Nuke] خطأ في فحص الباند:", e.message));
 });
 
 client.on('guildBanRemove', (ban) => {
