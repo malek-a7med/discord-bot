@@ -302,6 +302,30 @@ class Database {
     return this.data.verifyChannels?.[guildId] || null;
   }
 
+  // ── رتبة التحقق (قابلة للتخصيص) ──────────────────────────────
+  setVerifyRole(guildId, roleId) {
+    if (!this.data.verifyRoles) this.data.verifyRoles = {};
+    this.data.verifyRoles[guildId] = roleId;
+    this.save();
+  }
+  getVerifyRole(guildId) {
+    return this.data.verifyRoles?.[guildId] || null;
+  }
+
+  // ── رتبة تلقائية عند الانضمام ─────────────────────────────────
+  setAutoRole(guildId, roleId) {
+    if (!this.data.autoRoles) this.data.autoRoles = {};
+    this.data.autoRoles[guildId] = roleId;
+    this.save();
+  }
+  getAutoRole(guildId) {
+    return this.data.autoRoles?.[guildId] || null;
+  }
+  clearAutoRole(guildId) {
+    if (this.data.autoRoles) delete this.data.autoRoles[guildId];
+    this.save();
+  }
+
   // ── تشغيل/إيقاف الأنظمة ──────────────────────────────────────
   _getToggles(guildId) {
     if (!this.data.toggles) this.data.toggles = {};

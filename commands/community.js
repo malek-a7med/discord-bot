@@ -15,8 +15,7 @@ import {
 import config from "../config.js";
 import { COLORS, footer, fmtNum } from "../helpers/theme.js";
 
-const VERIFIED_ROLE_NAME = "Verified";
-const VERIFY_BUTTON_ID   = "verify_gate_accept";
+const VERIFY_BUTTON_ID = "verify_gate_accept";
 
 // ── /top — أعلى 10 أعضاء حسب الـ XP ─────────────────────────
 export const topCommand = new SlashCommandBuilder()
@@ -92,11 +91,18 @@ export async function handleVerifyGateCommand(interaction) {
   return interaction.reply({ embeds: [embed], components: [row] });
 }
 
-async function ensureVerifiedRole(guild) {
-  let role = guild.roles.cache.find((r) => r.name === VERIFIED_ROLE_NAME);
+// ── جلب/إنشاء رتبة التحقق (مخصصة أو Verified كـ fallback) ─────
+async function resolveVerifyRole(guild, db) {
+  const savedId = db.getVerifyRole(guild.id);
+  if (savedId) {
+    const r = guild.roles.cache.get(savedId) || await guild.roles.fetch(savedId).catch(() => null);
+    if (r) return r;
+  }
+  // fallback: ابحث عن "Verified" أو أنشئها
+  let role = guild.roles.cache.find((r) => r.name === "Verified");
   if (!role) {
     role = await guild.roles.create({
-      name: VERIFIED_ROLE_NAME,
+      name: "Verified",
       color: 0xFFD700,
       hoist: false,
       reason: "رتبة التحقق — بوابة الدخول",
@@ -105,11 +111,19 @@ async function ensureVerifiedRole(guild) {
   return role;
 }
 
-export async function handleVerifyButton(interaction) {
+export async function handleVerifyButton(interaction, db) {
   if (interaction.customId !== VERIFY_BUTTON_ID) return;
 
+  // فحص toggle التحقق (لو موقف يرفض)
+  if (db && !db.getToggle(interaction.guild.id, "verify", false)) {
+    return interaction.reply({
+      content: "🔒 بوابة التحقق مش مفعّلة في السيرفر ده حالياً.",
+      ephemeral: true,
+    });
+  }
+
   try {
-    const role = await ensureVerifiedRole(interaction.guild);
+    const role   = await resolveVerifyRole(interaction.guild, db);
     const member = await interaction.guild.members.fetch(interaction.user.id);
 
     if (member.roles.cache.has(role.id)) {
@@ -124,7 +138,7 @@ export async function handleVerifyButton(interaction) {
       embeds: [new EmbedBuilder()
         .setColor(COLORS.SUCCESS)
         .setTitle("✅ تم التحقق بنجاح!")
-        .setDescription(`أهلاً بك يا **${member.displayName}**!\nاتضافتلك رتبة **${VERIFIED_ROLE_NAME}** وبقت الرومات مفتوحة ليك 🎉`)
+        .setDescription(`أهلاً بك يا **${member.displayName}**!\nاتضافتلك رتبة **${role.name}** وبقت الرومات مفتوحة ليك 🎉`)
         .setFooter(footer())
         .setTimestamp()],
       ephemeral: true,
