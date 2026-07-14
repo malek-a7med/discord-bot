@@ -286,7 +286,6 @@ async function handleSetupInteraction(interaction, db) {
         new ActionRowBuilder().addComponents(
           new ChannelSelectMenuBuilder().setCustomId(menuId)
             .setPlaceholder("اختار القناة")
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
         ),
         backRow,
       ],
