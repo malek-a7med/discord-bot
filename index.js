@@ -101,8 +101,8 @@ function buildSetupEmbed(gid, db) {
   const arole  = db.getAutoRole(gid);
   const vrole  = db.getVerifyRole(gid);
 
-  const wOn  = db.getToggle(gid, "welcome",  true);
-  const gOn  = db.getToggle(gid, "goodbye",  true);
+  const wOn  = db.getToggle(gid, "welcome",  false);
+  const gOn  = db.getToggle(gid, "goodbye",  false);
   const tOn  = db.getToggle(gid, "trap",     true);
   const amOn = db.getToggle(gid, "automod",  true);
   const anOn = db.getAutoModSettings(gid).antiNuke?.enabled ?? false;
@@ -143,8 +143,8 @@ function buildSetupEmbed(gid, db) {
 }
 
 function buildSetupRows(gid, db) {
-  const wOn  = db.getToggle(gid, "welcome", true);
-  const gOn  = db.getToggle(gid, "goodbye", true);
+  const wOn  = db.getToggle(gid, "welcome", false);
+  const gOn  = db.getToggle(gid, "goodbye", false);
   const tOn  = db.getToggle(gid, "trap",    true);
   const amOn = db.getToggle(gid, "automod", true);
   const anOn = db.getAutoModSettings(gid).antiNuke?.enabled ?? false;
@@ -6965,7 +6965,7 @@ client.on('guildMemberAdd', async (member) => {
   if (!_dedupeWelcome(`${member.guild.id}-${member.id}`)) return;
 
   // تحقق من التشغيل/الإيقاف
-  if (!db.getToggle(member.guild.id, "welcome", true)) return;
+  if (!db.getToggle(member.guild.id, "welcome", false)) return;
 
   const WELCOME_CHANNEL_ID = db.getWelcomeChannel(member.guild.id) || "1486100560494203183";
 
@@ -7032,7 +7032,7 @@ client.on('guildMemberRemove', async (member) => {
   if (!_dedupeLeave(`${member.guild.id}-${member.id}`)) return;
 
   // تحقق من التشغيل/الإيقاف
-  if (!db.getToggle(member.guild.id, "goodbye", true)) return;
+  if (!db.getToggle(member.guild.id, "goodbye", false)) return;
 
   const GOODBYE_CHANNEL_ID = db.getGoodbyeChannel(member.guild.id)
     || db.getWelcomeChannel(member.guild.id)
