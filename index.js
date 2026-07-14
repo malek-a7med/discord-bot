@@ -1936,6 +1936,10 @@ client.once("clientReady", async (c) => {
   c.user.setActivity(`${LEGACY_COMMANDS.length + 14} أمر | /مساعدة`, { type: 3 });
   await deployCommands(process.env.DISCORD_TOKEN, c.user.id);
   validateLatestFeatures(LEGACY_COMMANDS);
+
+  // ── إيقاف الترحيب والوداع لسيرفر الأونر (بيستخدم ProBot) ──────
+  db.setToggle("1485896430957625367", "welcome", false);
+  db.setToggle("1485896430957625367", "goodbye", false);
   await ensureSuggestionsPanel(c);
   setInterval(() => sendAutoBackup(c), 24 * 60 * 60 * 1000);
   logger.info("⏰ نظام النسخ الاحتياطية التلقائية اليومية جاهز");
