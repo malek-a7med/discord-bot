@@ -67,9 +67,22 @@ import { topCommand, handleTopCommand, verifyGateCommand, handleVerifyGateComman
 import { autoModSettingsCommand, handleAutoModSettingsCommand, handleAutoModSettingsInteraction } from "./commands/automod-settings.js";
 // ══ /اعداد — inline ════════════════════════════════════════════════
 const DEFAULT_WELCOME_MSG =
-  "👋 أهلاً **{mention}** في **{server}**!\nأنت العضو رقم **{count}**. نتمنالك وقت حلو معنا 🎉";
+  "🦅 **أهلاً بك في عرش الفراعنة العظيم** 🏛️\n\n" +
+  "━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+  "✨ **لقد أشرقت الأنوار وانضم إلينا كاتب تاريخ جديد!**\n" +
+  "👤 **الـعـضـو الـجـديـد:** {mention}\n" +
+  "🆔 **الـمـعـرّف الـخـاص:** `{id}`\n" +
+  "📊 **أنـت الـفـرعـون رقـم:** `{count}` في مملكتنا!\n" +
+  "━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+  "🔥 **نتمنى لك قضاء وقت أسطوري مليء بالحماس والذكريات الجبارة. طير على الرومات وتفاعل مع بقية الفراعنة وفجّر المكان بوجودك!** 👑";
 const DEFAULT_GOODBYE_MSG =
-  "🥀 وداعاً **{user}** — شكراً على وجودك معنا.\nعدد الأعضاء الآن: **{count}**.";
+  "🦅 العرش مش هوه هوه من غيرك! 🏛️\n\n" +
+  "━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+  "👤 **الفرعون اللي ودعنا:** {mention}\n" +
+  "🚶‍♂️ قرر يكمل رحلته بعيد عننا.\n" +
+  "📊 **بقينا** `{count}` **فرعون في المملكة.**\n" +
+  "━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+  "🔥 نورتنا في وقتك معانا، ومش هننساك. الباب دايماً مفتوح لأي فرعون أصيل يرجع لأهله في أي وقت. في رعاية الله! 👑";
 
 function applyPlaceholders(template, vars = {}) {
   return String(template)
@@ -6933,11 +6946,9 @@ async function checkAntiRaid(member) {
 }
 
 // ── لوج انضمام/خروج/تغيير رتب الأعضاء في روم واحدة (نفس روم تحديثات الأوامر) ──
-async function sendServerActivityLog(embed) {
-  try {
-    const logChannel = await client.channels.fetch(COMMANDS_UPDATE_LOG_CHANNEL_ID).catch(() => null);
-    if (logChannel) await logChannel.send({ embeds: [embed] }).catch(() => {});
-  } catch {}
+async function sendServerActivityLog(_embed) {
+  // ✅ اللوج ده مقفول عمداً — المستخدم طلب إيقافه خالص (لوج انضمام/خروج/تغيير رتب الأعضاء).
+  return;
 }
 
 client.on('guildMemberAdd', async (member) => {
@@ -6999,10 +7010,11 @@ client.on('guildMemberAdd', async (member) => {
     });
 
     const welcomeEmbed = new EmbedBuilder()
-      .setColor('#5865F2')
-      .setTitle('👋 عضو جديد!')
+      .setColor('#A020F0')
+      .setTitle('⚜️ 『 بـسـم الله الـرحـمـن الـرحـيـم 』 ⚜️')
       .setDescription(welcomeText)
       .setThumbnail(avatarURL)
+      .setFooter({ text: '🔱 طاقم الإدارة يرحب بك ويتمنى لك رحلة سعيدة ⚜️' })
       .setTimestamp();
 
     // لو مفيش رسالة مخصصة، ضيف الصورة الافتراضية
@@ -7078,10 +7090,11 @@ client.on('guildMemberRemove', async (member) => {
     });
 
     const goodbyeEmbed = new EmbedBuilder()
-      .setColor('#5865F2')
-      .setTitle('🥀 عضو غادر السيرفر')
+      .setColor('#A020F0')
+      .setTitle('🥀 فرعون جديد سابنا ومشي 🥀')
       .setDescription(goodbyeText)
       .setThumbnail(avatarURL)
+      .setFooter({ text: '🔱 عيلة الفراعنة بتتمنى لك كل خير يا بطل ⚜️' })
       .setTimestamp();
 
     await channel.send({ content: `<@${member.id}>`, embeds: [goodbyeEmbed] });
