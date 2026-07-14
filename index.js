@@ -203,30 +203,65 @@ async function handleSetupCommand(interaction, db) {
 }
 
 async function handleSetupInteraction(interaction, db) {
-  const id  = interaction.customId;
+  // ── backward compat: customIds من الإصدار السابق ──────────────
+  const LEGACY_IDS = {
+    "setup_welcome_ch":     "sp_ch_welcome",
+    "setup_goodbye_ch":     "sp_ch_goodbye",
+    "setup_log_ch":         "sp_ch_log",
+    "setup_trap_ch":        "sp_ch_trap",
+    "setup_verify_ch":      "sp_ch_verify",
+    "setup_welcome_msg":    "sp_msg_welcome",
+    "setup_goodbye_msg":    "sp_msg_goodbye",
+    "setup_modroles":       "sp_role_mod",
+    "setup_tog_welcome":    "sp_tog_welcome",
+    "setup_tog_goodbye":    "sp_tog_goodbye",
+    "setup_tog_trap":       "sp_tog_trap",
+    "setup_tog_automod":    "sp_tog_automod",
+    "setup_tog_antinuke":   "sp_tog_antinuke",
+    "setup_set_welcome_ch": "sp_setch_welcome",
+    "setup_set_goodbye_ch": "sp_setch_goodbye",
+    "setup_set_log_ch":     "sp_setch_log",
+    "setup_set_trap_ch":    "sp_setch_trap",
+    "setup_set_verify_ch":  "sp_setch_verify",
+    "setup_set_modrole":    "sp_setrole_mod",
+    "setup_setch_welcome":  "sp_setch_welcome",
+    "setup_setch_goodbye":  "sp_setch_goodbye",
+    "setup_setch_log":      "sp_setch_log",
+    "setup_setch_trap":     "sp_setch_trap",
+    "setup_setch_verify":   "sp_setch_verify",
+    "setup_setrole_auto":   "sp_setrole_auto",
+    "setup_setrole_verify": "sp_setrole_verify",
+    "setup_setrole_mod":    "sp_setrole_mod",
+  };
+  const id  = LEGACY_IDS[interaction.customId] ?? interaction.customId;
   const gid = interaction.guild.id;
 
-  // ── helper: أعد رسم اللوحة ──────────────────────────────────
+  // ── helper: أعد رسم اللوحة كاملة ───────────────────────────
   const refreshPanel = () => interaction.update({
     embeds:     [buildSetupEmbed(gid, db)],
     components: buildSetupRows(gid, db),
   });
 
-  // ══ أزرار تشغيل / إيقاف — حماية ═══════════════════════════════
-  if (id === "sp_tog_welcome") {
-    db.setToggle(gid, "welcome", !db.getToggle(gid, "welcome", true));
-    return refreshPanel();
-  }
-  if (id === "sp_tog_goodbye") {
-    db.setToggle(gid, "goodbye", !db.getToggle(gid, "goodbye", true));
-    return refreshPanel();
-  }
-  if (id === "sp_tog_trap") {
-    db.setToggle(gid, "trap", !db.getToggle(gid, "trap", true));
-    return refreshPanel();
-  }
-  if (id === "sp_tog_automod") {
-    db.setToggle(gid, "automod", !db.getToggle(gid, "automod", true));
+  // ── زر رجوع مشترك ─────────────────────────────────────────
+  const backRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("sp_back").setLabel("↩️ رجوع للإعدادات").setStyle(ButtonStyle.Secondary)
+  );
+
+  if (id === "sp_back") return refreshPanel();
+
+  // ══ toggles ══════════════════════════════════════════════════
+  const TOGGLES = {
+    sp_tog_welcome:  ["welcome",  true],
+    sp_tog_goodbye:  ["goodbye",  true],
+    sp_tog_trap:     ["trap",     true],
+    sp_tog_automod:  ["automod",  true],
+    sp_tog_verify:   ["verify",   false],
+    sp_tog_ai:       ["ai",       true],
+    sp_tog_xp:       ["xp",       true],
+  };
+  if (TOGGLES[id]) {
+    const [key, def] = TOGGLES[id];
+    db.setToggle(gid, key, !db.getToggle(gid, key, def));
     return refreshPanel();
   }
   if (id === "sp_tog_antinuke") {
@@ -234,112 +269,88 @@ async function handleSetupInteraction(interaction, db) {
     db.updateAntiNukeSettings(gid, { enabled: !cur });
     return refreshPanel();
   }
-  // ══ أزرار تشغيل / إيقاف — مميزات ══════════════════════════════
-  if (id === "sp_tog_verify") {
-    db.setToggle(gid, "verify", !db.getToggle(gid, "verify", false));
-    return refreshPanel();
-  }
-  if (id === "sp_tog_ai") {
-    db.setToggle(gid, "ai", !db.getToggle(gid, "ai", true));
-    return refreshPanel();
-  }
-  if (id === "sp_tog_xp") {
-    db.setToggle(gid, "xp", !db.getToggle(gid, "xp", true));
-    return refreshPanel();
-  }
 
-  // ══ قنوات ═══════════════════════════════════════════════════════
-  const chMap = {
-    sp_ch_welcome: ["setup_setch_welcome", "👋 اختار قناة الترحيب:"],
-    sp_ch_goodbye: ["setup_setch_goodbye", "🥀 اختار قناة الوداع:"],
-    sp_ch_log:     ["setup_setch_log",     "📜 اختار قناة السجلات:"],
-    sp_ch_trap:    ["setup_setch_trap",    "🪤 اختار قناة المصيدة (أي حد يكتب فيها يُطرد فوراً):"],
-    sp_ch_verify:  ["setup_setch_verify",  "🔐 اختار قناة بوابة التحقق:"],
+  // ══ اختيار قناة — inline picker ══════════════════════════════
+  const CH_PICKERS = {
+    sp_ch_welcome: { menuId: "sp_setch_welcome", title: "👋 قناة الترحيب",   desc: "اختار القناة اللي هيبعت فيها البوت رسايل الترحيب" },
+    sp_ch_goodbye: { menuId: "sp_setch_goodbye", title: "🥀 قناة الوداع",    desc: "اختار القناة اللي هيبعت فيها البوت رسايل الوداع" },
+    sp_ch_log:     { menuId: "sp_setch_log",     title: "📜 قناة السجلات",   desc: "اختار القناة اللي بتتسجل فيها كل الأحداث" },
+    sp_ch_trap:    { menuId: "sp_setch_trap",     title: "🪤 قناة المصيدة",   desc: "أي حد يكتب في القناة دي بيتطرد فوراً (للهاكرات)" },
+    sp_ch_verify:  { menuId: "sp_setch_verify",  title: "🔐 بوابة التحقق",   desc: "القناة اللي هتنشر فيها زرار التحقق للأعضاء الجداد" },
   };
-  if (chMap[id]) {
-    const [menuId, label] = chMap[id];
-    return interaction.reply({
-      content: label,
-      components: [new ActionRowBuilder().addComponents(
-        new ChannelSelectMenuBuilder().setCustomId(menuId)
-          .setPlaceholder("اختار القناة").addChannelTypes(ChannelType.GuildText)
-      )], flags: 64,
+  if (CH_PICKERS[id]) {
+    const { menuId, title, desc } = CH_PICKERS[id];
+    return interaction.update({
+      embeds: [new EmbedBuilder().setColor(0xf1c40f).setTitle(`⚙️ ${title}`).setDescription(desc)],
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ChannelSelectMenuBuilder().setCustomId(menuId)
+            .setPlaceholder("اختار القناة")
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        ),
+        backRow,
+      ],
     });
-  }
-  if (id === "setup_setch_welcome") {
-    db.setWelcomeChannel(gid, interaction.values[0]);
-    return interaction.reply({ content: `✅ قناة الترحيب: <#${interaction.values[0]}>`, flags: 64 });
-  }
-  if (id === "setup_setch_goodbye") {
-    db.setGoodbyeChannel(gid, interaction.values[0]);
-    return interaction.reply({ content: `✅ قناة الوداع: <#${interaction.values[0]}>`, flags: 64 });
-  }
-  if (id === "setup_setch_log") {
-    db.setLogChannel(gid, interaction.values[0]);
-    return interaction.reply({ content: `✅ قناة السجلات: <#${interaction.values[0]}>`, flags: 64 });
-  }
-  if (id === "setup_setch_trap") {
-    db.setTrapChannel(gid, interaction.values[0]);
-    return interaction.reply({ content: `✅ مصيدة الهاكرات: <#${interaction.values[0]}>`, flags: 64 });
-  }
-  if (id === "setup_setch_verify") {
-    db.setVerifyChannel(gid, interaction.values[0]);
-    return interaction.reply({ content: `✅ بوابة التحقق: <#${interaction.values[0]}>`, flags: 64 });
   }
 
-  // ══ رتب ═════════════════════════════════════════════════════════
-  if (id === "sp_role_auto") {
-    return interaction.reply({
-      content: "👤 اختار الرتبة اللي هتتضاف تلقائياً لكل عضو جديد:",
-      components: [new ActionRowBuilder().addComponents(
-        new RoleSelectMenuBuilder().setCustomId("setup_setrole_auto")
-          .setPlaceholder("رتبة تلقائية عند الانضمام")
-      )], flags: 64,
+  // ── نتايج اختيار القناة ─────────────────────────────────────
+  const CH_SETTERS = {
+    sp_setch_welcome: (v) => db.setWelcomeChannel(gid, v),
+    sp_setch_goodbye: (v) => db.setGoodbyeChannel(gid, v),
+    sp_setch_log:     (v) => db.setLogChannel(gid, v),
+    sp_setch_trap:    (v) => db.setTrapChannel(gid, v),
+    sp_setch_verify:  (v) => db.setVerifyChannel(gid, v),
+  };
+  if (CH_SETTERS[id]) {
+    CH_SETTERS[id](interaction.values[0]);
+    return refreshPanel();
+  }
+
+  // ══ اختيار رتبة — inline picker ══════════════════════════════
+  const ROLE_PICKERS = {
+    sp_role_auto:   { menuId: "sp_setrole_auto",   title: "👤 رتبة تلقائية", desc: "الرتبة دي هتتضاف لكل عضو جديد يدخل السيرفر تلقائياً", max: 1 },
+    sp_role_verify: { menuId: "sp_setrole_verify",  title: "✅ رتبة تحقق",   desc: "الرتبة دي هتتضاف للعضو بعد ما يضغط زرار التحقق",      max: 1 },
+    sp_role_mod:    { menuId: "sp_setrole_mod",     title: "👮 رتب إشراف",   desc: "الرتب دي ليها صلاحيات إشراف إضافية في البوت",           max: 5 },
+  };
+  if (ROLE_PICKERS[id]) {
+    const { menuId, title, desc, max } = ROLE_PICKERS[id];
+    return interaction.update({
+      embeds: [new EmbedBuilder().setColor(0xf1c40f).setTitle(`⚙️ ${title}`).setDescription(desc)],
+      components: [
+        new ActionRowBuilder().addComponents(
+          new RoleSelectMenuBuilder().setCustomId(menuId)
+            .setPlaceholder("اختار الرتبة").setMinValues(1).setMaxValues(max)
+        ),
+        backRow,
+      ],
     });
   }
-  if (id === "setup_setrole_auto") {
+
+  // ── نتايج اختيار الرتبة ─────────────────────────────────────
+  if (id === "sp_setrole_auto") {
     db.setAutoRole(gid, interaction.values[0]);
-    return interaction.reply({ content: `✅ الرتبة التلقائية: <@&${interaction.values[0]}>`, flags: 64 });
+    return refreshPanel();
   }
-
-  if (id === "sp_role_verify") {
-    return interaction.reply({
-      content: "✅ اختار الرتبة اللي هتتضاف بعد التحقق:",
-      components: [new ActionRowBuilder().addComponents(
-        new RoleSelectMenuBuilder().setCustomId("setup_setrole_verify")
-          .setPlaceholder("رتبة التحقق")
-      )], flags: 64,
-    });
-  }
-  if (id === "setup_setrole_verify") {
+  if (id === "sp_setrole_verify") {
     db.setVerifyRole(gid, interaction.values[0]);
-    return interaction.reply({ content: `✅ رتبة التحقق: <@&${interaction.values[0]}>`, flags: 64 });
+    return refreshPanel();
   }
-
-  if (id === "sp_role_mod") {
-    return interaction.reply({
-      content: "👮 اختار رتب الإشراف الإضافية (حتى 5):",
-      components: [new ActionRowBuilder().addComponents(
-        new RoleSelectMenuBuilder().setCustomId("setup_setrole_mod")
-          .setPlaceholder("رتب الإشراف").setMinValues(1).setMaxValues(5)
-      )], flags: 64,
-    });
-  }
-  if (id === "setup_setrole_mod") {
+  if (id === "sp_setrole_mod") {
     if (db.addExtraModRole) interaction.values.forEach(r => db.addExtraModRole(gid, r));
-    return interaction.reply({ content: `✅ اتضافت ${interaction.values.length} رتبة للإشراف.`, flags: 64 });
+    return refreshPanel();
   }
 
-  // ══ رسايل مخصصة ══════════════════════════════════════════════
+  // ══ رسايل مخصصة — modal ══════════════════════════════════════
   if (id === "sp_msg_welcome") {
     const cur = db.getWelcomeMessage(gid) || DEFAULT_WELCOME_MSG;
-    const modal = new ModalBuilder().setCustomId("setup_modal_wmsg").setTitle("✏️ رسالة الترحيب");
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("msg")
-        .setLabel("المتغيرات: {mention} {user} {server} {count} {id}")
-        .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
-    ));
-    return interaction.showModal(modal);
+    return interaction.showModal(
+      new ModalBuilder().setCustomId("setup_modal_wmsg").setTitle("✏️ رسالة الترحيب")
+        .addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("msg")
+            .setLabel("المتغيرات: {mention} {user} {server} {count} {id}")
+            .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
+        ))
+    );
   }
   if (id === "setup_modal_wmsg") {
     const text = interaction.fields.getTextInputValue("msg").trim();
@@ -348,16 +359,16 @@ async function handleSetupInteraction(interaction, db) {
     return interaction.reply({ content: `✅ رسالة الترحيب اتحدثت!\n\n${text}`, flags: 64 });
   }
 
-  // ══ رسالة وداع مخصصة ═══════════════════════════════════════════
   if (id === "sp_msg_goodbye") {
     const cur = db.getGoodbyeMessage(gid) || DEFAULT_GOODBYE_MSG;
-    const modal = new ModalBuilder().setCustomId("setup_modal_gmsg").setTitle("✏️ رسالة الوداع");
-    modal.addComponents(new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId("msg")
-        .setLabel("المتغيرات: {mention} {user} {server} {count} {id}")
-        .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
-    ));
-    return interaction.showModal(modal);
+    return interaction.showModal(
+      new ModalBuilder().setCustomId("setup_modal_gmsg").setTitle("✏️ رسالة الوداع")
+        .addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId("msg")
+            .setLabel("المتغيرات: {mention} {user} {server} {count} {id}")
+            .setStyle(TextInputStyle.Paragraph).setValue(cur).setMaxLength(1000)
+        ))
+    );
   }
   if (id === "setup_modal_gmsg") {
     const text = interaction.fields.getTextInputValue("msg").trim();
