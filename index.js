@@ -16,7 +16,6 @@ import config from "./config.js";
 import Database from "./database.js";
 import Logger from "./logger.js";
 import ModerationListener from "./helpers/moderation-listener.js";
-import { registerMusicCommands, musicHandler, initMusicSystem, handlePlay, handleSkip, handleVoteSkip, handleStop, handleQueue, handlePause, handleResume, handleNowPlaying, handleVolume, handleRepeat, handleShuffle, handleJump, handleRemove, handleLyrics, handlePrevious, handleQueueJump, handleSeek, handleFilter, handleSearch, handleSearchButton, handleMove, handleClearQueue } from "./commands/music.js";
 import { registerCleanChapterCommand, handleCleanChapter } from "./commands/image-cleaner.js";
 import { registerTranslateChapterCommand, handleTranslateChapter } from "./commands/translator.js";
 import {
@@ -421,15 +420,6 @@ import {
   RoleSelectMenuBuilder,
   ChannelType,
 } from "discord.js";
-import {
-  joinVoiceChannel,
-  createAudioPlayer,
-  createAudioResource,
-  AudioPlayerStatus,
-  VoiceConnectionStatus,
-  entersState,
-  VoiceConnectionDisconnectReason,
-} from "@discordjs/voice";
 import { initGeminiKeys, getChatModel, getImageModel, getKeyCount, getKeyStats, addKeys, removeKey, setActiveKeyIndex, resetExhaustedKeys } from "./helpers/gemini-keys.js";
 import { getRanks, addRank, removeRank, resetRanks } from "./helpers/rank-roles.js";
 import fs from "fs";
@@ -1080,7 +1070,6 @@ function validateLatestFeatures(allCommands) {
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
       "مسح","تعديل-إعلان","انشاء-رول","تعديل-الرول","رتبة",
       "تحذير","اسكات","طرد","تبنيد","تحذيرات","ليدربورد","ترحيب-قناة","عقوبة",
-      "شغل-اغنية","skip","خروج","queue","pause","resume","nowplaying","volume",
       "اقتراح","لوحة","صورة",
       "نسخة-احتياطية","استرجاع","قناة-النسخ","تشغيل-اختبار","قناة-اللوجز","نسخ-احتياطي","بوت",
       "رسالة-جماعية","حالة-البوت","مفاتيح-جيميني",
@@ -1109,7 +1098,6 @@ function validateLatestFeatures(allCommands) {
 
 // Advanced Feature Commands
 async function getAdvancedCommands() {
-  const musicCommands = await registerMusicCommands(null);
   const cleanCommand = await registerCleanChapterCommand(null);
   const translateCommand = await registerTranslateChapterCommand(null);
   const whitenCommands = await registerWhitenCommands(null);
@@ -1119,7 +1107,6 @@ async function getAdvancedCommands() {
   return [
     cleanCommand.data,
     translateCommand.data,
-    ...musicCommands.map(cmd => cmd.data),
     ...whitenCommands.map(cmd => cmd.data),
     ...rpgCommands.map(cmd => cmd.data),
   ];
@@ -1163,8 +1150,6 @@ function buildDMControlPanel(guild) {
     new ButtonBuilder().setCustomId("dmp_stats").setLabel("📊 إحصائيات").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("dmp_lb").setLabel("🏆 ليدربورد").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("dmp_backup").setLabel("💾 نسخة").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("dmp_queue").setLabel("🎵 قائمة").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("dmp_stop").setLabel("⏹️ إيقاف").setStyle(ButtonStyle.Danger)
   );
 
   const row2 = new ActionRowBuilder().addComponents(
@@ -1296,8 +1281,6 @@ const client = new Client({
   },
 });
 
-// ── تهيئة DisTube بعد إنشاء الكلاينت مباشرة ──────────────────
-initMusicSystem(client).catch(e => console.error('❌ [Music] init فشل:', e.message));
 
 const activeGames = new Collection();
 // إجراءات التأديب المعلقة — تنتظر تأكيد المشرف
@@ -2349,107 +2332,6 @@ client.on("messageCreate", async (msg) => {
       .replace(/^<@!?\d+>\s*/u, '')
       .trim();
 
-    // play / شغل / تشغيل + query
-    const playMatch = txt.match(/^[!?؟.,،]?\s*(play|شغل|تشغيل|شغلها|شغل\s*الأغنية)\s+(.+)/iu);
-    if (playMatch) {
-      const query = playMatch[2].trim();
-      const voiceChannel = msg.member?.voice?.channel;
-      if (!voiceChannel) {
-        await msg.reply('❌ لازم تكون في قناة صوتية الأول!').catch(() => {});
-        return;
-      }
-      const statusMsg = await msg.reply('🔍 جاري البحث...').catch(() => null);
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        await mh.joinVoiceChannelAndPlay(msg.guildId, voiceChannel, msg.channel);
-        const results = await mh.resolveSource(query, msg.author.tag);
-        let added = 0;
-        for (const song of results) {
-          try { await mh.addToQueue(msg.guildId, song); added++; } catch {}
-        }
-        const reply = results.length > 1
-          ? `✅ تم إضافة **${added}** أغنية للقائمة!`
-          : `🎵 شغال دلوقتي: **${results[0]?.title || query}**`;
-        await statusMsg?.edit(reply).catch(() => msg.channel.send(reply).catch(() => {}));
-      } catch (err) {
-        await statusMsg?.edit(`❌ ${err.message}`).catch(() => {});
-      }
-      return;
-    }
-
-    // skip / تخطي / التالي
-    if (/^[!?؟.,،]?\s*(skip|تخطي|تخطى|التالي|next|سكيب)$/iu.test(txt)) {
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        await mh.skip(msg.guildId);
-        await msg.react('⏭️').catch(() => {});
-      } catch { await msg.reply('❌ مفيش أغنية شغالة!').catch(() => {}); }
-      return;
-    }
-
-    // stop / وقف / اوقف / اطلع
-    if (/^[!?؟.,،]?\s*(stop|وقف|اوقف|اطلع|استوب|leave|اخرج|وقفها)$/iu.test(txt)) {
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        await mh.stop(msg.guildId);
-        await msg.react('⏹️').catch(() => {});
-      } catch { await msg.reply('❌ مفيش موسيقى شغالة!').catch(() => {}); }
-      return;
-    }
-
-    // pause / وقف مؤقت / بوز
-    if (/^[!?؟.,،]?\s*(pause|وقف\s*مؤقت|وقفها\s*شوية|بوز|باوز)$/iu.test(txt)) {
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        await mh.pause(msg.guildId);
-        await msg.react('⏸️').catch(() => {});
-      } catch { await msg.reply('❌ مفيش أغنية شغالة!').catch(() => {}); }
-      return;
-    }
-
-    // resume / استمر / كمل / رجعها
-    if (/^[!?؟.,،]?\s*(resume|استمر|كمل|رجعها|unpause|شغل\s*تاني)$/iu.test(txt)) {
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        await mh.resume(msg.guildId);
-        await msg.react('▶️').catch(() => {});
-      } catch { await msg.reply('❌ مفيش أغنية موقوفة!').catch(() => {}); }
-      return;
-    }
-
-    // queue / قائمة / القائمة
-    if (/^[!?؟.,،]?\s*(queue|قائمة|القائمة|قائمة\s*التشغيل|list)$/iu.test(txt)) {
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        const display = mh.getQueueDisplay(msg.guildId, 1);
-        await msg.reply(`\`\`\`\n${display}\n\`\`\``).catch(() => {});
-      } catch { await msg.reply('❌ القائمة فارغة!').catch(() => {}); }
-      return;
-    }
-
-    // np / nowplaying / الأغنية الحالية
-    if (/^[!?؟.,،]?\s*(np|nowplaying|now\s*playing|الأغنية\s*الحالية|ايه\s*الأغنية|بتشغل\s*ايه)$/iu.test(txt)) {
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        const queue = mh.getQueue(msg.guildId);
-        if (!queue?.currentSong) return msg.reply('❌ مفيش أغنية شغالة!').catch(() => {});
-        const s = queue.currentSong;
-        await msg.reply(`🎵 **${s.title}**${s.artist ? ` — ${s.artist}` : ''}`).catch(() => {});
-      } catch { await msg.reply('❌ مفيش أغنية شغالة!').catch(() => {}); }
-      return;
-    }
-
-    // volume / صوت + number
-    const volMatch = txt.match(/^[!?؟.,،]?\s*(volume|vol|صوت|الصوت)\s+(\d+)$/iu);
-    if (volMatch) {
-      try {
-        const { musicHandler: mh } = await import('./commands/music.js');
-        const level = Math.max(0, Math.min(100, parseInt(volMatch[2])));
-        mh.setVolume(msg.guildId, level / 100);
-        await msg.reply(`🔊 تم ضبط الصوت على **${level}%**`).catch(() => {});
-      } catch { await msg.reply('❌ مفيش موسيقى شغالة!').catch(() => {}); }
-      return;
-    }
   }
 
   // ── Auto-Mod الذكي (السيرفر بس) ──────────────────────────────────
@@ -3739,46 +3621,6 @@ client.on("interactionCreate", async (interaction) => {
         return await handleOcrUpload(interaction);
       }
 
-      // Music Commands
-      // ─── لو الأمر جاي من DM: بنجيب الميمبر من السيرفر عشان نعرف الـ voice channel ───
-      const MUSIC_CMDS = ["شغل","شغل-اغنية","تخطي","skip","خروج","قائمة","queue","بوز","pause","كمل","resume","شغال-ايه","nowplaying","صوت","volume","تكرار","خلط","تخطى-لـ","احذف","كلمات"];
-      if (MUSIC_CMDS.includes(cmd)) {
-        let musicInteraction = interaction;
-        if (isFromDM && guild) {
-          const guildMember = await guild.members.fetch(user.id).catch(() => null);
-          musicInteraction = new Proxy(interaction, {
-            get(target, prop) {
-              if (prop === "guild")   return guild;
-              if (prop === "guildId") return guild.id;
-              if (prop === "member")  return guildMember;
-              const val = target[prop];
-              return typeof val === "function" ? val.bind(target) : val;
-            }
-          });
-        }
-
-        if (cmd === "شغل" || cmd === "شغل-اغنية") return await handlePlay(musicInteraction);
-        if (cmd === "تخطي" || cmd === "skip")      return await handleSkip(musicInteraction);
-        if (cmd === "وقف"  || cmd === "خروج")      return await handleStop(musicInteraction);
-        if (cmd === "قائمة"|| cmd === "queue")     return await handleQueue(musicInteraction);
-        if (cmd === "بوز"  || cmd === "pause")     return await handlePause(musicInteraction);
-        if (cmd === "كمل"  || cmd === "resume")    return await handleResume(musicInteraction);
-        if (cmd === "شغال-ايه" || cmd === "nowplaying") return await handleNowPlaying(musicInteraction);
-        if (cmd === "صوت"  || cmd === "volume")    return await handleVolume(musicInteraction);
-        if (cmd === "تكرار")                       return await handleRepeat(musicInteraction);
-        if (cmd === "خلط")                         return await handleShuffle(musicInteraction);
-        if (cmd === "تخطى-لـ")                     return await handleJump(musicInteraction);
-        if (cmd === "احذف")                        return await handleRemove(musicInteraction);
-        if (cmd === "كلمات")                       return await handleLyrics(musicInteraction);
-        if (cmd === "تصويت-تخطي")                 return await handleVoteSkip(musicInteraction);
-        if (cmd === "انتقل")                       return await handleSeek(musicInteraction);
-        if (cmd === "فلتر")                        return await handleFilter(musicInteraction);
-        if (cmd === "سابق")                        return await handlePrevious(musicInteraction);
-        if (cmd === "بحث")                         return await handleSearch(musicInteraction);
-        if (cmd === "نقل")                         return await handleMove(musicInteraction);
-        if (cmd === "مسح-القائمة")                 return await handleClearQueue(musicInteraction);
-      }
-
       // ═══════════════════════════════════════════════════════════════
       //  Legacy Commands
       // ═══════════════════════════════════════════════════════════════
@@ -4583,7 +4425,6 @@ client.on("interactionCreate", async (interaction) => {
               { name: "🎮 الألعاب",    value: "`/الألعاب` — كل الألعاب من مكان واحد", inline: true },
               { name: "🏦 الاقتصاد",  value: "`/بنك` `/يومي` `/تحويل` `/بروفايل`", inline: true },
               { name: "🏆 ترتيب",     value: "`/ليدربورد` `/top`", inline: true },
-              { name: "🎵 موسيقى",    value: "`/موسيقى` — تشغيل، تخطي، قائمة...", inline: true },
               { name: "⚔️ RPG",       value: "`/كلاسي` `/بروفايل-rpg` `/الانجازات`", inline: true },
               { name: "📺 أنمي",      value: "`/أنمي` — بحث، قوائم، ترشيحات", inline: true },
               { name: "🖼️ صور",       value: "`/صورة` `/تنظيف-صورة` `/تنظيف-رابط`", inline: true },
@@ -5176,34 +5017,6 @@ client.on("interactionCreate", async (interaction) => {
         return await handleTicketClaim(interaction);
       }
 
-      // ─── أزرار بحث الموسيقى ──────────────────────────────────────
-      if (interaction.customId.startsWith("msearch_")) {
-        return await handleSearchButton(interaction);
-      }
-
-      // ─── أزرار التحكم في الموسيقى ────────────────────────────────
-      if (interaction.customId.startsWith("music_")) {
-        const id = interaction.customId;
-        if (id === "music_prev")       return await handlePrevious(interaction);
-        if (id === "music_pause")      return await handlePause(interaction);
-        if (id === "music_resume")     return await handleResume(interaction);
-        if (id === "music_skip")       return await handleSkip(interaction);
-        if (id === "music_stop")       return await handleStop(interaction);
-        if (id === "music_nowplaying") return await handleNowPlaying(interaction);
-        if (id === "music_repeat")     return await handleRepeat(interaction);
-        if (id === "music_lyrics")     return await handleLyrics(interaction);
-        if (id === "music_shuffle")    return await handleShuffle(interaction);
-        if (id.startsWith("music_queue_page_")) return await handleQueue(interaction);
-        if (id === "music_vol_up" || id === "music_vol_down") {
-          const q = musicHandler.getQueue(interaction.guildId);
-          if (!q) return interaction.reply({ content: '❌ مفيش موسيقى شغالة!', ephemeral: true });
-          const next = id === "music_vol_up" ? Math.min(q.volume + 10, 100) : Math.max(q.volume - 10, 0);
-          await musicHandler.setVolume(interaction.guildId, next / 100);
-          return interaction.reply({ content: `🔊 الصوت: **${next}%**`, ephemeral: true });
-        }
-        return;
-      }
-
       // ─── أزرار إيمبد Builder ─────────────────────────────────────
       if (interaction.customId.startsWith("embed_send_") || interaction.customId.startsWith("embed_cancel_")) {
         const isCancel = interaction.customId.startsWith("embed_cancel_");
@@ -5489,20 +5302,6 @@ client.on("interactionCreate", async (interaction) => {
             embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle("💾 نسخة احتياطية").setDescription(`✅ ${Object.keys(allData.users||{}).length} عضو محفوظ`).setTimestamp()],
             files: [att]
           });
-        }
-
-        // 🎵 قائمة الميوزك
-        if (interaction.customId === "dmp_queue") {
-          const q = musicHandler?.getQueue?.(g?.id);
-          if (!q || !q.songs?.length) return interaction.reply({ content: "🎵 مفيش أغاني في القائمة دلوقتي!", ephemeral: true });
-          const txt = q.songs.slice(0, 5).map((s, i) => `**${i+1}.** ${s.title || s.name}`).join("\n");
-          return interaction.reply({ content: `🎵 **قائمة التشغيل:**\n${txt}`, ephemeral: true });
-        }
-
-        // ⏹️ إيقاف الميوزك
-        if (interaction.customId === "dmp_stop") {
-          await musicHandler?.stop?.(g?.id).catch(() => {});
-          return interaction.reply({ content: "⏹️ تم إيقاف الميوزك!", ephemeral: true });
         }
 
         // 🔲 موودالات المودريشن
@@ -6677,11 +6476,6 @@ client.on("interactionCreate", async (interaction) => {
   // ─── قوائم الاختيار (Select Menus) ──────────────────────────────
   if (interaction.isStringSelectMenu()) {
     try {
-      // ─── قائمة الأغاني في الموسيقى ────────────────────────────────
-      if (interaction.customId === "music_queue_select") {
-        return await handleQueueJump(interaction);
-      }
-
       // ─── قوائم نظام الأنمي ─────────────────────────────────────────
       if (interaction.customId === "anime_select_result") {
         return await handleAnimeSelectResult(interaction, db);
