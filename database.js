@@ -761,6 +761,45 @@ class Database {
     }
     this.save();
   }
+
+  // ═══════════════════════════════════════════════════════════
+  //  قنوات الصمت — القنوات اللي البوت مش بيرد فيها
+  // ═══════════════════════════════════════════════════════════
+
+  /** جلب قايمة القنوات المقيدة للسيرفر ده */
+  getSilencedChannels(guildId) {
+    if (!this.data.silencedChannels) this.data.silencedChannels = {};
+    return this.data.silencedChannels[guildId] || [];
+  }
+
+  /** تقييد البوت في قناة معينة */
+  silenceChannel(guildId, channelId) {
+    if (!this.data.silencedChannels) this.data.silencedChannels = {};
+    if (!this.data.silencedChannels[guildId]) this.data.silencedChannels[guildId] = [];
+    if (!this.data.silencedChannels[guildId].includes(channelId)) {
+      this.data.silencedChannels[guildId].push(channelId);
+      this.save();
+      return true; // تمت الإضافة
+    }
+    return false; // كانت مضافة أصلاً
+  }
+
+  /** إزالة التقييد عن قناة */
+  unsilenceChannel(guildId, channelId) {
+    if (!this.data.silencedChannels?.[guildId]) return false;
+    const before = this.data.silencedChannels[guildId].length;
+    this.data.silencedChannels[guildId] = this.data.silencedChannels[guildId].filter(id => id !== channelId);
+    if (this.data.silencedChannels[guildId].length !== before) {
+      this.save();
+      return true; // تمت الإزالة
+    }
+    return false; // لم تكن مقيدة
+  }
+
+  /** هل القناة دي مقيدة؟ */
+  isChannelSilenced(guildId, channelId) {
+    return (this.data.silencedChannels?.[guildId] || []).includes(channelId);
+  }
 }
 
 export default Database;

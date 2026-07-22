@@ -977,6 +977,28 @@ const LEGACY_COMMANDS = [
   fullProfileCommand,
   serverStatsCommand,
   new SlashCommandBuilder()
+    .setName("كلام-البوت")
+    .setDescription("🔇 تحكم في القنوات اللي البوت بيرد فيها [مشرف]")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+    .addSubcommand(sub =>
+      sub.setName("اغلق")
+        .setDescription("🔇 البوت مش هيرد في القناة دي")
+        .addChannelOption(o =>
+          o.setName("قناة").setDescription("القناة المراد تقييدها (الافتراضي: القناة الحالية)").setRequired(false)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName("افتح")
+        .setDescription("🔊 البوت هيرد في القناة دي تاني")
+        .addChannelOption(o =>
+          o.setName("قناة").setDescription("القناة المراد فتحها (الافتراضي: القناة الحالية)").setRequired(false)
+        )
+    )
+    .addSubcommand(sub =>
+      sub.setName("قائمة")
+        .setDescription("📋 عرض القنوات المقيدة في السيرفر ده")
+    ),
+  new SlashCommandBuilder()
     .setName("يومي")
     .setDescription("🎁 استلم مكافأتك اليومية من الكوينز"),
   new SlashCommandBuilder()
@@ -1064,7 +1086,7 @@ function validateLatestFeatures(allCommands) {
     // الأوامر الأساسية القديمة — موجودة قبل نظام /احدث-المميزات
     const skipList = [
       "ping","hello","roll","serverinfo","userinfo",
-      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","✏️ تعديل رسالة","إيمبد","إيمبد-تعديل",
+      "القوانين","مساعدة","الألعاب","احدث-المميزات","تغيير-طريقة-الكلام","auto-mod","حالة-الحماية","كلام-البوت","✏️ تعديل رسالة","إيمبد","إيمبد-تعديل",
       "بروفايل","محفظة","متجر","شراء","إعطاء","يومي","اقتصاد","ميوت","تحويل","متجر-البنك","إحصائيات-السيرفر",
       "بوابة-التحقق","ملخص-السيرفر","امسح-ذاكرتك","ماين-كرافت","الوان",
       "مانهوا-إنشاء","مانهوا-إضافة-مصطلح","مانهوا-عرض-المصطلحات","مانهوا",
@@ -2594,11 +2616,8 @@ client.on("messageCreate", async (msg) => {
 
   msg.channel.sendTyping().catch(() => {});
 
-  const BOT_CHANNEL_ID = "1516591390023352370";
-
-  if (msg.guild && !isOwner && msg.channel.id !== BOT_CHANNEL_ID) {
-    return msg.reply("مقدرش اتكلم هنا 😅 روحلي روم : 🤖روم-زنجي🤖").catch(() => {});
-  }
+  // لو القناة مقيدة — البوت بيتجاهل بصمت (مش بيرد بأي حاجة)
+  if (msg.guild && !isOwner && db.isChannelSilenced(msg.guild.id, msg.channel.id)) return;
 
   const rawText = msg.content.replace(/<@!?\d+>/g, "").trim();
 
@@ -3238,6 +3257,69 @@ client.on("interactionCreate", async (interaction) => {
             .setTimestamp()],
           ephemeral: true
         });
+      }
+
+      // ─── كلام-البوت — تقييد/فتح قنوات الرد ──────────────────────
+      if (cmd === "كلام-البوت") {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) && !config.isOwner(user.id)) {
+          return interaction.reply({ content: "❌ محتاج صلاحية **Manage Channels** عشان تستخدم الأمر ده!", ephemeral: true });
+        }
+        const sub = interaction.options.getSubcommand();
+        const guildId = interaction.guildId;
+
+        if (sub === "اغلق") {
+          const ch = interaction.options.getChannel("قناة") || interaction.channel;
+          const added = db.silenceChannel(guildId, ch.id);
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setTitle("🔇 تم تقييد القناة")
+              .setDescription(added
+                ? `البوت مش هيرد في <#${ch.id}> من دلوقتي.`
+                : `<#${ch.id}> كانت مقيدة أصلاً.`)
+              .setTimestamp()],
+            ephemeral: true
+          });
+        }
+
+        if (sub === "افتح") {
+          const ch = interaction.options.getChannel("قناة") || interaction.channel;
+          const removed = db.unsilenceChannel(guildId, ch.id);
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0x2ecc71)
+              .setTitle("🔊 تم فتح القناة")
+              .setDescription(removed
+                ? `البوت هيرد في <#${ch.id}> تاني دلوقتي.`
+                : `<#${ch.id}> مكانتش مقيدة أصلاً.`)
+              .setTimestamp()],
+            ephemeral: true
+          });
+        }
+
+        if (sub === "قائمة") {
+          const silenced = db.getSilencedChannels(guildId);
+          if (!silenced.length) {
+            return interaction.reply({
+              embeds: [new EmbedBuilder()
+                .setColor(0x3498db)
+                .setTitle("📋 القنوات المقيدة")
+                .setDescription("✅ مفيش قنوات مقيدة دلوقتي — البوت بيرد في كل مكان.")
+                .setTimestamp()],
+              ephemeral: true
+            });
+          }
+          const list = silenced.map(id => `• <#${id}>`).join("\n");
+          return interaction.reply({
+            embeds: [new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setTitle(`📋 القنوات المقيدة (${silenced.length})`)
+              .setDescription(list)
+              .setFooter({ text: "استخدم /كلام-البوت افتح عشان ترجع أي قناة" })
+              .setTimestamp()],
+            ephemeral: true
+          });
+        }
       }
 
       if (cmd === "auto-mod") {
