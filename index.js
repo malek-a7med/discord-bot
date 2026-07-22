@@ -980,23 +980,16 @@ const LEGACY_COMMANDS = [
     .setName("كلام-البوت")
     .setDescription("🔇 تحكم في القنوات اللي البوت بيرد فيها [مشرف]")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
-    .addSubcommand(sub =>
-      sub.setName("اغلق")
-        .setDescription("🔇 البوت مش هيرد في القناة دي")
-        .addChannelOption(o =>
-          o.setName("قناة").setDescription("القناة المراد تقييدها (الافتراضي: القناة الحالية)").setRequired(false)
+    .addStringOption(o =>
+      o.setName("الإجراء").setDescription("اختار العملية").setRequired(true)
+        .addChoices(
+          { name: "🔇 اغلق — البوت مش هيرد هنا", value: "اغلق" },
+          { name: "🔊 افتح — البوت هيرد هنا تاني", value: "افتح" },
+          { name: "📋 قائمة — القنوات المقيدة", value: "قائمة" }
         )
     )
-    .addSubcommand(sub =>
-      sub.setName("افتح")
-        .setDescription("🔊 البوت هيرد في القناة دي تاني")
-        .addChannelOption(o =>
-          o.setName("قناة").setDescription("القناة المراد فتحها (الافتراضي: القناة الحالية)").setRequired(false)
-        )
-    )
-    .addSubcommand(sub =>
-      sub.setName("قائمة")
-        .setDescription("📋 عرض القنوات المقيدة في السيرفر ده")
+    .addChannelOption(o =>
+      o.setName("قناة").setDescription("القناة (الافتراضي: القناة الحالية — مش بيشتغل مع قائمة)").setRequired(false)
     ),
   new SlashCommandBuilder()
     .setName("يومي")
@@ -3264,10 +3257,10 @@ client.on("interactionCreate", async (interaction) => {
         if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels) && !config.isOwner(user.id)) {
           return interaction.reply({ content: "❌ محتاج صلاحية **Manage Channels** عشان تستخدم الأمر ده!", ephemeral: true });
         }
-        const sub = interaction.options.getSubcommand();
+        const action  = interaction.options.getString("الإجراء");
         const guildId = interaction.guildId;
 
-        if (sub === "اغلق") {
+        if (action === "اغلق") {
           const ch = interaction.options.getChannel("قناة") || interaction.channel;
           const added = db.silenceChannel(guildId, ch.id);
           return interaction.reply({
@@ -3282,7 +3275,7 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        if (sub === "افتح") {
+        if (action === "افتح") {
           const ch = interaction.options.getChannel("قناة") || interaction.channel;
           const removed = db.unsilenceChannel(guildId, ch.id);
           return interaction.reply({
@@ -3297,7 +3290,7 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        if (sub === "قائمة") {
+        if (action === "قائمة") {
           const silenced = db.getSilencedChannels(guildId);
           if (!silenced.length) {
             return interaction.reply({
@@ -3315,7 +3308,7 @@ client.on("interactionCreate", async (interaction) => {
               .setColor(0xe74c3c)
               .setTitle(`📋 القنوات المقيدة (${silenced.length})`)
               .setDescription(list)
-              .setFooter({ text: "استخدم /كلام-البوت افتح عشان ترجع أي قناة" })
+              .setFooter({ text: "استخدم /كلام-البوت ← افتح عشان ترجع أي قناة" })
               .setTimestamp()],
             ephemeral: true
           });
