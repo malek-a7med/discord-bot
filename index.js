@@ -2322,6 +2322,7 @@ client.on("messageCreate", async (msg) => {
     try { await msg.delete().catch(() => {}); } catch {}
     try {
       await msg.channel.send({
+        files: [{ attachment: "./attached_assets/Gemini_Generated_Image_n5ekmhn5ekmhn5ek_1784831985815.png", name: "warning.png" }],
         embeds: [
           new EmbedBuilder()
             .setColor(0xe74c3c)
@@ -2330,7 +2331,7 @@ client.on("messageCreate", async (msg) => {
               "**القناة دي بتُستخدم للكشف عن الحسابات الآلية.**\n" +
               "أي رسالة بتتبعت هنا بتودي إلى **طرد تلقائي فوري**. ⚠️"
             )
-            .setThumbnail("https://i.imgur.com/p5dDDAf.png")
+            .setImage("attachment://warning.png")
             .setTimestamp()
         ]
       });
