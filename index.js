@@ -2751,7 +2751,8 @@ client.on("messageCreate", async (msg) => {
   msg.channel.sendTyping().catch(() => {});
   try {
     const senderName  = msg.member?.displayName ?? msg.author.displayName ?? msg.author.username;
-    const prompt      = buildUserPrompt(senderName, question, msg.author.id);
+    const guildEmojis = msg.guild?.emojis.cache ?? null;
+    const prompt      = buildUserPrompt(senderName, question, msg.author.id, guildEmojis);
 
     let aiPromise;
     if (visionPayload) {
