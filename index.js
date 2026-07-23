@@ -1433,6 +1433,65 @@ function isSuggestionAdmin(interaction) {
   );
 }
 
+/**
+ * مشترك بين apply_role_select و apply_role_modal:
+ * يحدّث الإمبد الأصلي، يعطي الرتبة للعضو، ويبعت DM.
+ * @param {import('discord.js').Interaction} interaction
+ * @param {import('discord.js').Role|null} role  — كائن الرتبة أو null
+ * @param {string} userId
+ * @param {string} channelId
+ * @param {string} messageId
+ */
+async function _finalizeApplyAccept(interaction, role, userId, channelId, messageId) {
+  const adminName = interaction.user.globalName || interaction.user.username;
+
+  // جيب المتقدم
+  let applicant = null;
+  try { applicant = await interaction.client.users.fetch(userId); } catch {}
+
+  // جيب الرسالة الأصلية وحدّثها
+  try {
+    const ch  = await interaction.client.channels.fetch(channelId);
+    const msg = await ch.messages.fetch(messageId);
+    const newEmbed = EmbedBuilder.from(msg.embeds[0])
+      .setColor(0x2ecc71)
+      .spliceFields(msg.embeds[0].fields.length, 0, {
+        name: "✅ القرار",
+        value: `تم القبول بواسطة ${interaction.user} (${adminName})` +
+               (role ? ` — الرتبة: <@&${role.id}> (${role.name})` : ""),
+        inline: false,
+      });
+    const disabledRow = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`apply_accept_${userId}`).setLabel("✅ قبول").setStyle(ButtonStyle.Success).setDisabled(true),
+      new ButtonBuilder().setCustomId(`apply_reject_${userId}`).setLabel("❌ رفض").setStyle(ButtonStyle.Danger).setDisabled(true),
+    );
+    await msg.edit({ embeds: [newEmbed], components: [disabledRow] });
+  } catch {}
+
+  // إدي الرتبة للعضو لو لا يزال في السيرفر
+  if (role && interaction.guild) {
+    try {
+      const member = await interaction.guild.members.fetch(userId);
+      await member.roles.add(role.id);
+    } catch {}
+  }
+
+  // بعت DM للمتقدم
+  if (applicant) {
+    const dmEmbed = new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle("🎉 تهانينا! طلب التقديم اتقبل")
+      .setDescription(
+        `يا **${applicant.globalName || applicant.username}**! الإدارة راجعت طلبك وقررت قبولك. 🔱` +
+        (role ? `\n\n🎭 **الرتبة اللي اتديتها:** ${role.name}` : "") +
+        `\n\nهيتواصل معاك أحد من الإدارة قريباً.`
+      )
+      .setFooter({ text: "سيرفر الفراعنة — نظام التقديم للإدارة" })
+      .setTimestamp();
+    try { await applicant.send({ embeds: [dmEmbed] }); } catch {}
+  }
+}
+
 async function updateLinkedSuggestionMessages({
   client,
   publicMessageId,
@@ -5896,57 +5955,92 @@ client.on("interactionCreate", async (interaction) => {
           return interaction.reply({ content: "❌ الزر ده للإدارة بس.", ephemeral: true });
         }
 
-        const isAccept  = interaction.customId.startsWith("apply_accept_");
-        const userId    = interaction.customId.split("_")[2];
-        const adminName = interaction.user.globalName || interaction.user.username;
+        const isAccept = interaction.customId.startsWith("apply_accept_");
+        const userId   = interaction.customId.split("_")[2];
 
-        // جيب المتقدم
-        let applicant = null;
-        try { applicant = await interaction.client.users.fetch(userId); } catch { /* مش موجود */ }
+        // ── رفض: لا يحتاج رتبة، نحدّث الإمبد فوراً ─────────────────
+        if (!isAccept) {
+          const adminName = interaction.user.globalName || interaction.user.username;
+          let applicant = null;
+          try { applicant = await interaction.client.users.fetch(userId); } catch {}
 
-        // عدّل الإمبد — غيّر اللون وأضف حقل القرار
-        const oldEmbed  = interaction.message.embeds[0];
-        const newEmbed  = EmbedBuilder.from(oldEmbed)
-          .setColor(isAccept ? 0x2ecc71 : 0xe74c3c)
-          .spliceFields(oldEmbed.fields.length, 0, {
-            name: isAccept ? "✅ القرار" : "❌ القرار",
-            value: `${isAccept ? "تم القبول" : "تم الرفض"} بواسطة ${interaction.user} (${adminName})`,
-            inline: false,
-          });
+          const oldEmbed = interaction.message.embeds[0];
+          const newEmbed = EmbedBuilder.from(oldEmbed)
+            .setColor(0xe74c3c)
+            .spliceFields(oldEmbed.fields.length, 0, {
+              name: "❌ القرار",
+              value: `تم الرفض بواسطة ${interaction.user} (${adminName})`,
+              inline: false,
+            });
 
-        // عطّل الزراير
-        const disabledRow = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`apply_accept_${userId}`)
-            .setLabel("✅ قبول")
-            .setStyle(ButtonStyle.Success)
-            .setDisabled(true),
-          new ButtonBuilder()
-            .setCustomId(`apply_reject_${userId}`)
-            .setLabel("❌ رفض")
-            .setStyle(ButtonStyle.Danger)
-            .setDisabled(true),
-        );
+          const disabledRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`apply_accept_${userId}`).setLabel("✅ قبول").setStyle(ButtonStyle.Success).setDisabled(true),
+            new ButtonBuilder().setCustomId(`apply_reject_${userId}`).setLabel("❌ رفض").setStyle(ButtonStyle.Danger).setDisabled(true),
+          );
 
-        await interaction.update({ embeds: [newEmbed], components: [disabledRow] });
+          await interaction.update({ embeds: [newEmbed], components: [disabledRow] });
 
-        // بعت DM للمتقدم لو أمكن
-        if (applicant) {
-          const dmEmbed = new EmbedBuilder()
-            .setColor(isAccept ? 0x2ecc71 : 0xe74c3c)
-            .setTitle(isAccept ? "🎉 تهانينا! طلب التقديم اتقبل" : "😔 طلب التقديم اترفض")
-            .setDescription(
-              isAccept
-                ? `يا **${applicant.globalName || applicant.username}**! الإدارة راجعت طلبك وقررت قبولك. 🔱\n\nهيتواصل معاك أحد من الإدارة قريباً.`
-                : `يا **${applicant.globalName || applicant.username}**! الإدارة راجعت طلبك وللأسف القرار كان بالرفض في الوقت الحالي.\n\nممكن تحاول تاني في المستقبل. 💪`
-            )
-            .setFooter({ text: "سيرفر الفراعنة — نظام التقديم للإدارة" })
-            .setTimestamp();
-
-          try { await applicant.send({ embeds: [dmEmbed] }); } catch { /* DMs مقفولة */ }
+          if (applicant) {
+            const dmEmbed = new EmbedBuilder()
+              .setColor(0xe74c3c)
+              .setTitle("😔 طلب التقديم اترفض")
+              .setDescription(`يا **${applicant.globalName || applicant.username}**! الإدارة راجعت طلبك وللأسف القرار كان بالرفض في الوقت الحالي.\n\nممكن تحاول تاني في المستقبل. 💪`)
+              .setFooter({ text: "سيرفر الفراعنة — نظام التقديم للإدارة" })
+              .setTimestamp();
+            try { await applicant.send({ embeds: [dmEmbed] }); } catch {}
+          }
+          return;
         }
 
-        return;
+        // ── قبول: اختيار الرتبة أولاً ────────────────────────────────
+        const refSuffix = `${userId}_${interaction.channelId}_${interaction.message.id}`;
+
+        return interaction.reply({
+          ephemeral: true,
+          content: "🎭 **اختار الرتبة اللي هتديها للعضو:**",
+          components: [
+            new ActionRowBuilder().addComponents(
+              new RoleSelectMenuBuilder()
+                .setCustomId(`apply_role_select_${refSuffix}`)
+                .setPlaceholder("اختار رتبة من هنا…")
+                .setMinValues(1)
+                .setMaxValues(1)
+            ),
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId(`apply_role_manual_${refSuffix}`)
+                .setLabel("🔢 إدخال ID الرتبة يدوياً")
+                .setStyle(ButtonStyle.Secondary)
+            ),
+          ],
+        });
+      }
+
+      // ─── زر إدخال ID الرتبة يدوياً (قبول تقديم) ─────────────────────
+      if (interaction.customId.startsWith("apply_role_manual_")) {
+        const parts     = interaction.customId.split("_");
+        // apply_role_manual_{userId}_{channelId}_{messageId}
+        const userId    = parts[3];
+        const channelId = parts[4];
+        const messageId = parts[5];
+
+        return interaction.showModal(
+          new ModalBuilder()
+            .setCustomId(`apply_role_modal_${userId}_${channelId}_${messageId}`)
+            .setTitle("🔢 أدخل ID الرتبة")
+            .addComponents(
+              new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                  .setCustomId("role_id_input")
+                  .setLabel("ID الرتبة")
+                  .setStyle(TextInputStyle.Short)
+                  .setPlaceholder("مثال: 1234567890123456789")
+                  .setRequired(true)
+                  .setMinLength(15)
+                  .setMaxLength(20)
+              )
+            )
+        );
       }
 
     } catch (err) {
@@ -6408,6 +6502,38 @@ client.on("interactionCreate", async (interaction) => {
         return await handleAdminReplyModalSubmit(interaction);
       }
 
+      // ─── مودال إدخال ID الرتبة يدوياً (قبول تقديم إدارة) ────────────
+      if (interaction.customId.startsWith("apply_role_modal_")) {
+        const parts     = interaction.customId.split("_");
+        // apply_role_modal_{userId}_{channelId}_{messageId}
+        const userId    = parts[3];
+        const channelId = parts[4];
+        const messageId = parts[5];
+        const rawId     = interaction.fields.getTextInputValue("role_id_input").trim();
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // تحقق من الرتبة في السيرفر
+        let role = null;
+        if (interaction.guild) {
+          try {
+            await interaction.guild.roles.fetch(); // ريفرش الكاش
+            role = interaction.guild.roles.cache.get(rawId) ?? null;
+          } catch {}
+        }
+
+        if (!role) {
+          return interaction.editReply({ content: `❌ مش لاقي رتبة بالـ ID ده: \`${rawId}\`\nتأكد من الـ ID وحاول تاني.` });
+        }
+
+        await _finalizeApplyAccept(interaction, role, userId, channelId, messageId);
+
+        return interaction.editReply({
+          content: `✅ تم قبول المتقدم وإضافة رتبة **${role.name}** بنجاح!`,
+          components: [],
+        });
+      }
+
       // ─── مودال تعديل / إعادة إرسال أي رسالة ─────────────────────
       if (interaction.customId.startsWith("editmsg_")) {
         const parts     = interaction.customId.split("_");
@@ -6724,6 +6850,32 @@ client.on("interactionCreate", async (interaction) => {
       }
     } catch (err) {
       logger.error("خطأ في معالجة قائمة اختيار الرومات:", err);
+      return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
+    }
+  }
+
+  // ─── قوائم اختيار الرتب (Role Select Menus) ──────────────────────
+  if (interaction.isRoleSelectMenu()) {
+    try {
+      // اختيار رتبة لقبول تقديم إدارة
+      if (interaction.customId.startsWith("apply_role_select_")) {
+        const parts     = interaction.customId.split("_");
+        // apply_role_select_{userId}_{channelId}_{messageId}
+        const userId    = parts[3];
+        const channelId = parts[4];
+        const messageId = parts[5];
+        const role      = interaction.roles.first();
+
+        await interaction.deferUpdate();
+        await _finalizeApplyAccept(interaction, role, userId, channelId, messageId);
+
+        return interaction.editReply({
+          content: `✅ تم قبول المتقدم وإضافة رتبة **${role?.name ?? "—"}** بنجاح!`,
+          components: [],
+        });
+      }
+    } catch (err) {
+      logger.error("خطأ في معالجة قائمة اختيار الرتب:", err);
       return interaction.reply({ content: "معلش يسطا ثواني بس", ephemeral: true }).catch(() => {});
     }
   }
