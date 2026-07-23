@@ -2187,9 +2187,20 @@ function parseAiReply(raw) {
   return { text, reactionEmoji, gifCategory };
 }
 
-function buildUserPrompt(senderName, question, userId) {
+function buildUserPrompt(senderName, question, userId, guildEmojis = null) {
   const hist = getUserHistory(userId);
   const histText = hist.map(m => `${m.role === "user" ? senderName : "زنجي"}: ${m.text}`).join("\n");
+
+  // قايمة إيموجيات السيرفر (لو متاحة)
+  let emojiSection = "";
+  if (guildEmojis && guildEmojis.size > 0) {
+    const emojiList = [...guildEmojis.values()]
+      .slice(0, 30)
+      .map(e => `${e.animated ? `<a:${e.name}:${e.id}>` : `<:${e.name}:${e.id}>`}`)
+      .join("  ");
+    emojiSection = `\nإيموجيات السيرفر — ممكن تستخدمها في ردودك عادي:\n${emojiList}\n`;
+  }
+
   const modeNote = botSpeechMode === "free"
     ? "\nأسلوبك باد بوي — لو الشخص اللي بيكلمك بعت شتيمة أو ألفاظ وحشة موجّهة ليك، ردّ عليه بنفس المستوى أو أقوى بدون تردد. لو الكلام عادي ومحترم، ردودك عادية ومحترمة تماماً — مش بتبدأ الشتيمة من نفسك."
     : botSpeechMode === "toxic"
@@ -2199,7 +2210,7 @@ function buildUserPrompt(senderName, question, userId) {
     ? "\nاللهجة: تكلم بالعربي الفصيح / العربي الرسمي بشكل كامل — مش عامية مصرية."
     : "\nاللهجة: تكلم بالعامية المصرية الطبيعية بس.";
   const personalCtx = buildPersonalContext(userId, senderName);
-  return `أنت زنجي — بوت ديسكورد.${dialectNote}${modeNote}${personalCtx}
+  return `أنت زنجي — بوت ديسكورد.${dialectNote}${modeNote}${personalCtx}${emojiSection}
 
 فهم الكلام:
 - افهم كل أنواع الكلام بدون استثناء: عامية، سلانج، ألفاظ، اختصارات، كلام مكسور، إنجليزي عربي (عربيزي)، وحتى لو فيه أخطاء إملائية — افهمه واتعامل معاه بشكل طبيعي.
@@ -2214,7 +2225,7 @@ ${senderName}: ${question}
 
 تعليمات الرد:
 - رد بالعربي المصري فقط، مختصر وطبيعي.
-- استخدم إيموجيات في الرد بشكل طبيعي لما يناسب (مش في كل جملة — بس لما بتعبر فعلاً).
+- لما تحب تحط إيموجي في الرد، استخدم إيموجيات السيرفر المدرجة فوق (لو موجودة) أو إيموجيات Unicode المشهورة الكل بيعرفها (زي 😂 😢 😡 ❤️ 🔥 👍 💀 🙏 😭 🤣 😤 🫡 🎉 💪 👀 🤔). **ممنوع تماماً** تستخدم إيموجيات غريبة أو نادرة زي 🫃 🫄 🧌 🫧 أو أي إيموجي ممكن يطلع شكله غلط على ديسكورد. مش في كل جملة — بس لما بتعبر فعلاً.
 - في آخر ردك، أضف سطر META بالشكل ده بالظبط:
   [META:react=EMOJI,gif=CATEGORY]
   - EMOJI: إيموجي واحد بس بيعبر عن ردة فعلك على رسالة الشخص
@@ -2380,7 +2391,7 @@ client.on("messageCreate", async (msg) => {
     msg.channel.sendTyping().catch(() => {});
     try {
       const senderName = msg.author.globalName || msg.author.username;
-      const prompt     = buildUserPrompt(senderName, question, msg.author.id);
+      const prompt     = buildUserPrompt(senderName, question, msg.author.id, null); // DM — مفيش إيموجيات سيرفر
       const aiPromise  = geminiModel().generateContent(prompt);
       const timeout    = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000));
       const result     = await Promise.race([aiPromise, timeout]);
