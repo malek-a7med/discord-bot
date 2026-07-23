@@ -5890,6 +5890,65 @@ client.on("interactionCreate", async (interaction) => {
           ephemeral: true,
         });
       }
+      // ─── قبول / رفض طلب التقديم للإدارة ──────────────────────────
+      if (interaction.customId.startsWith("apply_accept_") || interaction.customId.startsWith("apply_reject_")) {
+        if (!isSuggestionAdmin(interaction)) {
+          return interaction.reply({ content: "❌ الزر ده للإدارة بس.", ephemeral: true });
+        }
+
+        const isAccept  = interaction.customId.startsWith("apply_accept_");
+        const userId    = interaction.customId.split("_")[2];
+        const adminName = interaction.user.globalName || interaction.user.username;
+
+        // جيب المتقدم
+        let applicant = null;
+        try { applicant = await interaction.client.users.fetch(userId); } catch { /* مش موجود */ }
+
+        // عدّل الإمبد — غيّر اللون وأضف حقل القرار
+        const oldEmbed  = interaction.message.embeds[0];
+        const newEmbed  = EmbedBuilder.from(oldEmbed)
+          .setColor(isAccept ? 0x2ecc71 : 0xe74c3c)
+          .spliceFields(oldEmbed.fields.length, 0, {
+            name: isAccept ? "✅ القرار" : "❌ القرار",
+            value: `${isAccept ? "تم القبول" : "تم الرفض"} بواسطة ${interaction.user} (${adminName})`,
+            inline: false,
+          });
+
+        // عطّل الزراير
+        const disabledRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`apply_accept_${userId}`)
+            .setLabel("✅ قبول")
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(true),
+          new ButtonBuilder()
+            .setCustomId(`apply_reject_${userId}`)
+            .setLabel("❌ رفض")
+            .setStyle(ButtonStyle.Danger)
+            .setDisabled(true),
+        );
+
+        await interaction.update({ embeds: [newEmbed], components: [disabledRow] });
+
+        // بعت DM للمتقدم لو أمكن
+        if (applicant) {
+          const dmEmbed = new EmbedBuilder()
+            .setColor(isAccept ? 0x2ecc71 : 0xe74c3c)
+            .setTitle(isAccept ? "🎉 تهانينا! طلب التقديم اتقبل" : "😔 طلب التقديم اترفض")
+            .setDescription(
+              isAccept
+                ? `يا **${applicant.globalName || applicant.username}**! الإدارة راجعت طلبك وقررت قبولك. 🔱\n\nهيتواصل معاك أحد من الإدارة قريباً.`
+                : `يا **${applicant.globalName || applicant.username}**! الإدارة راجعت طلبك وللأسف القرار كان بالرفض في الوقت الحالي.\n\nممكن تحاول تاني في المستقبل. 💪`
+            )
+            .setFooter({ text: "سيرفر الفراعنة — نظام التقديم للإدارة" })
+            .setTimestamp();
+
+          try { await applicant.send({ embeds: [dmEmbed] }); } catch { /* DMs مقفولة */ }
+        }
+
+        return;
+      }
+
     } catch (err) {
       logger.error("خطأ في معالجة الزر:", err);
       return interaction.reply({
@@ -6329,7 +6388,18 @@ client.on("interactionCreate", async (interaction) => {
           .setFooter({ text: "طلب تقديم للإدارة" })
           .setTimestamp();
 
-        await adminChannel.send({ embeds: [applyEmbed] });
+        const applyRow = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`apply_accept_${interaction.user.id}`)
+            .setLabel("✅ قبول")
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`apply_reject_${interaction.user.id}`)
+            .setLabel("❌ رفض")
+            .setStyle(ButtonStyle.Danger),
+        );
+
+        await adminChannel.send({ embeds: [applyEmbed], components: [applyRow] });
 
         return interaction.editReply({ content: "✅ اتبعت طلبك للإدارة، هتتراجع وهتوصلك ردهم." });
       }
