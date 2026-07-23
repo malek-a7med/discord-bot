@@ -6505,7 +6505,7 @@ client.on("interactionCreate", async (interaction) => {
             .setStyle(ButtonStyle.Danger),
         );
 
-        await adminChannel.send({ embeds: [applyEmbed], components: [applyRow] });
+        await adminChannel.send({ content: "<@&1525901997583241216>", embeds: [applyEmbed], components: [applyRow] });
 
         return interaction.editReply({ content: "✅ اتبعت طلبك للإدارة، هتتراجع وهتوصلك ردهم." });
       }
