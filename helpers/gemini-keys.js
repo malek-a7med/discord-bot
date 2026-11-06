@@ -239,7 +239,7 @@ setInterval(() => {
 class OpenAICompatibleChatModel {
   constructor({ apiKey, baseUrl, modelName, provider, systemInstruction = null }) {
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl.replace(/\\/$/, "");
+    this.baseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
     this.modelName = modelName;
     this.provider = provider;
     this.systemInstruction = systemInstruction;
