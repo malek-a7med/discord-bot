@@ -259,7 +259,7 @@ class OpenAICompatibleChatModel {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
+          ...(this.apiKey ? { "Authorization": `Bearer ${this.apiKey}` } : {}),
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ model: this.modelName, messages, temperature: 0.7 }),
@@ -267,8 +267,10 @@ class OpenAICompatibleChatModel {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const error = new Error(payload.error?.message || `${this.provider} API returned HTTP ${response.status}`);
-        error.isQuotaError = response.status === 429;
+        const detail = payload.error?.message || payload.message || `${this.provider} API returned HTTP ${response.status}`;
+        const error = new Error(detail);
+        error.isQuotaError = response.status === 429 ||
+          ((response.status === 402 || response.status === 403) && /quota|rate.?limit|limit.?exceeded|credit|exhaust/i.test(String(detail)));
         throw error;
       }
       const text = payload.choices?.[0]?.message?.content;
@@ -303,6 +305,7 @@ class QuotaFallbackChatModel {
 let _keys = [];
 let _chatModel = null;
 let _imageModel = null;
+let _configuredProviderNames = [];
 
 export function initGeminiKeys(systemInstruction) {
   _keys = collectKeys();
@@ -314,16 +317,25 @@ export function initGeminiKeys(systemInstruction) {
     : null;
   if (geminiChat) configuredModels.push(geminiChat);
 
-  const groqKey = process.env.GROQ_API_KEY?.trim();
-  if (groqKey) {
+  const addProvider = ({ provider, keyEnv, baseUrl, defaultModel, modelEnv }) => {
+    const apiKey = process.env[keyEnv]?.trim();
+    if (!apiKey) return;
     configuredModels.push(new OpenAICompatibleChatModel({
-      apiKey: groqKey,
-      baseUrl: "https://api.groq.com/openai/v1",
-      modelName: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
-      provider: "Groq",
+      apiKey,
+      baseUrl,
+      modelName: process.env[modelEnv] || defaultModel,
+      provider,
       systemInstruction,
     }));
-  }
+  };
+
+  // Credentialed providers from mnfst/awesome-free-llm-apis.
+  // Anonymous-only Kilo Code and OVH endpoints are deliberately not enabled.
+  addProvider({ provider: "Groq", keyEnv: "GROQ_API_KEY", baseUrl: "https://api.groq.com/openai/v1", defaultModel: "openai/gpt-oss-120b", modelEnv: "GROQ_MODEL" });
+  addProvider({ provider: "Aion Labs", keyEnv: "AION_API_KEY", baseUrl: "https://api.aionlabs.ai/v1", defaultModel: "aion-labs/aion-3.0-mini", modelEnv: "AION_MODEL" });
+  addProvider({ provider: "Cohere", keyEnv: "COHERE_API_KEY", baseUrl: "https://api.cohere.ai/compatibility/v1", defaultModel: "command-r7b-12-2024", modelEnv: "COHERE_MODEL" });
+  addProvider({ provider: "Mistral AI", keyEnv: "MISTRAL_API_KEY", baseUrl: "https://api.mistral.ai/v1", defaultModel: "mistral-small-latest", modelEnv: "MISTRAL_MODEL" });
+  addProvider({ provider: "Z AI", keyEnv: "ZAI_API_KEY", baseUrl: "https://open.bigmodel.cn/api/paas/v4", defaultModel: "glm-4.7-flash", modelEnv: "ZAI_MODEL" });
 
   const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
   const cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
@@ -337,6 +349,14 @@ export function initGeminiKeys(systemInstruction) {
     }));
   }
 
+  addProvider({ provider: "Gonka Broker", keyEnv: "GONKA_API_KEY", baseUrl: "https://proxy.gonkabroker.com/v1", defaultModel: "MiniMaxAI/MiniMax-M2.7", modelEnv: "GONKA_MODEL" });
+  addProvider({ provider: "LLM7.io", keyEnv: "LLM7_API_KEY", baseUrl: "https://api.llm7.io/v1", defaultModel: "gpt-oss:20b", modelEnv: "LLM7_MODEL" });
+  addProvider({ provider: "ModelScope", keyEnv: "MODELSCOPE_API_KEY", baseUrl: "https://api-inference.modelscope.cn/v1", defaultModel: "Qwen/Qwen3.5-35B-A3B", modelEnv: "MODELSCOPE_MODEL" });
+  addProvider({ provider: "NVIDIA NIM", keyEnv: "NVIDIA_API_KEY", baseUrl: "https://integrate.api.nvidia.com/v1", defaultModel: "nvidia/nemotron-3-ultra-550b-a55b", modelEnv: "NVIDIA_MODEL" });
+  addProvider({ provider: "OpenRouter", keyEnv: "OPENROUTER_API_KEY", baseUrl: "https://openrouter.ai/api/v1", defaultModel: "nvidia/nemotron-3.5-lightning:free", modelEnv: "OPENROUTER_MODEL" });
+  addProvider({ provider: "SiliconFlow", keyEnv: "SILICONFLOW_API_KEY", baseUrl: "https://api.siliconflow.cn/v1", defaultModel: "XingChenAGI/Xing4.0-29B", modelEnv: "SILICONFLOW_MODEL" });
+
+  _configuredProviderNames = configuredModels.map(model => model.provider || "Gemini");
   _chatModel = configuredModels.length > 1
     ? new QuotaFallbackChatModel(configuredModels)
     : configuredModels[0] || null;
@@ -350,7 +370,7 @@ export function initGeminiKeys(systemInstruction) {
   if (!_chatModel) return false;
   return true;
 }
-
+export function getAIProviderNames() { return [..._configuredProviderNames]; }
 export function getChatModel()  { return _chatModel; }
 export function getImageModel() { return _imageModel; }
 export function getKeyCount()   { return _keys.length; }
