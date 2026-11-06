@@ -1938,7 +1938,7 @@ const _geminiReady = initGeminiKeys(`أنت "زنجي" — بوت ديسكورد
 - لا تشرح إيه اللي بتعمله، بس افعله
 - لو مش واضح الأسلوب، افترض إنه محترم`);
 
-if (_geminiReady) logger.info("🤖 Gemini AI جاهز!");
+if (_geminiReady) logger.info(`🤖 AI جاهز! (${process.env.GROQ_API_KEY ? "Groq متاح كاحتياطي" : "Gemini"})`);
 
 // بيجيب الموديل في اللحظة اللي بيتستخدم فيها عشان يضمن التدوير
 function geminiModel()      { return getChatModel(); }
@@ -2953,7 +2953,11 @@ client.on("interactionCreate", async (interaction) => {
 
         const memMB    = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
         const ping     = client.ws.ping;
-        const aiStatus = _geminiReady ? `🟢 شغال (${getKeyCount()} مفتاح)` : "🔴 مش شغال";
+        const aiStatus = _geminiReady
+          ? (getKeyCount() > 0
+              ? `🟢 شغال (Gemini: ${getKeyCount()} مفتاح${process.env.GROQ_API_KEY ? " + Groq احتياطي" : ""})`
+              : "🟢 شغال (Groq)")
+          : "🔴 مش شغال";
         const locks    = getProcessingCount();
         const guilds   = client.guilds.cache.size;
 
@@ -2964,7 +2968,7 @@ client.on("interactionCreate", async (interaction) => {
             { name: "🏓 Ping Discord",    value: `\`${ping}ms\``,      inline: true },
             { name: "🧠 RAM",             value: `\`${memMB} MB\``,    inline: true },
             { name: "⏱️ Uptime",          value: `\`${uptimeStr}\``,   inline: true },
-            { name: "🤖 Gemini AI",       value: aiStatus,             inline: true },
+            { name: "🤖 AI",               value: aiStatus,             inline: true },
             { name: "🔒 طلبات جارية",    value: `\`${locks} طلب\``,   inline: true },
             { name: "🏛️ سيرفرات",         value: `\`${guilds}\``,      inline: true },
             { name: "🛡️ أخطاء متابَعة",   value: `\`${errorCooldowns.size} نوع\``, inline: true },
