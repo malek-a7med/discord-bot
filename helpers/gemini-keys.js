@@ -235,7 +235,7 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000); // كل ساعة
 
-// ── Groq text provider — compatible with the Gemini generateContent interface ──
+// ── OpenAI-compatible text providers — Gemini-style generateContent interface ──
 class OpenAICompatibleChatModel {
   constructor({ apiKey, baseUrl, modelName, provider, systemInstruction = null }) {
     this.apiKey = apiKey;
@@ -286,18 +286,16 @@ class QuotaFallbackChatModel {
   }
 
   async generateContent(prompt) {
-    let lastQuotaError = null;
     for (let i = 0; i < this.models.length; i++) {
       const model = this.models[i];
       try {
         return await model.generateContent(prompt);
       } catch (error) {
         if (!error.isQuotaError || i === this.models.length - 1) throw error;
-        lastQuotaError = error;
         console.warn(`⚠️ [AI] ${model.provider || "Gemini"} quota exhausted — switching to next provider`);
       }
     }
-    throw lastQuotaError || new Error("No AI providers are configured");
+    throw new Error("No AI providers are configured");
   }
 }
 
