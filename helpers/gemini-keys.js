@@ -235,6 +235,66 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000); // كل ساعة
 
+// ── Groq text provider — compatible with the Gemini generateContent interface ──
+class GroqChatModel {
+  constructor(apiKey, modelName = process.env.GROQ_MODEL || "openai/gpt-oss-120b", systemInstruction = null) {
+    this.apiKey = apiKey;
+    this.modelName = modelName;
+    this.systemInstruction = systemInstruction;
+  }
+
+  async generateContent(prompt) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const promptText = Array.isArray(prompt)
+        ? prompt.map(part => typeof part === "string" ? part : part?.text || "").filter(Boolean).join("\\n")
+        : String(prompt ?? "");
+      const messages = [];
+      if (this.systemInstruction) messages.push({ role: "system", content: this.systemInstruction });
+      messages.push({ role: "user", content: promptText });
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: this.modelName, messages, temperature: 0.7 }),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(payload.error?.message || `Groq API returned HTTP ${response.status}`);
+        error.isQuotaError = response.status === 429;
+        throw error;
+      }
+      const text = payload.choices?.[0]?.message?.content;
+      if (typeof text !== "string") throw new Error("Groq returned an empty response");
+      return { response: { text: () => text } };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+
+class GeminiWithGroqFallback {
+  constructor(primary, fallback) {
+    this.primary = primary;
+    this.fallback = fallback;
+  }
+
+  async generateContent(prompt) {
+    try {
+      return await this.primary.generateContent(prompt);
+    } catch (error) {
+      if (!error.isQuotaError) throw error;
+      console.warn("⚠️ [AI] Gemini quota exhausted — switching to Groq");
+      return this.fallback.generateContent(prompt);
+    }
+  }
+}
+
 // ── الـ instance الرئيسي للـ rotator ─────────────────────────
 let _keys = [];
 let _chatModel = null;
@@ -242,12 +302,23 @@ let _imageModel = null;
 
 export function initGeminiKeys(systemInstruction) {
   _keys = collectKeys();
-  if (_keys.length === 0) return false;
+  _imageModel = _keys.length > 0 ? new RotatingGeminiModel(_keys, "gemini-2.0-flash-lite") : null;
 
-  _chatModel  = new RotatingGeminiModel(_keys, "gemini-2.5-flash", systemInstruction);
-  _imageModel = new RotatingGeminiModel(_keys, "gemini-2.0-flash-lite");
+  const groqKey = process.env.GROQ_API_KEY?.trim();
+  const groqModel = groqKey ? new GroqChatModel(groqKey, process.env.GROQ_MODEL, systemInstruction) : null;
+  const geminiChat = _keys.length > 0
+    ? new RotatingGeminiModel(_keys, "gemini-2.5-flash", systemInstruction)
+    : null;
 
-  console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (~${_keys.length * 1500} طلب/يوم)`);
+  _chatModel = geminiChat && groqModel
+    ? new GeminiWithGroqFallback(geminiChat, groqModel)
+    : geminiChat || groqModel;
+
+  if (_keys.length > 0) {
+    console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (~${_keys.length * 1500} طلب/يوم)`);
+  }
+  if (groqModel) console.log(`✅ [AI] Groq text fallback ready (${groqModel.modelName})`);
+  if (!_chatModel) return false;
   return true;
 }
 
