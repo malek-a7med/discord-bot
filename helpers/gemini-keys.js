@@ -250,7 +250,7 @@ class OpenAICompatibleChatModel {
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const promptText = Array.isArray(prompt)
-        ? prompt.map(part => typeof part === "string" ? part : part?.text || "").filter(Boolean).join("\\n")
+        ? prompt.map(part => typeof part === "string" ? part : part?.text || "").filter(Boolean).join("\n")
         : String(prompt ?? "");
       const messages = [];
       if (this.systemInstruction) messages.push({ role: "system", content: this.systemInstruction });
