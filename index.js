@@ -1938,7 +1938,13 @@ const _geminiReady = initGeminiKeys(`أنت "زنجي" — بوت ديسكورد
 - لا تشرح إيه اللي بتعمله، بس افعله
 - لو مش واضح الأسلوب، افترض إنه محترم`);
 
-if (_geminiReady) logger.info(`🤖 AI جاهز! (${process.env.GROQ_API_KEY ? "Groq متاح كاحتياطي" : "Gemini"})`);
+const activeAIProviders = [
+  getKeyCount() > 0 ? `Gemini (${getKeyCount()} مفتاح)` : null,
+  process.env.GROQ_API_KEY ? "Groq" : null,
+  process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN ? "Cloudflare Workers AI" : null,
+].filter(Boolean);
+
+if (_geminiReady) logger.info(`🤖 AI جاهز! (${activeAIProviders.join(" → ")})`);
 
 // بيجيب الموديل في اللحظة اللي بيتستخدم فيها عشان يضمن التدوير
 function geminiModel()      { return getChatModel(); }
@@ -2954,9 +2960,7 @@ client.on("interactionCreate", async (interaction) => {
         const memMB    = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(1);
         const ping     = client.ws.ping;
         const aiStatus = _geminiReady
-          ? (getKeyCount() > 0
-              ? `🟢 شغال (Gemini: ${getKeyCount()} مفتاح${process.env.GROQ_API_KEY ? " + Groq احتياطي" : ""})`
-              : "🟢 شغال (Groq)")
+          ? `🟢 شغال (${activeAIProviders.join(" → ")})`
           : "🔴 مش شغال";
         const locks    = getProcessingCount();
         const guilds   = client.guilds.cache.size;

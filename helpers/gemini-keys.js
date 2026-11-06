@@ -235,11 +235,13 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000); // كل ساعة
 
-// ── Groq text provider — compatible with the Gemini generateContent interface ──
-class GroqChatModel {
-  constructor(apiKey, modelName = process.env.GROQ_MODEL || "openai/gpt-oss-120b", systemInstruction = null) {
+// ── OpenAI-compatible text providers — Gemini-style generateContent interface ──
+class OpenAICompatibleChatModel {
+  constructor({ apiKey, baseUrl, modelName, provider, systemInstruction = null }) {
     this.apiKey = apiKey;
+    this.baseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
     this.modelName = modelName;
+    this.provider = provider;
     this.systemInstruction = systemInstruction;
   }
 
@@ -254,7 +256,7 @@ class GroqChatModel {
       if (this.systemInstruction) messages.push({ role: "system", content: this.systemInstruction });
       messages.push({ role: "user", content: promptText });
 
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${this.apiKey}`,
@@ -265,12 +267,12 @@ class GroqChatModel {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const error = new Error(payload.error?.message || `Groq API returned HTTP ${response.status}`);
+        const error = new Error(payload.error?.message || `${this.provider} API returned HTTP ${response.status}`);
         error.isQuotaError = response.status === 429;
         throw error;
       }
       const text = payload.choices?.[0]?.message?.content;
-      if (typeof text !== "string") throw new Error("Groq returned an empty response");
+      if (typeof text !== "string") throw new Error(`${this.provider} returned an empty response`);
       return { response: { text: () => text } };
     } finally {
       clearTimeout(timer);
@@ -278,20 +280,22 @@ class GroqChatModel {
   }
 }
 
-class GeminiWithGroqFallback {
-  constructor(primary, fallback) {
-    this.primary = primary;
-    this.fallback = fallback;
+class QuotaFallbackChatModel {
+  constructor(models) {
+    this.models = models;
   }
 
   async generateContent(prompt) {
-    try {
-      return await this.primary.generateContent(prompt);
-    } catch (error) {
-      if (!error.isQuotaError) throw error;
-      console.warn("⚠️ [AI] Gemini quota exhausted — switching to Groq");
-      return this.fallback.generateContent(prompt);
+    for (let i = 0; i < this.models.length; i++) {
+      const model = this.models[i];
+      try {
+        return await model.generateContent(prompt);
+      } catch (error) {
+        if (!error.isQuotaError || i === this.models.length - 1) throw error;
+        console.warn(`⚠️ [AI] ${model.provider || "Gemini"} quota exhausted — switching to next provider`);
+      }
     }
+    throw new Error("No AI providers are configured");
   }
 }
 
@@ -304,20 +308,45 @@ export function initGeminiKeys(systemInstruction) {
   _keys = collectKeys();
   _imageModel = _keys.length > 0 ? new RotatingGeminiModel(_keys, "gemini-2.0-flash-lite") : null;
 
-  const groqKey = process.env.GROQ_API_KEY?.trim();
-  const groqModel = groqKey ? new GroqChatModel(groqKey, process.env.GROQ_MODEL, systemInstruction) : null;
+  const configuredModels = [];
   const geminiChat = _keys.length > 0
     ? new RotatingGeminiModel(_keys, "gemini-2.5-flash", systemInstruction)
     : null;
+  if (geminiChat) configuredModels.push(geminiChat);
 
-  _chatModel = geminiChat && groqModel
-    ? new GeminiWithGroqFallback(geminiChat, groqModel)
-    : geminiChat || groqModel;
+  const groqKey = process.env.GROQ_API_KEY?.trim();
+  if (groqKey) {
+    configuredModels.push(new OpenAICompatibleChatModel({
+      apiKey: groqKey,
+      baseUrl: "https://api.groq.com/openai/v1",
+      modelName: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+      provider: "Groq",
+      systemInstruction,
+    }));
+  }
+
+  const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  const cloudflareApiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
+  if (cloudflareAccountId && cloudflareApiToken) {
+    configuredModels.push(new OpenAICompatibleChatModel({
+      apiKey: cloudflareApiToken,
+      baseUrl: `https://api.cloudflare.com/client/v4/accounts/${cloudflareAccountId}/ai/v1`,
+      modelName: process.env.CLOUDFLARE_MODEL || "@cf/openai/gpt-oss-120b",
+      provider: "Cloudflare Workers AI",
+      systemInstruction,
+    }));
+  }
+
+  _chatModel = configuredModels.length > 1
+    ? new QuotaFallbackChatModel(configuredModels)
+    : configuredModels[0] || null;
 
   if (_keys.length > 0) {
     console.log(`✅ [GeminiKeys] ${_keys.length} مفتاح جاهز (~${_keys.length * 1500} طلب/يوم)`);
   }
-  if (groqModel) console.log(`✅ [AI] Groq text fallback ready (${groqModel.modelName})`);
+  for (const model of configuredModels) {
+    if (model.provider) console.log(`✅ [AI] ${model.provider} text provider ready (${model.modelName})`);
+  }
   if (!_chatModel) return false;
   return true;
 }
