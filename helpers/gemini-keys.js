@@ -199,6 +199,19 @@ class RotatingGeminiModel {
           } catch (fallbackErr) {
             clearTimeout(abortTimer2);
             lastErr = fallbackErr;
+
+            const fallbackIs429 =
+              fallbackErr.message?.includes("429") ||
+              fallbackErr.message?.toLowerCase().includes("quota") ||
+              fallbackErr.message?.includes("EXHAUSTED");
+
+            if (fallbackIs429) {
+              // Fallback quota counts against this key too; rotate instead of
+              // stopping while other configured keys may still have quota.
+              markExhausted(key);
+              continue;
+            }
+
             throw fallbackErr;
           }
         } else {
